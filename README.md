@@ -20,7 +20,14 @@ legal-assistant/
 │   ├── services/        # Services (model_factory)
 │   ├── routes/          # Endpoints API
 │   └── main.py          # Point d'entree FastAPI
-├── frontend/            # Next.js (a venir)
+├── frontend/            # Next.js 15 + React 19
+│   ├── src/
+│   │   ├── app/         # Pages (App Router)
+│   │   ├── components/  # Composants React (UI, layout)
+│   │   ├── lib/         # Utilitaires et API client
+│   │   └── types/       # Types TypeScript
+│   └── package.json
+├── notary/              # Ancien systeme (reference seulement)
 ├── docs/                # Documentation
 └── docker-compose.yml   # SurrealDB
 ```
@@ -109,7 +116,11 @@ curl -X POST http://localhost:8000/api/judgments/{id}/summarize
 
 ## Developpement
 
+### Backend
+
 ```bash
+cd backend
+
 # Lancer en mode dev (hot reload)
 uv run uvicorn main:app --reload
 
@@ -119,6 +130,22 @@ uv run ruff format .
 
 # Tests
 uv run pytest
+```
+
+### Frontend
+
+```bash
+cd frontend
+
+# Installer les dependances
+npm install
+
+# Lancer en mode dev
+npm run dev
+# Le frontend sera disponible sur http://localhost:3001
+
+# Build production
+npm run build
 ```
 
 ## Modeles de donnees
@@ -153,7 +180,7 @@ Le workflow utilise 4 agents specialises:
 - **Backend**: Python 3.12 + FastAPI + Agno
 - **Base de donnees**: SurrealDB
 - **IA**: Ollama / Claude / MLX / HuggingFace
-- **Frontend**: Next.js 14+ (a venir)
+- **Frontend**: Next.js 15 + React 19 + Tailwind CSS + shadcn/ui
 
 ## License
 
