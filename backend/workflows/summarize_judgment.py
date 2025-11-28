@@ -12,12 +12,12 @@ Agents:
 
 Usage:
     from workflows.summarize_judgment import create_summarize_workflow
-    from services.model_factory import create_model
+    from agno.models.anthropic import Claude
 
-    model = create_model("ollama:qwen2.5:7b")
-    workflow = create_summarize_workflow(model=model)
+    model = Claude(id="claude-sonnet-4-5-20250929")
+    workflow = create_summarize_workflow(model)
 
-    result = workflow.run(judgment_text="...")
+    result = workflow.run(input="texte du jugement...")
 """
 
 import json
@@ -25,7 +25,7 @@ import logging
 from typing import Any, Optional
 
 from agno.agent import Agent
-from agno.workflow import Workflow
+from agno.workflow import Workflow, Step
 
 logger = logging.getLogger(__name__)
 
@@ -49,59 +49,39 @@ Analyse le texte du jugement fourni et extrait les informations suivantes:
 2. **Parties:**
    - Demandeur/Appelant (et son avocat si mentionne)
    - Defendeur/Intime (et son avocat si mentionne)
-   - Autres parties (intervenants, etc.)
 
 3. **Classification:**
    - Domaine de droit (civil, criminel, administratif, familial, etc.)
-   - Type de procedure (action, requete, appel, revision judiciaire, etc.)
+   - Type de procedure (action, requete, appel, etc.)
 
-Reponds en JSON avec cette structure:
+Reponds UNIQUEMENT en JSON valide avec cette structure:
 {
     "case_name": "...",
     "citation": "...",
     "court": "...",
     "decision_date": "YYYY-MM-DD",
     "judge": "...",
-    "parties": [
-        {"name": "...", "role": "plaintiff|defendant|appellant|respondent", "lawyer": "..."}
-    ],
+    "parties": [{"name": "...", "role": "plaintiff|defendant", "lawyer": null}],
     "legal_domain": "civil|criminal|administrative|family|commercial|other",
     "procedure_type": "..."
 }
-
-Si une information n'est pas disponible, utilise null.
 """
 
 ANALYZER_PROMPT = """Tu es un assistant juridique specialise dans l'analyse de jugements.
 
 A partir du texte du jugement, identifie et extrait:
 
-1. **Faits pertinents:**
-   - Liste les faits materiels essentiels a la decision
-   - Concentre-toi sur les faits juridiquement significatifs
-   - Maximum 10 faits, en ordre chronologique si possible
+1. **Faits pertinents** (max 10, en ordre chronologique)
+2. **Questions en litige** avec leur importance (primary/secondary)
+3. **Arguments des parties**
+4. **Historique procedural**
 
-2. **Questions en litige (Issues):**
-   - Quelles sont les questions juridiques que le tribunal doit trancher?
-   - Formule chaque question de maniere precise
-   - Indique si c'est une question principale ou secondaire
-
-3. **Arguments des parties:**
-   - Resume les principaux arguments du demandeur/appelant
-   - Resume les principaux arguments du defendeur/intime
-
-4. **Historique procedural:**
-   - Decisions anterieures s'il y en a (premiere instance, etc.)
-   - Historique pertinent de l'affaire
-
-Reponds en JSON avec cette structure:
+Reponds UNIQUEMENT en JSON valide avec cette structure:
 {
-    "facts": ["Fait 1", "Fait 2", ...],
-    "issues": [
-        {"question": "...", "importance": "primary|secondary", "answer": "..."}
-    ],
-    "plaintiff_arguments": ["Argument 1", ...],
-    "defendant_arguments": ["Argument 1", ...],
+    "facts": ["Fait 1", "Fait 2"],
+    "issues": [{"question": "...", "importance": "primary|secondary", "answer": "..."}],
+    "plaintiff_arguments": ["Argument 1"],
+    "defendant_arguments": ["Argument 1"],
     "procedural_history": "..."
 }
 """
@@ -110,39 +90,17 @@ SYNTHESIZER_PROMPT = """Tu es un assistant juridique expert en synthese de juris
 
 A partir du texte du jugement, identifie:
 
-1. **Regles de droit applicables:**
-   - Articles de loi cites (Code civil, Code criminel, etc.)
-   - Precedents jurisprudentiels invoques
-   - Principes juridiques fondamentaux
+1. **Regles de droit applicables** (articles de loi, precedents)
+2. **Ratio decidendi** (la regle contraignante)
+3. **Obiter dicta** (remarques incidentes)
+4. **Dispositif** (decision finale et remedes)
 
-2. **Analyse du tribunal:**
-   - Comment le tribunal applique les regles aux faits
-   - Raisonnement juridique principal
-
-3. **Ratio decidendi:**
-   - LA regle de droit etablie par cette decision
-   - Le motif essentiel qui fonde la decision
-   - C'est la partie CONTRAIGNANTE du jugement
-
-4. **Obiter dicta:**
-   - Remarques incidentes du juge
-   - Commentaires qui ne sont pas essentiels a la decision
-   - Ces elements ne sont PAS contraignants mais peuvent etre persuasifs
-
-5. **Dispositif/Conclusion:**
-   - La decision finale du tribunal
-   - Les remedes accordes (dommages, injonction, etc.)
-
-Reponds en JSON avec cette structure:
+Reponds UNIQUEMENT en JSON valide avec cette structure:
 {
-    "rules": [
-        {"rule": "...", "source": "Art. 1457 C.c.Q.", "source_type": "statute|case_law|doctrine|principle"}
-    ],
-    "analysis_points": [
-        {"point": "...", "is_ratio": true|false, "is_obiter": true|false}
-    ],
+    "rules": [{"rule": "...", "source": "Art. X C.c.Q.", "source_type": "statute|case_law|doctrine|principle"}],
+    "analysis_points": [{"point": "...", "is_ratio": true, "is_obiter": false}],
     "ratio_decidendi": "...",
-    "obiter_dicta": ["...", "..."],
+    "obiter_dicta": ["..."],
     "holding": "...",
     "remedy": "..."
 }
@@ -150,19 +108,10 @@ Reponds en JSON avec cette structure:
 
 FORMATTER_PROMPT = """Tu es un assistant juridique qui cree des fiches de jurisprudence (case briefs).
 
-A partir des informations extraites, genere un case brief complet et bien structure.
+A partir des informations extraites, genere un case brief complet.
+Calcule un score de confiance (0-100) base sur la completude des informations.
 
-Le case brief doit etre:
-- Clair et concis
-- Utile pour revision et etude
-- Structure selon le format standard
-
-Calcule aussi un score de confiance (0-100) base sur:
-- Completude des informations extraites
-- Clarte des questions en litige
-- Identification claire du ratio decidendi
-
-Reponds en JSON avec cette structure finale:
+Reponds UNIQUEMENT en JSON valide avec cette structure:
 {
     "case_brief": {
         "case_name": "...",
@@ -175,42 +124,184 @@ Reponds en JSON avec cette structure finale:
         "procedural_history": "...",
         "issues": [...],
         "rules": [...],
-        "analysis": [...],
         "ratio_decidendi": "...",
         "obiter_dicta": [...],
         "holding": "...",
         "remedy": "..."
     },
     "confidence_score": 85,
-    "key_takeaway": "Une phrase resumant l'apport principal de ce jugement"
+    "key_takeaway": "Resume en une phrase"
 }
 """
 
 
 # ============================================================
-# WORKFLOW
+# HELPER FUNCTIONS
 # ============================================================
 
-class SummarizeJudgmentWorkflow:
+def parse_json_response(content: str) -> dict:
+    """Parse une reponse JSON d'un agent."""
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+        logger.warning(f"Could not parse JSON: {content[:200]}...")
+        return {}
+
+
+def create_summarize_workflow(model: Any, db: Optional[Any] = None) -> Workflow:
     """
-    Workflow pour resumer un jugement juridique.
+    Cree un workflow Agno pour resumer un jugement juridique.
 
-    Ce workflow orchestre 4 agents specialises pour produire
-    un case brief structure.
+    Args:
+        model: Instance de modele Agno (Claude, Ollama, etc.)
+        db: Base de donnees Agno optionnelle pour la persistance
+
+    Returns:
+        Workflow: Instance du workflow configuree
     """
 
-    def __init__(self, model: Any, db: Optional[Any] = None):
-        """
-        Initialise le workflow.
+    # Creer les agents
+    extractor = Agent(
+        name="Extracteur",
+        model=model,
+        instructions=EXTRACTOR_PROMPT,
+        markdown=False,
+    )
 
-        Args:
-            model: Instance de modele Agno (Ollama, Claude, etc.)
-            db: Instance de base de donnees Agno (optionnel, pour persistance)
-        """
+    analyzer = Agent(
+        name="Analyseur",
+        model=model,
+        instructions=ANALYZER_PROMPT,
+        markdown=False,
+    )
+
+    synthesizer = Agent(
+        name="Synthetiseur",
+        model=model,
+        instructions=SYNTHESIZER_PROMPT,
+        markdown=False,
+    )
+
+    formatter = Agent(
+        name="Formateur",
+        model=model,
+        instructions=FORMATTER_PROMPT,
+        markdown=False,
+    )
+
+    # Creer les steps du workflow
+    steps = [
+        Step(name="extraction", agent=extractor, description="Extrait les informations de base"),
+        Step(name="analysis", agent=analyzer, description="Analyse les faits et questions"),
+        Step(name="synthesis", agent=synthesizer, description="Synthetise le ratio decidendi"),
+        Step(name="formatting", agent=formatter, description="Genere le case brief final"),
+    ]
+
+    # Creer le workflow
+    workflow_kwargs = {
+        "name": "SummarizeJudgment",
+        "description": "Workflow de resume de jugements juridiques avec 4 agents",
+        "steps": steps,
+    }
+
+    if db:
+        workflow_kwargs["db"] = db
+
+    return Workflow(**workflow_kwargs)
+
+
+def run_summarize_workflow(model: Any, judgment_text: str, db: Optional[Any] = None) -> dict:
+    """
+    Execute le workflow et retourne le resultat structure.
+
+    Args:
+        model: Instance de modele Agno
+        judgment_text: Texte du jugement a analyser
+        db: Base de donnees optionnelle
+
+    Returns:
+        dict: Resultat avec case_brief, confidence_score, etc.
+    """
+    workflow = create_summarize_workflow(model=model, db=db)
+
+    logger.info("Starting judgment summarization workflow")
+
+    try:
+        # Executer le workflow
+        result = workflow.run(input=judgment_text)
+
+        # Extraire les resultats de chaque step
+        extraction_data = {}
+        analysis_data = {}
+        synthesis_data = {}
+        final_data = {}
+
+        if hasattr(result, 'outputs') and result.outputs:
+            for step_output in result.outputs:
+                if hasattr(step_output, 'content'):
+                    content = step_output.content
+                    parsed = parse_json_response(content)
+
+                    if hasattr(step_output, 'step_name'):
+                        if step_output.step_name == "extraction":
+                            extraction_data = parsed
+                        elif step_output.step_name == "analysis":
+                            analysis_data = parsed
+                        elif step_output.step_name == "synthesis":
+                            synthesis_data = parsed
+                        elif step_output.step_name == "formatting":
+                            final_data = parsed
+
+        # Si on n'a pas de resultats structures, essayer d'extraire du contenu global
+        if not final_data and hasattr(result, 'content'):
+            final_data = parse_json_response(result.content)
+
+        logger.info("Workflow completed successfully")
+
+        return {
+            "success": True,
+            "case_brief": final_data.get("case_brief", {}),
+            "confidence_score": final_data.get("confidence_score", 0) / 100 if final_data.get("confidence_score") else 0,
+            "key_takeaway": final_data.get("key_takeaway", ""),
+            "intermediate_results": {
+                "extraction": extraction_data,
+                "analysis": analysis_data,
+                "synthesis": synthesis_data
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Workflow error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "case_brief": {},
+            "confidence_score": 0
+        }
+
+
+# ============================================================
+# SIMPLE SEQUENTIAL EXECUTION (Alternative sans Workflow)
+# ============================================================
+
+class SimpleJudgmentSummarizer:
+    """
+    Version simplifiee qui execute les agents sequentiellement.
+
+    Cette version n'utilise pas le Workflow Agno mais execute
+    directement les agents l'un apres l'autre.
+    """
+
+    def __init__(self, model: Any):
         self.model = model
-        self.db = db
 
-        # Creer les agents
         self.extractor = Agent(
             name="Extracteur",
             model=model,
@@ -239,68 +330,58 @@ class SummarizeJudgmentWorkflow:
             markdown=False,
         )
 
-        # Creer le workflow
-        workflow_kwargs = {
-            "name": "SummarizeJudgment",
-            "agents": [self.extractor, self.analyzer, self.synthesizer, self.formatter],
-        }
-
-        if db:
-            workflow_kwargs["db"] = db
-
-        self.workflow = Workflow(**workflow_kwargs)
-
-    def run(self, judgment_text: str) -> dict:
+    def summarize(self, judgment_text: str) -> dict:
         """
-        Execute le workflow sur un texte de jugement.
+        Resume un jugement en executant 4 agents sequentiellement.
 
         Args:
-            judgment_text: Texte complet du jugement a analyser
+            judgment_text: Texte du jugement
 
         Returns:
-            dict: Case brief structure avec score de confiance
+            dict: Resultat structure
         """
-        logger.info("Starting judgment summarization workflow")
+        logger.info("Starting simple judgment summarization")
 
         try:
-            # Etape 1: Extraction des informations de base
-            logger.info("Step 1/4: Extracting basic information...")
+            # Step 1: Extraction
+            logger.info("Step 1/4: Extraction...")
             extraction_result = self.extractor.run(
-                f"Analyse ce jugement et extrait les informations:\n\n{judgment_text}"
+                f"Analyse ce jugement:\n\n{judgment_text}"
             )
-            extraction_data = self._parse_json_response(extraction_result.content)
+            extraction_data = parse_json_response(extraction_result.content)
 
-            # Etape 2: Analyse des faits et questions en litige
-            logger.info("Step 2/4: Analyzing facts and issues...")
+            # Step 2: Analysis
+            logger.info("Step 2/4: Analysis...")
             analysis_result = self.analyzer.run(
                 f"Analyse ce jugement:\n\n{judgment_text}"
             )
-            analysis_data = self._parse_json_response(analysis_result.content)
+            analysis_data = parse_json_response(analysis_result.content)
 
-            # Etape 3: Synthese du ratio decidendi
-            logger.info("Step 3/4: Synthesizing ratio decidendi...")
+            # Step 3: Synthesis
+            logger.info("Step 3/4: Synthesis...")
             synthesis_result = self.synthesizer.run(
                 f"Synthetise ce jugement:\n\n{judgment_text}"
             )
-            synthesis_data = self._parse_json_response(synthesis_result.content)
+            synthesis_data = parse_json_response(synthesis_result.content)
 
-            # Etape 4: Formatage final
-            logger.info("Step 4/4: Formatting case brief...")
-            combined_data = {
+            # Step 4: Formatting
+            logger.info("Step 4/4: Formatting...")
+            combined = {
                 "extraction": extraction_data,
                 "analysis": analysis_data,
                 "synthesis": synthesis_data
             }
             format_result = self.formatter.run(
-                f"Genere le case brief final a partir de ces donnees:\n\n{json.dumps(combined_data, ensure_ascii=False, indent=2)}"
+                f"Genere le case brief:\n\n{json.dumps(combined, ensure_ascii=False, indent=2)}"
             )
-            final_data = self._parse_json_response(format_result.content)
+            final_data = parse_json_response(format_result.content)
 
-            logger.info("Workflow completed successfully")
+            logger.info("Summarization completed successfully")
+
             return {
                 "success": True,
                 "case_brief": final_data.get("case_brief", {}),
-                "confidence_score": final_data.get("confidence_score", 0) / 100,  # Normaliser 0-1
+                "confidence_score": final_data.get("confidence_score", 0) / 100 if final_data.get("confidence_score") else 0,
                 "key_takeaway": final_data.get("key_takeaway", ""),
                 "intermediate_results": {
                     "extraction": extraction_data,
@@ -310,7 +391,7 @@ class SummarizeJudgmentWorkflow:
             }
 
         except Exception as e:
-            logger.error(f"Workflow error: {e}")
+            logger.error(f"Summarization error: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -318,95 +399,39 @@ class SummarizeJudgmentWorkflow:
                 "confidence_score": 0
             }
 
-    def _parse_json_response(self, content: str) -> dict:
-        """
-        Parse une reponse JSON d'un agent.
-
-        Args:
-            content: Reponse de l'agent (peut contenir du texte autour du JSON)
-
-        Returns:
-            dict: Donnees JSON parsees
-        """
-        try:
-            # Essayer de parser directement
-            return json.loads(content)
-        except json.JSONDecodeError:
-            # Chercher un bloc JSON dans le texte
-            import re
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except json.JSONDecodeError:
-                    pass
-
-            logger.warning(f"Could not parse JSON from response: {content[:200]}...")
-            return {}
-
-
-def create_summarize_workflow(model: Any, db: Optional[Any] = None) -> SummarizeJudgmentWorkflow:
-    """
-    Factory function pour creer un workflow de resume.
-
-    Args:
-        model: Instance de modele Agno
-        db: Instance de base de donnees Agno (optionnel)
-
-    Returns:
-        SummarizeJudgmentWorkflow: Instance du workflow
-    """
-    return SummarizeJudgmentWorkflow(model=model, db=db)
-
 
 # ============================================================
 # TEST
 # ============================================================
 
 if __name__ == "__main__":
-    # Test avec un exemple simple
+    import os
     import sys
-    sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
 
-    from services.model_factory import create_model
-
-    # Creer un modele Ollama
-    model = create_model("ollama:qwen2.5:7b")
-
-    # Creer le workflow
-    workflow = create_summarize_workflow(model=model)
-
-    # Texte de test (exemple simplifie)
     test_judgment = """
     COUR SUPERIEURE DU QUEBEC
 
     Dossier: 500-17-123456-789
-
     DATE: 15 janvier 2024
-
     JUGE: L'honorable Jean Tremblay, j.c.s.
 
     ENTRE:
-    MARIE DUPONT
-    Demanderesse
-
+    MARIE DUPONT, Demanderesse
     ET:
-    JEAN LAVOIE
-    Defendeur
+    JEAN LAVOIE, Defendeur
 
     JUGEMENT
 
-    [1] La demanderesse reclame des dommages-interets de 50 000 $ pour
-    bris de contrat suite a la vente d'un vehicule defectueux.
+    [1] La demanderesse reclame 50 000 $ pour bris de contrat.
 
     FAITS
 
-    [2] Le 1er juin 2023, la demanderesse a achete du defendeur un vehicule
-    d'occasion pour la somme de 15 000 $.
+    [2] Le 1er juin 2023, la demanderesse a achete un vehicule d'occasion
+    du defendeur pour 15 000 $.
 
-    [3] Le defendeur a garanti que le vehicule etait en bon etat mecanique.
+    [3] Le defendeur a garanti que le vehicule etait en bon etat.
 
-    [4] Deux semaines apres l'achat, le moteur a cesse de fonctionner.
+    [4] Deux semaines apres, le moteur a cesse de fonctionner.
     L'expertise revele un vice cache connu du vendeur.
 
     QUESTION EN LITIGE
@@ -415,31 +440,42 @@ if __name__ == "__main__":
 
     ANALYSE
 
-    [6] Selon l'article 1726 C.c.Q., le vendeur est tenu de garantir
-    l'acheteur contre les vices caches.
+    [6] Selon l'article 1726 C.c.Q., le vendeur garantit l'acheteur
+    contre les vices caches.
 
     [7] La preuve demontre que le defendeur connaissait le vice.
 
     CONCLUSION
 
-    [8] ACCUEILLE l'action de la demanderesse;
+    [8] ACCUEILLE l'action;
     [9] CONDAMNE le defendeur a payer 25 000 $ plus interets.
 
-    ________________________________
     Jean Tremblay, j.c.s.
     """
 
     print("=" * 60)
-    print("TEST: Workflow de resume de jugement")
+    print("TEST: Summarize Judgment Workflow")
     print("=" * 60)
 
-    result = workflow.run(test_judgment)
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("\nERREUR: ANTHROPIC_API_KEY non definie")
+        sys.exit(1)
 
-    if result["success"]:
-        print("\n✅ Succes!")
-        print(f"\nScore de confiance: {result['confidence_score']:.0%}")
-        print(f"\nA retenir: {result['key_takeaway']}")
-        print("\nCase Brief:")
-        print(json.dumps(result["case_brief"], ensure_ascii=False, indent=2))
-    else:
-        print(f"\n❌ Erreur: {result['error']}")
+    from agno.models.anthropic import Claude
+    model = Claude(id="claude-sonnet-4-5-20250929", api_key=api_key)
+
+    print("\n1. Using SimpleJudgmentSummarizer...")
+    summarizer = SimpleJudgmentSummarizer(model=model)
+
+    print("\n2. Executing summarization (30-60s)...\n")
+    result = summarizer.summarize(test_judgment)
+
+    print("=" * 60)
+    print("RESULTS")
+    print("=" * 60)
+    print(f"\nSuccess: {result.get('success')}")
+    print(f"Confidence: {result.get('confidence_score', 0):.0%}")
+    print(f"\nKey takeaway: {result.get('key_takeaway', 'N/A')}")
+    print("\nCase Brief:")
+    print(json.dumps(result.get("case_brief", {}), ensure_ascii=False, indent=2))

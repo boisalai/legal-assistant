@@ -12,10 +12,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import settings
+from services.surreal_service import init_surreal_service, get_surreal_service
 
 # Configuration du logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO if settings.debug else logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -38,17 +39,53 @@ async def lifespan(app: FastAPI):
     logger.info(f"SurrealDB: {settings.surreal_url}")
     logger.info(f"Default model: {settings.model_id}")
 
+    # Initialize SurrealDB service
+    logger.info("Initializing SurrealDB service...")
+    surreal_service = init_surreal_service(
+        url=settings.surreal_url,
+        namespace=settings.surreal_namespace,
+        database=settings.surreal_database,
+        username=settings.surreal_username,
+        password=settings.surreal_password,
+    )
+
+    try:
+        await surreal_service.connect()
+        logger.info("SurrealDB connected successfully")
+    except Exception as e:
+        logger.warning(f"Could not connect to SurrealDB: {e}")
+        logger.warning("API will start but database features may not work")
+
     yield
 
     # === SHUTDOWN ===
     logger.info("Legal Assistant API - Shutting down...")
+    try:
+        service = get_surreal_service()
+        await service.disconnect()
+        logger.info("SurrealDB disconnected")
+    except Exception as e:
+        logger.warning(f"Error during shutdown: {e}")
     logger.info("Goodbye!")
 
 
 # Creation de l'application FastAPI
 app = FastAPI(
     title="Legal Assistant API",
-    description="API pour l'assistant d'etudes juridiques - Resume de jugements",
+    description="""
+    API pour l'assistant d'etudes juridiques.
+
+    ## Fonctionnalites
+
+    - **Jugements**: Upload et gestion de jugements juridiques
+    - **Resumes**: Generation automatique de case briefs avec 4 agents specialises
+    - **Authentification**: Systeme de connexion securise
+
+    ## Endpoints principaux
+
+    - `/api/auth/*` - Authentification (login, register, logout)
+    - `/api/judgments/*` - Gestion des jugements et resumes
+    """,
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -58,18 +95,44 @@ app = FastAPI(
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Error handling middleware
+try:
+    from middleware.error_handler import ErrorHandlerMiddleware, setup_exception_handlers
+    app.add_middleware(ErrorHandlerMiddleware)
+    setup_exception_handlers(app)
+    logger.info("Error handler middleware configured")
+except ImportError as e:
+    logger.warning(f"Could not load error handler middleware: {e}")
+
+
+# ============================================================
+# ROUTES
+# ============================================================
+
+from routes import auth_router, judgments_router
+
+app.include_router(auth_router, tags=["Authentication"])
+app.include_router(judgments_router, tags=["Judgments"])
+
+logger.info("Routes configured: /api/auth, /api/judgments")
 
 
 # ============================================================
 # ROUTES DE BASE
 # ============================================================
 
-@app.get("/")
+@app.get("/", tags=["Info"])
 async def root():
     """Endpoint racine - Information sur l'API."""
     return {
@@ -79,26 +142,34 @@ async def root():
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
-            "judgments": "/api/judgments (coming soon)",
-            "summaries": "/api/summaries (coming soon)"
+            "auth": "/api/auth",
+            "judgments": "/api/judgments"
         }
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["Info"])
 async def health_check():
     """Verification de l'etat de l'API."""
+    db_status = "unknown"
+    try:
+        service = get_surreal_service()
+        if service.db:
+            db_status = "connected"
+        else:
+            db_status = "not_connected"
+    except Exception:
+        db_status = "not_initialized"
+
     return {
         "status": "healthy",
-        "services": {
-            "api": "running",
-            "database": "not_connected",  # A implementer
-            "llm": "not_tested"  # A implementer
-        }
+        "database": db_status,
+        "model": settings.model_id,
+        "debug": settings.debug,
     }
 
 
-@app.get("/api/models")
+@app.get("/api/models", tags=["Info"])
 async def list_models():
     """Liste les modeles LLM disponibles."""
     from config.models import get_all_models_for_api
@@ -106,19 +177,18 @@ async def list_models():
 
 
 # ============================================================
-# ROUTES API (A IMPLEMENTER)
-# ============================================================
-
-# TODO: Importer et inclure les routes
-# from routes.judgments import router as judgments_router
-# app.include_router(judgments_router, prefix="/api/judgments", tags=["judgments"])
-
-
-# ============================================================
 # POINT D'ENTREE
 # ============================================================
 
 if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("  Legal Assistant API")
+    print("=" * 60)
+    print(f"  Mode: {'DEBUG' if settings.debug else 'PRODUCTION'}")
+    print(f"  Model: {settings.model_id}")
+    print(f"  Docs: http://{settings.api_host}:{settings.api_port}/docs")
+    print("=" * 60 + "\n")
+
     uvicorn.run(
         "main:app",
         host=settings.api_host,

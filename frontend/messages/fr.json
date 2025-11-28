@@ -1,0 +1,355 @@
+{
+  "common": {
+    "appName": "Assistant Notarial",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "actions": "Actions",
+    "confirm": "Confirmer",
+    "close": "Fermer",
+    "retry": "Réessayer",
+    "yes": "Oui",
+    "no": "Non",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "download": "Télécharger",
+    "upload": "Téléverser",
+    "preview": "Prévisualiser",
+    "language": "Langue",
+    "french": "Français",
+    "english": "Anglais"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "cases": "Dossiers",
+    "newCase": "Nouveau dossier",
+    "analysis": "Analyse",
+    "assistant": "Assistant IA",
+    "calculator": "Calculatrice",
+    "settings": "Paramètres",
+    "admin": "Administration",
+    "logout": "Déconnexion",
+    "login": "Connexion"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "subtitle": "Gérez vos dossiers notariaux",
+    "newCase": "Nouveau dossier",
+    "totalCases": "Total dossiers",
+    "casesCreated": "dossiers créés",
+    "newCases": "Nouveaux",
+    "toAnalyze": "à analyser",
+    "inAnalysis": "En analyse",
+    "inProgress": "en cours",
+    "completed": "Complétés",
+    "finished": "terminés",
+    "errors": "Erreurs",
+    "toFix": "à corriger",
+    "archived": "Archivés",
+    "noCases": "Aucun dossier pour le moment.",
+    "createFirst": "Créer votre premier dossier",
+    "loadError": "Impossible de charger les dossiers"
+  },
+  "cases": {
+    "title": "Dossiers",
+    "newCase": "Nouveau dossier",
+    "caseName": "Nom du dossier",
+    "caseNamePlaceholder": "Ex: Vente Dupont-Martin",
+    "transactionType": "Type de transaction",
+    "selectType": "Sélectionnez un type",
+    "types": {
+      "vente": "Vente",
+      "achat": "Achat",
+      "hypotheque": "Hypothèque",
+      "testament": "Testament",
+      "succession": "Succession",
+      "donation": "Donation",
+      "servitude": "Servitude",
+      "autre": "Autre"
+    },
+    "status": {
+      "nouveau": "Nouveau",
+      "en_analyse": "En analyse",
+      "termine": "Terminé",
+      "en_erreur": "En erreur",
+      "archive": "Archivé"
+    },
+    "createCase": "Créer le dossier",
+    "creating": "Création...",
+    "deleteConfirm": "Supprimer ce dossier ?",
+    "deleteWarning": "Cette action est irréversible. Le dossier et tous ses documents seront supprimés définitivement.",
+    "deleting": "Suppression...",
+    "viewCase": "Voir le dossier",
+    "createdAt": "Créé le",
+    "updatedAt": "Mis à jour le",
+    "documentsCount": "documents",
+    "noDocuments": "Aucun document"
+  },
+  "documents": {
+    "title": "Documents",
+    "addDocuments": "Ajouter des documents",
+    "dropzone": "Glissez-déposez vos fichiers ou cliquez pour les sélectionner",
+    "recordAudio": "Enregistrer un audio",
+    "uploading": "Téléversement...",
+    "uploadFiles": "Téléverser {count} fichier(s)",
+    "noDocuments": "Aucun document pour le moment",
+    "useDropzone": "Utilisez la zone ci-dessus pour ajouter des fichiers",
+    "deleteConfirm": "Supprimer ce document ?",
+    "deleteWarning": "Le document \"{name}\" sera supprimé définitivement.",
+    "fileTypes": {
+      "pdf": "PDF",
+      "doc": "Word",
+      "docx": "Word",
+      "txt": "Texte",
+      "md": "Markdown",
+      "audio": "Audio",
+      "image": "Image"
+    }
+  },
+  "analysis": {
+    "title": "Analyse",
+    "subtitle": "Lancez une analyse IA sur vos documents",
+    "startAnalysis": "Lancer l'analyse",
+    "analyzing": "Analyse en cours...",
+    "stopAnalysis": "Arrêter l'analyse",
+    "analysisComplete": "Analyse terminée",
+    "analysisError": "Erreur lors de l'analyse",
+    "confidenceScore": "Score de confiance",
+    "steps": {
+      "extraction": "Extraction des données",
+      "classification": "Classification de la transaction",
+      "verification": "Vérification de cohérence",
+      "checklist": "Génération de la checklist"
+    },
+    "noDocuments": "Aucun document à analyser",
+    "uploadFirst": "Veuillez d'abord téléverser des documents"
+  },
+  "checklist": {
+    "title": "Checklist",
+    "noChecklist": "Aucune checklist disponible",
+    "runAnalysis": "Lancez une analyse pour générer la checklist",
+    "itemsCompleted": "{completed} sur {total} éléments complétés",
+    "priority": {
+      "critical": "Critique",
+      "high": "Haute",
+      "medium": "Moyenne",
+      "low": "Basse"
+    }
+  },
+  "assistant": {
+    "title": "Assistant IA",
+    "subtitle": "Posez vos questions sur vos dossiers",
+    "placeholder": "Posez une question...",
+    "send": "Envoyer",
+    "thinking": "Réflexion en cours...",
+    "welcome": "Bonjour ! Je suis votre assistant notarial. Comment puis-je vous aider ?",
+    "selectModel": "Modèle IA",
+    "clearHistory": "Effacer l'historique"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Configurez l'application",
+    "language": "Langue de l'interface",
+    "languageDescription": "Choisissez la langue de l'interface utilisateur",
+    "theme": "Thème",
+    "themeDescription": "Choisissez le thème de l'interface",
+    "themes": {
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "aiModel": "Modèle IA",
+    "aiModelDescription": "Sélectionnez le modèle pour l'analyse",
+    "extractionMethod": "Méthode d'extraction",
+    "extractionDescription": "Méthode pour extraire le texte des PDFs",
+    "useOcr": "Utiliser l'OCR",
+    "useOcrDescription": "Activer l'OCR pour les PDFs scannés",
+    "saved": "Paramètres enregistrés"
+  },
+  "login": {
+    "title": "Connexion",
+    "subtitle": "Connectez-vous à votre compte",
+    "email": "Email",
+    "emailPlaceholder": "votre@email.com",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "••••••••",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "submit": "Se connecter",
+    "logging": "Connexion...",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Vous n'avez pas de compte ?",
+    "hasAccount": "Vous avez déjà un compte ?",
+    "register": "Créer un compte",
+    "signIn": "Se connecter",
+    "error": "Email ou mot de passe incorrect",
+    "continueWithGoogle": "Continuer avec Google",
+    "orContinueWith": "Ou continuer avec",
+    "contactUs": "Nous contacter",
+    "demoCredentials": "Identifiants de démonstration",
+    "presentation": {
+      "title": "Bienvenue sur",
+      "subtitle": "Assistant Notarial",
+      "description": "Gérez vos dossiers notariaux avec l'assistance de l'intelligence artificielle. Analysez vos documents, détectez les incohérences et générez des checklists en quelques clics.",
+      "feature1": "Analyse intelligente des documents",
+      "feature2": "Détection automatique des incohérences",
+      "feature3": "Génération de checklists personnalisées",
+      "feature4": "Transcription audio automatique"
+    },
+    "registerForm": {
+      "title": "Créer un compte",
+      "subtitle": "Inscrivez-vous pour commencer",
+      "fullName": "Nom complet",
+      "fullNamePlaceholder": "Jean Tremblay",
+      "confirmPassword": "Confirmer le mot de passe",
+      "confirmPasswordPlaceholder": "••••••••",
+      "terms": "J'accepte les",
+      "termsLink": "conditions d'utilisation",
+      "privacyLink": "politique de confidentialité",
+      "and": "et la",
+      "submit": "Créer mon compte",
+      "creating": "Création en cours...",
+      "success": "Compte créé avec succès ! Connexion en cours..."
+    },
+    "validation": {
+      "emailRequired": "L'email est requis",
+      "emailInvalid": "Veuillez entrer une adresse email valide",
+      "emailTaken": "Cet email est déjà associé à un compte",
+      "passwordRequired": "Le mot de passe est requis",
+      "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordMismatch": "Les mots de passe ne correspondent pas",
+      "nameRequired": "Le nom complet est requis",
+      "nameTooShort": "Le nom doit contenir au moins 2 caractères",
+      "termsRequired": "Vous devez accepter les conditions d'utilisation"
+    },
+    "errors": {
+      "invalidCredentials": "Email ou mot de passe incorrect",
+      "serverError": "Une erreur est survenue. Veuillez réessayer.",
+      "networkError": "Impossible de se connecter au serveur"
+    }
+  },
+  "forgotPassword": {
+    "title": "Mot de passe oublié",
+    "subtitle": "Entrez votre adresse email pour recevoir un lien de réinitialisation",
+    "submit": "Envoyer le lien",
+    "sending": "Envoi en cours...",
+    "backToLogin": "Retour à la connexion",
+    "success": {
+      "title": "Email envoyé !",
+      "description": "Si un compte existe avec cette adresse email, vous recevrez un lien pour réinitialiser votre mot de passe."
+    },
+    "validation": {
+      "emailRequired": "L'email est requis",
+      "emailInvalid": "Veuillez entrer une adresse email valide"
+    },
+    "errors": {
+      "serverError": "Une erreur est survenue. Veuillez réessayer."
+    }
+  },
+  "resetPassword": {
+    "title": "Réinitialiser le mot de passe",
+    "subtitle": "Créez un nouveau mot de passe pour votre compte",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "submit": "Réinitialiser le mot de passe",
+    "resetting": "Réinitialisation...",
+    "backToLogin": "Retour à la connexion",
+    "goToLogin": "Aller à la page de connexion",
+    "requestNewLink": "Demander un nouveau lien",
+    "success": {
+      "title": "Mot de passe réinitialisé !",
+      "description": "Votre mot de passe a été modifié avec succès. Vous allez être redirigé vers la page de connexion."
+    },
+    "validation": {
+      "passwordRequired": "Le mot de passe est requis",
+      "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordMismatch": "Les mots de passe ne correspondent pas"
+    },
+    "errors": {
+      "invalidToken": "Le lien de réinitialisation est invalide ou a expiré",
+      "noToken": "Lien invalide",
+      "noTokenDescription": "Le lien de réinitialisation est manquant ou invalide. Veuillez demander un nouveau lien.",
+      "serverError": "Une erreur est survenue. Veuillez réessayer."
+    }
+  },
+  "calculator": {
+    "title": "Calculatrice",
+    "subtitle": "Calculez les frais de transaction",
+    "salePrice": "Prix de vente",
+    "welcomeTax": "Taxe de bienvenue",
+    "calculate": "Calculer",
+    "result": "Résultat",
+    "breakdown": "Détail du calcul"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue",
+    "network": "Erreur de connexion au serveur",
+    "notFound": "Ressource introuvable",
+    "unauthorized": "Non autorisé",
+    "validation": "Données invalides"
+  },
+  "admin": {
+    "users": {
+      "title": "Gestion des utilisateurs",
+      "description": "Gérez les comptes utilisateurs de l'application",
+      "list": "Liste des utilisateurs",
+      "totalUsers": "{count} utilisateur(s) au total",
+      "addUser": "Ajouter un utilisateur",
+      "search": "Rechercher par nom ou email...",
+      "noUsers": "Aucun utilisateur",
+      "noResults": "Aucun résultat pour cette recherche",
+      "columns": {
+        "name": "Nom",
+        "email": "Email",
+        "role": "Rôle",
+        "status": "Statut",
+        "createdAt": "Date de création",
+        "actions": "Actions"
+      },
+      "createDialog": {
+        "title": "Créer un utilisateur",
+        "description": "Remplissez les informations pour créer un nouveau compte"
+      },
+      "editDialog": {
+        "title": "Modifier l'utilisateur",
+        "description": "Modifiez les informations de l'utilisateur"
+      },
+      "deleteDialog": {
+        "title": "Supprimer l'utilisateur",
+        "description": "Êtes-vous sûr de vouloir supprimer {name} ? Cette action est irréversible."
+      },
+      "form": {
+        "name": "Nom complet",
+        "namePlaceholder": "Jean Tremblay",
+        "email": "Adresse email",
+        "emailPlaceholder": "jean@example.com",
+        "password": "Mot de passe",
+        "passwordPlaceholder": "Minimum 8 caractères",
+        "newPassword": "Nouveau mot de passe",
+        "newPasswordPlaceholder": "Laisser vide pour ne pas changer",
+        "role": "Rôle",
+        "active": "Compte actif",
+        "cancel": "Annuler",
+        "create": "Créer",
+        "save": "Enregistrer",
+        "delete": "Supprimer"
+      }
+    },
+    "roles": {
+      "admin": "Administrateur",
+      "notaire": "Notaire",
+      "assistant": "Assistant"
+    },
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif"
+    }
+  }
+}
