@@ -1,0 +1,44 @@
+# docker-compose.dev.yml
+# Version pour le développement - SurrealDB sans authentification
+
+version: '3.8'
+
+services:
+  # ==============================================
+  # SurrealDB - Base de données multi-modèle (DEV MODE)
+  # ==============================================
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: notary-surrealdb
+    restart: unless-stopped
+
+    environment:
+      # Timezone
+      TZ: America/Montreal
+
+    ports:
+      - "8001:8000"  # HTTP + WebSocket
+
+    volumes:
+      # Persister les données RocksDB (survit aux redémarrages)
+      - ./backend/data/surrealdb:/data
+      # Script d'initialisation (optionnel)
+      - ./backend/data/surreal:/init
+
+    # Commande de démarrage - MODE DÉVELOPPEMENT
+    # --allow-all: Désactive l'authentification (DEV ONLY!)
+    command: >
+      start
+      --log trace
+      --allow-all
+      file:/data/notary.db
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    name: notary_network
