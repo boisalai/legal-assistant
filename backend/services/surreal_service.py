@@ -21,7 +21,7 @@ class SurrealDBService:
     Exemple d'utilisation:
     ```python
     service = SurrealDBService(
-        url="ws://localhost:8001/rpc",
+        url="ws://localhost:8002/rpc",
         namespace="notary",
         database="notary_db"
     )
@@ -59,7 +59,7 @@ class SurrealDBService:
         Initialise le service SurrealDB.
 
         Args:
-            url: URL de connexion (ws://localhost:8001/rpc pour local)
+            url: URL de connexion (ws://localhost:8002/rpc pour local)
             namespace: Namespace SurrealDB
             database: Nom de la database
             username: Nom d'utilisateur (défaut: root)
@@ -530,7 +530,7 @@ def init_surreal_service(
 
 @asynccontextmanager
 async def get_db_connection(
-    url: str = "ws://localhost:8001/rpc",
+    url: str = "ws://localhost:8002/rpc",
     namespace: str = "notary",
     database: str = "notary_db"
 ):
