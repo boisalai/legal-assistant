@@ -1,0 +1,38 @@
+services:
+  # ==============================================
+  # SurrealDB - Base de donnees multi-modele
+  # ==============================================
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: legal-assistant-surrealdb
+    restart: unless-stopped
+
+    environment:
+      TZ: America/Montreal
+
+    ports:
+      - "8001:8000"  # HTTP + WebSocket
+
+    volumes:
+      # Persister les donnees RocksDB
+      - ./backend/data/surrealdb:/data
+      # Script d'initialisation (optionnel)
+      - ./backend/data/surreal:/init
+
+    # Commande de demarrage
+    # --allow-all pour developpement (pas d'auth)
+    command:
+      - start
+      - --log=trace
+      - --allow-all
+      - file:/data/legal.db
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    name: legal_assistant_network

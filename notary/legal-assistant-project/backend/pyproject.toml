@@ -1,0 +1,126 @@
+[project]
+name = "legal-assistant"
+version = "0.1.0"
+description = "Assistant d'etudes juridiques - Resume de jugements"
+requires-python = ">=3.10"
+dependencies = [
+    # Framework API
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    # Workflows et agents IA
+    "agno>=0.1.0",
+    "sqlalchemy>=2.0.0", # Required by Agno for database
+    # Traitement de documents
+    "pypdf>=5.1.0",
+    "python-multipart>=0.0.20",
+    "python-docx>=1.1.0",  # Word documents
+    # Base de données
+    "surrealdb>=0.3.0",
+    # Configuration et sécurité
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    # Utilitaires
+    "python-dotenv>=1.0.0",
+    "email-validator>=2.3.0",
+    "reportlab>=4.4.5",
+    "openai>=2.8.1",
+    "fastmcp>=2.13.1",
+    "anthropic>=0.74.0",
+    # Server-Sent Events pour streaming progression
+    "sse-starlette>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+    "httpx>=0.28.0",
+    "ruff>=0.8.0",
+    "faker>=33.1.0",
+]
+
+# Configuration pour les LLMs locaux
+
+# MLX (Apple Silicon - Local)
+mlx = [
+    "mlx>=0.24.0",
+    "mlx-lm>=0.22.0",
+]
+
+# Hugging Face (Transformers - Local)
+hf = [
+    "transformers>=4.48.0",
+    "torch>=2.6.0",
+]
+
+# Anthropic (Claude API - Cloud)
+anthropic = [
+    "anthropic>=0.42.0",
+]
+
+# Ollama (Local - Cross-platform)
+ollama = [
+    "ollama>=0.4.0",
+    "requests>=2.32.0",
+]
+
+# Docling (Document extraction - PDF, tables, OCR)
+docling = [
+    "docling>=2.0.0",
+]
+
+# Whisper (Audio transcription - Local)
+whisper = [
+    "openai-whisper>=20231117",
+]
+
+# Installer tous les providers LLM
+all-llm = [
+    "mlx>=0.24.0",
+    "mlx-lm>=0.22.0",
+    "transformers>=4.48.0",
+    "torch>=2.6.0",
+    "anthropic>=0.42.0",
+    "ollama>=0.4.0",
+    "requests>=2.32.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["config", "workflows", "models", "routes", "services"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "slow: Slow tests",
+]

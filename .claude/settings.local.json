@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "WebFetch(domain:surrealdb.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(uv run python:*)",
+      "Bash(mkdir:*)",
+      "WebFetch(domain:docs.agno.com)",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
