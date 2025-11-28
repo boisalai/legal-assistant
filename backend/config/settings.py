@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # ===== Base de donnees SurrealDB =====
     surreal_url: str = Field(
-        default="ws://localhost:8001/rpc",
+        default="ws://localhost:8002/rpc",
         description="URL de connexion SurrealDB (WebSocket)"
     )
     surreal_namespace: str = Field(
