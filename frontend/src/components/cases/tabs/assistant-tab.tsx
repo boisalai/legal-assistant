@@ -14,8 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bot, User, Send, Loader2, Sparkles, AlertCircle, Wifi, WifiOff } from "lucide-react";
-import { chatApi, settingsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
-import type { Case } from "@/types";
+import { Markdown } from "@/components/ui/markdown";
+import { chatApi, settingsApi, documentsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
+import type { Case, Document } from "@/types";
+import { TranscriptionProgress, useTranscriptionProgress } from "../transcription-progress";
+import { useLLMSettings } from "@/hooks/use-llm-settings";
 
 interface Message {
   id: string;
@@ -44,15 +47,58 @@ const DEFAULT_MODELS: LLMModel[] = [
   { id: "anthropic:claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Claude" },
 ];
 
+// Audio file extensions
+const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".aac"];
+
+function isAudioFile(filename: string): boolean {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+  return AUDIO_EXTENSIONS.includes(ext);
+}
+
+// Detect if user is asking for transcription
+function detectTranscriptionRequest(message: string): { isRequest: boolean; filename?: string } {
+  const lowerMessage = message.toLowerCase();
+  // Added more keywords including "retranscris", "retranscrire", "audio"
+  const transcriptionKeywords = [
+    "transcrire", "transcris", "transcription", "transcrira",
+    "retranscrire", "retranscris", "retranscription",
+    "transcrit", "transcrire l'audio", "transcrire le fichier audio"
+  ];
+
+  const hasKeyword = transcriptionKeywords.some(kw => lowerMessage.includes(kw));
+
+  if (!hasKeyword) return { isRequest: false };
+
+  // Try to extract filename from message - multiple patterns
+  const filenameMatch =
+    message.match(/['"«»]([^'"«»]+\.(mp3|wav|m4a|ogg|webm|flac|aac))['"«»]/i) ||
+    message.match(/fichier\s+(?:audio\s+)?(\S+\.(mp3|wav|m4a|ogg|webm|flac|aac))/i) ||
+    message.match(/audio\s+(\S+\.(mp3|wav|m4a|ogg|webm|flac|aac))/i) ||
+    message.match(/(\S+\.(mp3|wav|m4a|ogg|webm|flac|aac))/i);
+
+  console.log("[detectTranscriptionRequest] message:", lowerMessage, "hasKeyword:", hasKeyword, "filename:", filenameMatch?.[1]);
+
+  return {
+    isRequest: true,
+    filename: filenameMatch ? filenameMatch[1] : undefined
+  };
+}
+
 export function AssistantTab({ caseData }: AssistantTabProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [models, setModels] = useState<LLMModel[]>(DEFAULT_MODELS);
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS[0].id);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // LLM settings hook - persists to localStorage
+  const { modelId: selectedModel, updateSetting: updateLLMSetting, isLoaded: llmSettingsLoaded } = useLLMSettings();
+
+  // Transcription progress hook
+  const transcriptionProgress = useTranscriptionProgress();
 
   // Load available models from backend
   const loadModels = useCallback(async () => {
@@ -60,9 +106,22 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       const response = await settingsApi.getModels();
       const allModels: LLMModel[] = [];
 
+      // Backend returns providers directly at root level (e.g., { ollama: {...}, anthropic: {...} })
+      // Or wrapped in providers property
+      const providers = response.providers || response;
+
       // Flatten providers into a single list
-      Object.entries(response.providers).forEach(([provider, providerModels]) => {
-        providerModels.forEach((model: LLMModel) => {
+      Object.entries(providers).forEach(([provider, providerData]) => {
+        // Skip non-provider keys
+        if (provider === 'providers' || provider === 'defaults') return;
+
+        // Handle both formats: array or object with models property
+        const data = providerData as { models?: LLMModel[] };
+        const models = Array.isArray(providerData)
+          ? providerData
+          : data.models || [];
+
+        models.forEach((model: LLMModel) => {
           allModels.push({
             ...model,
             provider: provider.charAt(0).toUpperCase() + provider.slice(1),
@@ -73,8 +132,9 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       if (allModels.length > 0) {
         setModels(allModels);
         // Use default from settings if available
-        if (response.defaults?.model_id) {
-          setSelectedModel(response.defaults.model_id);
+        // Only set default model from API if no saved preference exists
+        if (response.defaults?.model_id && !llmSettingsLoaded) {
+          updateLLMSetting("modelId", response.defaults.model_id);
         }
       }
       setApiConnected(true);
@@ -82,11 +142,121 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       console.log("Settings API not available, using default models");
       setApiConnected(false);
     }
-  }, []);
+  }, [llmSettingsLoaded, updateLLMSetting]);
+
+  // Load documents for transcription detection
+  const loadDocuments = useCallback(async () => {
+    try {
+      const docs = await documentsApi.list(caseData.id);
+      setDocuments(docs);
+    } catch {
+      console.log("Could not load documents");
+    }
+  }, [caseData.id]);
 
   useEffect(() => {
     loadModels();
-  }, [loadModels]);
+    loadDocuments();
+  }, [loadModels, loadDocuments]);
+
+  // Handle transcription workflow
+  const handleTranscription = useCallback(async (filename: string): Promise<string> => {
+    // Refresh documents list first to ensure we have the latest
+    let currentDocs = documents;
+    if (currentDocs.length === 0) {
+      try {
+        currentDocs = await documentsApi.list(caseData.id);
+        setDocuments(currentDocs);
+      } catch {
+        return "Impossible de charger la liste des documents.";
+      }
+    }
+
+    console.log("[Transcription] Looking for file:", filename, "in", currentDocs.map(d => d.nom_fichier));
+
+    // Find the document by filename
+    let doc: Document | undefined;
+
+    if (filename) {
+      // First try exact match
+      doc = currentDocs.find(d =>
+        d.nom_fichier.toLowerCase() === filename.toLowerCase()
+      );
+
+      // Then try includes match
+      if (!doc) {
+        doc = currentDocs.find(d =>
+          d.nom_fichier.toLowerCase().includes(filename.toLowerCase()) ||
+          filename.toLowerCase().includes(d.nom_fichier.toLowerCase().replace(/\.[^/.]+$/, ""))
+        );
+      }
+    }
+
+    if (!doc) {
+      // Look for any untranscribed audio file if no specific filename found
+      const audioDoc = currentDocs.find(d =>
+        isAudioFile(d.nom_fichier) && !d.texte_extrait
+      );
+
+      if (!audioDoc) {
+        // List available audio files
+        const audioFiles = currentDocs.filter(d => isAudioFile(d.nom_fichier));
+        if (audioFiles.length === 0) {
+          return "Je n'ai pas trouvé de fichier audio dans ce dossier.";
+        }
+        return `Je n'ai pas trouvé de fichier audio non transcrit. Fichiers audio disponibles: ${audioFiles.map(d => d.nom_fichier).join(", ")}`;
+      }
+
+      console.log("[Transcription] Using first untranscribed audio:", audioDoc.nom_fichier);
+      return await runTranscription(audioDoc);
+    }
+
+    if (!isAudioFile(doc.nom_fichier)) {
+      return `Le fichier "${doc.nom_fichier}" n'est pas un fichier audio.`;
+    }
+
+    console.log("[Transcription] Found document:", doc.nom_fichier);
+    return await runTranscription(doc);
+  }, [documents, caseData.id]);
+
+  const runTranscription = async (doc: Document): Promise<string> => {
+    transcriptionProgress.startTranscription();
+
+    try {
+      const result = await documentsApi.transcribeWithWorkflow(
+        caseData.id,
+        doc.id,
+        {
+          language: "fr",
+          createMarkdown: true,
+          onProgress: (progress) => {
+            transcriptionProgress.updateProgress(
+              progress.step,
+              progress.message,
+              progress.percentage
+            );
+          },
+          onStepStart: transcriptionProgress.onStepStart,
+          onStepComplete: transcriptionProgress.onStepComplete,
+        }
+      );
+
+      transcriptionProgress.endTranscription(result.success);
+
+      if (result.success) {
+        // Refresh documents list
+        await loadDocuments();
+
+        const baseName = doc.nom_fichier.replace(/\.[^/.]+$/, "");
+        return `J'ai transcrit le fichier audio "${doc.nom_fichier}" et créé un document markdown "${baseName}_transcription.md" avec le contenu formaté.\n\nVoici un aperçu de la transcription:\n\n${result.transcript_text?.slice(0, 500)}${(result.transcript_text?.length || 0) > 500 ? "..." : ""}`;
+      } else {
+        return `Erreur lors de la transcription: ${result.error || "Erreur inconnue"}`;
+      }
+    } catch (err) {
+      transcriptionProgress.endTranscription(false);
+      return `Erreur lors de la transcription: ${err instanceof Error ? err.message : "Erreur inconnue"}`;
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -127,7 +297,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
     if (lowerMessage.includes("résume") || lowerMessage.includes("important")) {
       return `Résumé du dossier "${caseData.nom_dossier}":\n\n` +
         `• Type: ${caseData.type_transaction}\n` +
-        `• Statut: ${caseData.statut}\n` +
+        `• Statut: ${caseData.status}\n` +
         `• Score de confiance: ${caseData.score_confiance || "Non calculé"}%\n\n` +
         `⚠️ Note: Cette réponse est simulée. Lancez le backend pour une analyse complète.`;
     }
@@ -169,21 +339,31 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       let responseContent: string;
       let usedModel = selectedModel;
 
-      // Try to call the real API
-      try {
-        const response = await chatApi.send(userMessage.content, {
-          caseId: caseData.id,
-          model: selectedModel,
-          history: buildHistory(),
-        });
-        responseContent = response.message;
-        usedModel = response.model || selectedModel;
-        setApiConnected(true);
-      } catch (apiError) {
-        // Fallback to simulation if API is unavailable
-        console.log("Chat API not available, using simulation", apiError);
-        responseContent = await simulateResponse(userMessage.content);
-        setApiConnected(false);
+      // Check if this is a transcription request
+      const transcriptionRequest = detectTranscriptionRequest(userMessage.content);
+
+      if (transcriptionRequest.isRequest) {
+        // Handle transcription locally (with progress display)
+        setLoading(false); // Allow UI to show progress
+        responseContent = await handleTranscription(transcriptionRequest.filename || "");
+        usedModel = "transcription-workflow";
+      } else {
+        // Try to call the real API
+        try {
+          const response = await chatApi.send(userMessage.content, {
+            caseId: caseData.id,
+            model: selectedModel,
+            history: buildHistory(),
+          });
+          responseContent = response.message;
+          usedModel = response.model || selectedModel;
+          setApiConnected(true);
+        } catch (apiError) {
+          // Fallback to simulation if API is unavailable
+          console.log("Chat API not available, using simulation", apiError);
+          responseContent = await simulateResponse(userMessage.content);
+          setApiConnected(false);
+        }
       }
 
       const assistantMessage: Message = {
@@ -243,7 +423,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
             </Badge>
           )}
         </div>
-        <Select value={selectedModel} onValueChange={setSelectedModel}>
+        <Select value={selectedModel} onValueChange={(value) => updateLLMSetting("modelId", value)}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Sélectionner un modèle" />
           </SelectTrigger>
@@ -324,7 +504,11 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
                         : "bg-muted"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.role === "assistant" ? (
+                      <Markdown className="text-sm">{message.content}</Markdown>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    )}
                     <div
                       className={`flex items-center gap-2 mt-1 text-xs ${
                         message.role === "user"
@@ -362,6 +546,13 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
                   </div>
                 </div>
               )}
+              {/* Transcription Progress */}
+              <TranscriptionProgress
+                isVisible={transcriptionProgress.isTranscribing}
+                currentMessage={transcriptionProgress.currentMessage}
+                percentage={transcriptionProgress.percentage}
+                currentStep={transcriptionProgress.currentStep}
+              />
               <div ref={messagesEndRef} />
             </>
           )}

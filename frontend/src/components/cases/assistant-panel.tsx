@@ -10,10 +10,12 @@ import {
   Settings2,
   Loader2,
   AlertCircle,
+  Brain,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LLMSettingsModal } from "./llm-settings-modal";
-import { chatApi, type ChatMessage as ApiChatMessage } from "@/lib/api";
+import { Markdown } from "@/components/ui/markdown";
+import { chatApi, healthApi, type ChatMessage as ApiChatMessage } from "@/lib/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -23,6 +25,10 @@ interface Message {
 interface AssistantPanelProps {
   caseId: string;
   onSendMessage?: (message: string, config: LLMConfig) => Promise<string>;
+  onAnalyze?: () => void;
+  isAnalyzing?: boolean;
+  hasDocuments?: boolean;
+  onDocumentCreated?: () => void;  // Called when a new document is created via chat
 }
 
 interface LLMConfig {
@@ -30,6 +36,38 @@ interface LLMConfig {
   temperature: number;
   maxTokens: number;
   topP: number;
+}
+
+const LLM_CONFIG_STORAGE_KEY = "legal-assistant-llm-config";
+
+const DEFAULT_LLM_CONFIG: LLMConfig = {
+  model: "ollama:qwen2.5:7b",
+  temperature: 0.7,
+  maxTokens: 2000,
+  topP: 0.9,
+};
+
+function loadLLMConfig(): LLMConfig {
+  if (typeof window === "undefined") return DEFAULT_LLM_CONFIG;
+  try {
+    const stored = localStorage.getItem(LLM_CONFIG_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { ...DEFAULT_LLM_CONFIG, ...parsed };
+    }
+  } catch (e) {
+    console.warn("Failed to load LLM config from localStorage:", e);
+  }
+  return DEFAULT_LLM_CONFIG;
+}
+
+function saveLLMConfig(config: LLMConfig): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LLM_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn("Failed to save LLM config to localStorage:", e);
+  }
 }
 
 // Available LLM models (kept for reference, actual list is in LLMSettingsModal)
@@ -71,7 +109,7 @@ const LLM_MODELS = [
   },
 ];
 
-export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
+export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, hasDocuments, onDocumentCreated }: AssistantPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -85,13 +123,22 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
   const [backendConnected, setBackendConnected] = useState(false);
   const [checkingBackend, setCheckingBackend] = useState(true);
 
-  // LLM configuration
-  const [config, setConfig] = useState<LLMConfig>({
-    model: "ollama:qwen2.5:7b",
-    temperature: 0.7,
-    maxTokens: 2000,
-    topP: 0.9,
-  });
+  // LLM configuration - initialized from localStorage
+  const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Load config from localStorage on mount (client-side only)
+  useEffect(() => {
+    const savedConfig = loadLLMConfig();
+    setConfig(savedConfig);
+    setConfigLoaded(true);
+  }, []);
+
+  // Save config to localStorage whenever it changes
+  const handleConfigChange = (newConfig: LLMConfig) => {
+    setConfig(newConfig);
+    saveLLMConfig(newConfig);
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -100,7 +147,7 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        await chatApi.health();
+        await healthApi.check();
         setBackendConnected(true);
       } catch {
         setBackendConnected(false);
@@ -163,6 +210,11 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
         });
 
         assistantResponse = response.message;
+
+        // If a document was created during the chat (e.g., transcription), notify parent
+        if (response.document_created && onDocumentCreated) {
+          onDocumentCreated();
+        }
       } else {
         // Simulated response when backend is not available
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -204,14 +256,29 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
             {getModelDisplayName(config.model)}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSettingsModalOpen(true)}
-          title="Paramètres LLM"
-        >
-          <Settings2 className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onAnalyze}
+            disabled={isAnalyzing || !hasDocuments}
+            title={hasDocuments ? "Analyser le dossier" : "Ajoutez des documents pour analyser"}
+          >
+            {isAnalyzing ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Brain className="h-5 w-5" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsModalOpen(true)}
+            title="Paramètres LLM"
+          >
+            <Settings2 className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Backend status warning */}
@@ -257,7 +324,11 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
                   : "bg-muted"
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {message.role === "assistant" ? (
+                <Markdown className="text-sm">{message.content}</Markdown>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
             </div>
             {message.role === "user" && (
               <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
@@ -286,13 +357,10 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Posez une question... (Enter pour envoyer, Shift+Enter pour nouvelle ligne)"
+          placeholder="Posez une question..."
           className="min-h-[80px] max-h-[200px] resize-none"
           disabled={isLoading}
         />
-        <p className="text-xs text-muted-foreground mt-2">
-          Enter pour envoyer • Shift+Enter pour nouvelle ligne
-        </p>
       </div>
 
       {/* LLM Settings Modal */}
@@ -300,7 +368,7 @@ export function AssistantPanel({ caseId, onSendMessage }: AssistantPanelProps) {
         open={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         config={config}
-        onConfigChange={setConfig}
+        onConfigChange={handleConfigChange}
       />
     </div>
   );

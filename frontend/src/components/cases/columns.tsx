@@ -128,8 +128,8 @@ export const createColumns = (
     },
     cell: ({ row }) => {
       const fullId = row.getValue("id") as string;
-      // Extract clean ID without "dossier:" prefix for URL
-      const urlId = fullId.replace("dossier:", "");
+      // Extract clean ID without "dossier:" or "judgment:" prefix for URL
+      const urlId = fullId.replace("dossier:", "").replace("judgment:", "");
       return (
         <Link
           href={`/cases/${urlId}`}
@@ -265,7 +265,7 @@ export const createColumns = (
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => window.location.href = `/cases/${caseItem.id.replace("dossier:", "")}`}
+              onClick={() => window.location.href = `/cases/${caseItem.id.replace("dossier:", "").replace("judgment:", "")}`}
             >
               Ouvrir
             </DropdownMenuItem>

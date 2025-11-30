@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -40,14 +48,20 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Case, Document, Checklist } from "@/types";
+import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 
 // Status configuration
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   nouveau: { label: "Nouveau", variant: "default" },
+  pending: { label: "Nouveau", variant: "default" },
   en_analyse: { label: "En analyse", variant: "secondary" },
+  analyzing: { label: "En analyse", variant: "secondary" },
   termine: { label: "Terminé", variant: "outline" },
+  summarized: { label: "Terminé", variant: "outline" },
   en_erreur: { label: "En erreur", variant: "destructive" },
+  error: { label: "En erreur", variant: "destructive" },
   archive: { label: "Archivé", variant: "secondary" },
+  archived: { label: "Archivé", variant: "secondary" },
 };
 
 // Transaction type labels
@@ -58,7 +72,28 @@ const typeLabels: Record<string, string> = {
   testament: "Testament",
   succession: "Succession",
   autre: "Autre",
+  civil: "Civil",
+  criminal: "Pénal",
+  administrative: "Administratif",
+  family: "Familial",
+  commercial: "Commercial",
+  labor: "Travail",
+  constitutional: "Constitutionnel",
+  juridique: "Juridique",
+  other: "Autre",
 };
+
+// Type options for the select
+const typeOptions = [
+  { value: "civil", label: "Civil" },
+  { value: "criminal", label: "Pénal" },
+  { value: "administrative", label: "Administratif" },
+  { value: "family", label: "Familial" },
+  { value: "commercial", label: "Commercial" },
+  { value: "labor", label: "Travail" },
+  { value: "constitutional", label: "Constitutionnel" },
+  { value: "other", label: "Autre" },
+];
 
 interface CaseDetailsPanelProps {
   caseData: Case;
@@ -67,11 +102,12 @@ interface CaseDetailsPanelProps {
   onUploadDocuments: () => void;
   onRecordAudio: () => void;
   onAnalyze: () => void;
-  onUpdateSummary: (summary: string) => Promise<void>;
+  onUpdateCase: (data: { description?: string; type_transaction?: string }) => Promise<void>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onDownloadDocument: (docId: string) => void;
   onPreviewDocument: (docId: string) => void;
   onDelete: () => void;
+  onAnalysisComplete?: () => void;
   deleting: boolean;
   isAnalyzing: boolean;
 }
@@ -83,33 +119,37 @@ export function CaseDetailsPanel({
   onUploadDocuments,
   onRecordAudio,
   onAnalyze,
-  onUpdateSummary,
+  onUpdateCase,
   onDeleteDocument,
   onDownloadDocument,
   onPreviewDocument,
   onDelete,
+  onAnalysisComplete,
   deleting,
   isAnalyzing,
 }: CaseDetailsPanelProps) {
-  const [isEditingSummary, setIsEditingSummary] = useState(false);
-  const [summaryValue, setSummaryValue] = useState(
-    caseData.summary || "Cliquez pour ajouter un résumé du dossier"
-  );
-  const [isSavingSummary, setIsSavingSummary] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDescription, setEditDescription] = useState(caseData.description || "");
+  const [editType, setEditType] = useState(caseData.type_transaction || "civil");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveSummary = async () => {
-    setIsSavingSummary(true);
+  const handleSave = async () => {
+    setIsSaving(true);
     try {
-      await onUpdateSummary(summaryValue);
-      setIsEditingSummary(false);
+      await onUpdateCase({
+        description: editDescription,
+        type_transaction: editType,
+      });
+      setIsEditing(false);
     } finally {
-      setIsSavingSummary(false);
+      setIsSaving(false);
     }
   };
 
   const handleCancelEdit = () => {
-    setSummaryValue(caseData.summary || "Cliquez pour ajouter un résumé du dossier");
-    setIsEditingSummary(false);
+    setEditDescription(caseData.description || "");
+    setEditType(caseData.type_transaction || "civil");
+    setIsEditing(false);
   };
 
   const getFileIcon = (type: string) => {
@@ -123,56 +163,58 @@ export function CaseDetailsPanel({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const statusInfo = statusConfig[caseData.statut] || statusConfig.nouveau;
+  const statusInfo = statusConfig[caseData.status] || statusConfig.nouveau;
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-4 space-y-4">
+    <div className="flex flex-col h-full overflow-y-auto">
       {/* Case Header */}
-      <div className="pb-4 border-b">
-        <h2 className="text-xl font-bold">{caseData.nom_dossier}</h2>
-        <div className="flex items-center gap-4 mt-1">
-          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-          <span className="text-sm text-muted-foreground">
-            {typeLabels[caseData.type_transaction]}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            {new Date(caseData.created_at).toLocaleDateString("fr-CA")}
+      <div className="p-4 border-b bg-background">
+        <div className="flex flex-col">
+          <h2 className="text-xl font-bold">{caseData.nom_dossier}</h2>
+          <span className="text-xs text-muted-foreground/60">
+            Statut : {statusInfo.label}. Date de création : {new Date(caseData.created_at).toLocaleDateString("fr-CA")}
           </span>
         </div>
       </div>
 
-      {/* Résumé éditable */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">Résumé :</span>
-          {!isEditingSummary && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={() => setIsEditingSummary(true)}
-            >
-              <Edit2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-        {isEditingSummary ? (
-          <div className="space-y-2">
-            <Input
-              value={summaryValue}
-              onChange={(e) => setSummaryValue(e.target.value)}
-              placeholder="Entrez un résumé du dossier"
-              maxLength={200}
-              disabled={isSavingSummary}
-              className="text-sm"
-            />
+      {/* Contenu principal avec padding */}
+      <div className="p-4 space-y-4 flex-1">
+        {/* Mode édition ou affichage */}
+        {isEditing ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Description du dossier"
+                disabled={isSaving}
+                className="text-sm min-h-[80px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-type">Type de dossier</Label>
+              <Select value={editType} onValueChange={setEditType} disabled={isSaving}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
-                onClick={handleSaveSummary}
-                disabled={isSavingSummary}
+                onClick={handleSave}
+                disabled={isSaving}
               >
-                {isSavingSummary ? (
+                {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Check className="h-4 w-4" />
@@ -183,7 +225,7 @@ export function CaseDetailsPanel({
                 size="sm"
                 variant="outline"
                 onClick={handleCancelEdit}
-                disabled={isSavingSummary}
+                disabled={isSaving}
               >
                 <X className="h-4 w-4" />
                 Annuler
@@ -191,49 +233,44 @@ export function CaseDetailsPanel({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            {summaryValue}
-          </p>
+          <div className="space-y-2">
+            {caseData.description && (
+              <p className="text-sm text-foreground">{caseData.description}</p>
+            )}
+            <p className="text-sm text-foreground">
+              <span className="font-medium">Type :</span> {typeLabels[caseData.type_transaction] || caseData.type_transaction}
+            </p>
+          </div>
         )}
-      </div>
 
-      {/* Boutons d'action */}
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          onClick={onUploadDocuments}
-          className="gap-2"
-        >
-          <FileUp className="h-4 w-4" />
-          <span>Ajouter des documents</span>
-        </Button>
-        <Button
-          size="sm"
-          onClick={onRecordAudio}
-          className="gap-2"
-        >
-          <Mic className="h-4 w-4" />
-          <span>Enregistrer un audio</span>
-        </Button>
-        <Button
-          onClick={onAnalyze}
-          disabled={isAnalyzing || documents.length === 0}
-          size="sm"
-          className="gap-2 ml-auto"
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analyse en cours...
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4" />
-              Analyser
-            </>
-          )}
-        </Button>
-      </div>
+        {/* Boutons d'action */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => setIsEditing(true)}
+            disabled={isEditing}
+            className="gap-2"
+          >
+            <Edit2 className="h-4 w-4" />
+            <span>Modifier</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={onUploadDocuments}
+            className="gap-2"
+          >
+            <FileUp className="h-4 w-4" />
+            <span>Ajouter des documents</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={onRecordAudio}
+            className="gap-2"
+          >
+            <Mic className="h-4 w-4" />
+            <span>Enregistrer un audio</span>
+          </Button>
+        </div>
 
       {/* Liste des documents */}
       <div className="space-y-2">
@@ -253,6 +290,7 @@ export function CaseDetailsPanel({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatFileSize(doc.taille)} • {doc.type_fichier.toUpperCase()}
+                    {doc.texte_extrait && <span className="ml-2 text-muted-foreground/70">Texte extrait</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -274,20 +312,44 @@ export function CaseDetailsPanel({
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    onClick={() => onDeleteDocument(doc.id)}
-                    title="Supprimer"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer le document</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Êtes-vous sûr de vouloir supprimer « {doc.nom_fichier} » ? Cette action est irréversible.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDeleteDocument(doc.id)}>
+                          Supprimer
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* Analysis Progress Indicator */}
+        <AnalysisProgressIndicator
+          caseId={caseData.id}
+          isAnalyzing={isAnalyzing}
+          onComplete={onAnalysisComplete}
+        />
       </div>
 
       {/* Score de confiance */}
@@ -347,12 +409,13 @@ export function CaseDetailsPanel({
           )}
         </>
       )}
+      </div>
 
-      {/* Delete Button */}
-      <div className="pt-4 border-t mt-auto flex justify-end">
+      {/* Footer avec bouton Supprimer */}
+      <div className="p-4 border-t mt-auto flex justify-end items-center">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" disabled={deleting}>
+            <Button disabled={deleting}>
               <Trash2 className="h-4 w-4 mr-2" />
               Supprimer
             </Button>

@@ -38,7 +38,7 @@ export function AppShell({ children }: AppShellProps) {
           showMenuButton
           onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
-        <main className="flex-1 overflow-auto p-6 bg-muted/30">
+        <main className="flex-1 overflow-auto bg-muted/30">
           {children}
         </main>
       </div>

@@ -63,11 +63,6 @@ const mainNavItems: NavItem[] = [
     href: "/analysis",
     icon: FileSearch,
   },
-  {
-    titleKey: "nav.calculator",
-    href: "/calculator",
-    icon: Calculator,
-  },
 ];
 
 const secondaryNavItems: NavItem[] = [
@@ -92,7 +87,7 @@ export function Sidebar() {
       try {
         const user = await authApi.getCurrentUser();
         setIsAdmin(user.role === "admin");
-        setUserName(user.name || "User");
+        setUserName(`${user.prenom} ${user.nom}`.trim() || "User");
         setUserEmail(user.email || "user@example.com");
       } catch {
         setIsAdmin(false);
@@ -228,20 +223,6 @@ export function Sidebar() {
         >
           <HelpCircle className="h-5 w-5 shrink-0" />
           {!collapsed && <span>Get Help</span>}
-        </button>
-
-        {/* Search */}
-        <button
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full",
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
-            collapsed && "justify-center px-2"
-          )}
-          title={collapsed ? "Search" : undefined}
-          onClick={() => router.push("/dashboard")}
-        >
-          <SearchIcon className="h-5 w-5 shrink-0" />
-          {!collapsed && <span>Search</span>}
         </button>
 
         {/* User Profile with Menu */}

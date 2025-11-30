@@ -68,13 +68,20 @@ export default function AssistantPage() {
       const response = await settingsApi.getModels();
       const allModels: LLMModel[] = [];
 
+      // Backend returns providers directly at root level (e.g., { ollama: {...}, anthropic: {...} })
+      // Or wrapped in providers property
+      const providers = response.providers || response;
+
       // Flatten providers into a single list
-      // Backend returns { providers: { ollama: { models: [...] }, ... } }
-      Object.entries(response.providers).forEach(([provider, providerData]) => {
+      Object.entries(providers).forEach(([provider, providerData]) => {
+        // Skip non-provider keys
+        if (provider === 'providers' || provider === 'defaults') return;
+
         // Handle both formats: array or object with models property
+        const data = providerData as { models?: LLMModel[] };
         const models = Array.isArray(providerData)
           ? providerData
-          : (providerData as { models?: LLMModel[] }).models || [];
+          : data.models || [];
 
         models.forEach((model: LLMModel) => {
           allModels.push({
@@ -86,6 +93,7 @@ export default function AssistantPage() {
 
       if (allModels.length > 0) {
         setModels(allModels);
+        // Use default from response if available
         if (response.defaults?.model_id) {
           setSelectedModel(response.defaults.model_id);
         }

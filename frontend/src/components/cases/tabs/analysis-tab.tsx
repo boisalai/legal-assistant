@@ -28,6 +28,7 @@ import {
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import type { Case, Document } from "@/types";
 import { analysisApi } from "@/lib/api";
+import { useLLMSettings } from "@/hooks/use-llm-settings";
 
 interface AnalysisTabProps {
   caseId: string;
@@ -53,15 +54,17 @@ export function AnalysisTab({ caseId, caseData, documents, onAnalysisComplete }:
   const [showProgress, setShowProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // LLM settings hook - persists to localStorage (shared with assistant tab)
+  const { modelId: selectedModel, updateSetting: updateLLMSetting } = useLLMSettings();
+
   // Settings
-  const [selectedModel, setSelectedModel] = useState(LLM_MODELS[0].id);
   const [extractionMethod, setExtractionMethod] = useState(EXTRACTION_METHODS[0].id);
   const [useOcr, setUseOcr] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  const canAnalyze = documents.length > 0 && caseData.statut === "nouveau";
-  const isComplete = ["analyse_complete", "complete", "valide"].includes(caseData.statut);
-  const isInProgress = caseData.statut === "en_analyse";
+  const canAnalyze = documents.length > 0 && (caseData.status === "nouveau" || caseData.status === "pending");
+  const isComplete = ["termine", "summarized", "analyse_complete", "complete", "valide"].includes(caseData.status);
+  const isInProgress = caseData.status === "en_analyse" || caseData.status === "analyzing";
 
   const handleStartAnalysis = async () => {
     setIsAnalyzing(true);
@@ -200,7 +203,7 @@ export function AnalysisTab({ caseId, caseData, documents, onAnalysisComplete }:
             {/* Model Selection */}
             <div className="space-y-2">
               <Label>Modèle LLM</Label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <Select value={selectedModel} onValueChange={(value) => updateLLMSetting("modelId", value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

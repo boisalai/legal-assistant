@@ -8,8 +8,14 @@ en utilisant Pydantic Settings pour une gestion type-safe.
 from pathlib import Path
 from typing import Literal
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file into os.environ for SDK clients that check os.environ directly
+# (e.g., Anthropic SDK used by Agno)
+_env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(_env_path)
 
 
 class Settings(BaseSettings):
