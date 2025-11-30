@@ -75,13 +75,19 @@ export default function SettingsPage() {
       ]);
 
       // Flatten models from providers
-      // Backend returns { providers: { ollama: { models: [...] }, mlx: { models: [...] }, ... } }
+      // Backend returns providers directly at root level (e.g., { ollama: {...}, anthropic: {...} })
+      // Or wrapped in providers property
+      const providers = modelsResponse.providers || modelsResponse;
       const allModels: LLMModel[] = [];
-      Object.entries(modelsResponse.providers).forEach(([provider, providerData]) => {
+      Object.entries(providers).forEach(([provider, providerData]) => {
+        // Skip non-provider keys
+        if (provider === 'providers' || provider === 'defaults') return;
+
         // Handle both formats: array or object with models property
+        const data = providerData as { models?: LLMModel[] };
         const models = Array.isArray(providerData)
           ? providerData
-          : (providerData as { models?: LLMModel[] }).models || [];
+          : data.models || [];
 
         models.forEach((model: LLMModel) => {
           allModels.push({

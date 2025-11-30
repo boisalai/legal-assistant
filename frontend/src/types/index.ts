@@ -1,35 +1,149 @@
-// Types for Notary Assistant application
-// Note: API uses French terms (dossier, etc.) but frontend uses English (case)
+// Types for Legal Assistant application
+// Assistant d'etudes juridiques - Resume de jugements
+
+// ============================================
+// Judgment Types
+// ============================================
+
+// Judgment status enum
+export type JudgmentStatus =
+  | "pending"
+  | "analyzing"
+  | "summarized"
+  | "error"
+  | "archived";
+
+// Legal domain enum
+export type LegalDomain =
+  | "civil"
+  | "criminal"
+  | "administrative"
+  | "family"
+  | "commercial"
+  | "constitutional"
+  | "labor"
+  | "other";
+
+// Court level enum
+export type CourtLevel =
+  | "tribunal_instance"
+  | "cour_superieure"
+  | "cour_appel"
+  | "cour_supreme";
+
+// Main Judgment type (maps to API "judgment")
+export interface Judgment {
+  id: string;
+  title?: string;             // Title or case name
+  description?: string;       // Description of the judgment
+  citation?: string;          // Legal citation (e.g., "2024 QCCS 1234")
+  court?: string;             // Court name
+  decision_date?: string;     // Date of decision
+  legal_domain?: string;      // Area of law
+  text?: string;              // Full text of judgment
+  file_path?: string;         // Path to uploaded PDF
+  status: JudgmentStatus;
+  user_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Judgment summary (Case Brief)
+export interface JudgmentSummary {
+  id: string;
+  judgment_id: string;
+  case_brief: CaseBrief;
+  confidence_score: number;   // 0-1
+  key_takeaway: string;
+  model_used: string;
+  created_at: string;
+}
+
+// Structured Case Brief
+export interface CaseBrief {
+  case_name?: string;
+  citation?: string;
+  court?: string;
+  decision_date?: string;
+  judge?: string;
+  parties?: Party[];
+  facts?: string[];
+  procedural_history?: string;
+  issues?: LegalIssue[];
+  rules?: LegalRule[];
+  ratio_decidendi?: string;
+  obiter_dicta?: string[];
+  holding?: string;
+  remedy?: string;
+}
+
+// Party in a legal case
+export interface Party {
+  name: string;
+  role: "plaintiff" | "defendant" | "appellant" | "respondent" | "other";
+  lawyer?: string;
+}
+
+// Legal issue
+export interface LegalIssue {
+  question: string;
+  importance: "primary" | "secondary";
+  answer?: string;
+}
+
+// Legal rule
+export interface LegalRule {
+  rule: string;
+  source: string;
+  source_type: "statute" | "case_law" | "doctrine" | "principle";
+}
+
+// ============================================
+// Case Types (for backwards compatibility)
+// ============================================
 
 // Case status enum
 export type CaseStatus =
   | "nouveau"
+  | "pending"
   | "en_analyse"
+  | "analyzing"
   | "termine"
+  | "summarized"
   | "en_erreur"
-  | "archive";
+  | "error"
+  | "archive"
+  | "archived";
 
-// Transaction type enum
+// Transaction type enum (now maps to legal domain)
 export type TransactionType =
-  | "vente"
-  | "achat"
-  | "hypotheque"
-  | "testament"
-  | "succession"
+  | "civil"
+  | "criminal"
+  | "administrative"
+  | "family"
+  | "commercial"
+  | "juridique"
   | "autre";
 
-// Main Case type (maps to API "Dossier")
+// Main Case type (maps to Judgment for compatibility)
 export interface Case {
   id: string;
-  nom_dossier: string;        // Case name
-  type_transaction: TransactionType;
-  statut: CaseStatus;
+  nom_dossier: string;        // Case name / Title
+  type_transaction: TransactionType | string;
+  status: CaseStatus;
+  statut?: CaseStatus;        // Alias for backwards compatibility
   user_id: string;
   created_at: string;
   updated_at: string;
-  score_confiance?: number;   // Confidence score (0-1 or 0-100)
+  score_confiance?: number;   // Confidence score (0-1)
   pinned?: boolean;           // Whether the case is pinned
-  summary?: string;           // One-line summary of the case (editable)
+  summary?: string;           // One-line summary
+  description?: string;       // Case description
+  // Judgment-specific fields
+  citation?: string;
+  court?: string;
+  decision_date?: string;
+  text?: string;
 }
 
 // Legacy alias for backward compatibility
@@ -147,6 +261,9 @@ export interface Checklist {
   commentaires?: string;
   generated_by?: string;
   created_at?: string;
+  // New fields from analysis API
+  summary?: string;
+  key_points?: string[];
 }
 
 // Analysis result

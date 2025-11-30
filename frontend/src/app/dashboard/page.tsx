@@ -52,7 +52,18 @@ function DashboardContent() {
     }
   };
 
-  const columns = createColumns(handleDelete);
+  const handleTogglePin = async (id: string) => {
+    try {
+      const updatedCase = await casesApi.togglePin(id);
+      setCases((prev) =>
+        prev.map((c) => (c.id === id ? updatedCase : c))
+      );
+    } catch {
+      alert("Erreur lors de l'épinglage");
+    }
+  };
+
+  const columns = createColumns(handleDelete, handleTogglePin);
 
   if (loading) {
     return (
@@ -79,42 +90,13 @@ function DashboardContent() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard
-          title="Total dossiers"
-          value={cases.length}
-          description="dossiers créés"
-        />
-        <StatCard
-          title="Nouveaux"
-          value={cases.filter(c => c.statut === "nouveau").length}
-          description="à analyser"
-          className="text-blue-600"
-        />
-        <StatCard
-          title="En analyse"
-          value={cases.filter(c => c.statut === "en_analyse").length}
-          description="en cours"
-          className="text-yellow-600"
-        />
-        <StatCard
-          title="Terminés"
-          value={cases.filter(c => c.statut === "termine").length}
-          description="terminés"
-          className="text-green-600"
-        />
-        <StatCard
-          title="En erreur"
-          value={cases.filter(c => c.statut === "en_erreur").length}
-          description="à corriger"
-          className="text-red-600"
-        />
-        <StatCard
-          title="Archivés"
-          value={cases.filter(c => c.statut === "archive").length}
-          description="archivés"
-          className="text-gray-500"
-        />
+      <div className="grid gap-3 grid-cols-3 lg:grid-cols-6">
+        <StatCard value={cases.length} label="dossiers" />
+        <StatCard value={cases.filter(c => c.status === "nouveau" || c.status === "pending").length} label="nouveaux" />
+        <StatCard value={cases.filter(c => c.status === "en_analyse" || c.status === "analyzing").length} label="en analyse" />
+        <StatCard value={cases.filter(c => c.status === "termine" || c.status === "summarized").length} label="terminés" />
+        <StatCard value={cases.filter(c => c.status === "en_erreur" || c.status === "error").length} label="en erreur" />
+        <StatCard value={cases.filter(c => c.status === "archive" || c.status === "archived").length} label="archivés" />
       </div>
 
       {/* Cases Table */}
@@ -150,18 +132,15 @@ export default function DashboardPage() {
 }
 
 interface StatCardProps {
-  title: string;
   value: number;
-  description: string;
-  className?: string;
+  label: string;
 }
 
-function StatCard({ title, value, description, className }: StatCardProps) {
+function StatCard({ value, label }: StatCardProps) {
   return (
-    <div className="bg-card rounded-lg border p-4">
-      <p className="text-sm text-muted-foreground">{title}</p>
-      <p className={`text-2xl font-bold ${className || ""}`}>{value}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
+    <div className="bg-card rounded-lg border px-3 py-2 text-center">
+      <span className="text-lg font-semibold">{value}</span>
+      <span className="text-sm ml-1">{label}</span>
     </div>
   );
 }

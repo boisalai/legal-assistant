@@ -13,7 +13,7 @@ dependencies = [
     # Traitement de documents
     "pypdf>=5.1.0",
     "python-multipart>=0.0.20",
-    "python-docx>=1.1.0",  # Word documents
+    "python-docx>=1.1.0", # Word documents
     # Base de données
     "surrealdb>=0.3.0",
     # Configuration et sécurité
@@ -30,6 +30,7 @@ dependencies = [
     "anthropic>=0.74.0",
     # Server-Sent Events pour streaming progression
     "sse-starlette>=2.0.0",
+    "ollama>=0.6.1",
 ]
 
 [project.optional-dependencies]
@@ -74,7 +75,13 @@ docling = [
 ]
 
 # Whisper (Audio transcription - Local)
+# mlx-whisper est recommande pour Apple Silicon (meilleure qualite et performance)
 whisper = [
+    "mlx-whisper>=0.4.0",
+]
+
+# Fallback openai-whisper pour non-Apple Silicon
+whisper-openai = [
     "openai-whisper>=20231117",
 ]
 

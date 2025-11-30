@@ -7,7 +7,20 @@
       "Bash(uv run python:*)",
       "Bash(mkdir:*)",
       "WebFetch(domain:docs.agno.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(ollama list:*)",
+      "Bash(echo:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(xargs ls:*)",
+      "Bash(uv run python3:*)"
     ],
     "deny": [],
     "ask": []

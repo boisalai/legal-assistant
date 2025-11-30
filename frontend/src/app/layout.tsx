@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default async function RootLayout({
       <body className="antialiased min-h-screen bg-background font-sans">
         <NextIntlClientProvider messages={messages}>
           {children}
+          <Toaster richColors position="top-right" />
         </NextIntlClientProvider>
       </body>
     </html>
