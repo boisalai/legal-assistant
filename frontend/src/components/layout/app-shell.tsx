@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { Sidebar } from "./sidebar";
-import { Header } from "./header";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
   children: React.ReactNode;
+  noPadding?: boolean;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, noPadding = false }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -34,11 +36,18 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          showMenuButton
-          onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        />
-        <main className="flex-1 overflow-auto bg-muted/30">
+        {/* Mobile Menu Button - only visible on mobile */}
+        <div className="md:hidden flex items-center h-14 px-4 border-b bg-card">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <main className={cn("flex-1 overflow-auto", !noPadding && "p-6")}>
           {children}
         </main>
       </div>

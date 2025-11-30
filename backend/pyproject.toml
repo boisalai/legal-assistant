@@ -31,6 +31,8 @@ dependencies = [
     # Server-Sent Events pour streaming progression
     "sse-starlette>=2.0.0",
     "ollama>=0.6.1",
+    "markitdown[pdf]>=0.1.3",
+    "yt-dlp>=2025.11.12",
 ]
 
 [project.optional-dependencies]

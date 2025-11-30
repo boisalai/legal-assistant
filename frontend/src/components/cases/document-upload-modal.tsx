@@ -223,7 +223,7 @@ export function DocumentUploadModal({
                       )}
                       {uploadFile.status === "success" && (
                         <p className="text-xs text-green-600 mt-1">
-                          Téléversé avec succès
+                          Ajouté avec succès
                         </p>
                       )}
                     </div>
@@ -252,10 +252,10 @@ export function DocumentUploadModal({
             {isUploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Upload en cours...
+                Ajout en cours...
               </>
             ) : (
-              `Téléverser ${files.filter((f) => f.status === "pending").length} fichier(s)`
+              `Ajouter ${files.filter((f) => f.status === "pending").length} fichier(s)`
             )}
           </Button>
         </DialogFooter>

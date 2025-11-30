@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
+import { NewCaseModal } from "@/components/cases/new-case-modal";
 import { casesApi } from "@/lib/api";
 import type { Case } from "@/types";
 import { Loader2, FolderOpen } from "lucide-react";
 
 export default function CasesListPage() {
+  const t = useTranslations();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNewCaseModal, setShowNewCaseModal] = useState(false);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -122,8 +126,12 @@ export default function CasesListPage() {
             columns={columns}
             data={sortedCases}
             onDeleteSelected={handleDeleteSelected}
+            onNewCase={() => setShowNewCaseModal(true)}
+            newCaseLabel={t("nav.newCase")}
           />
         )}
+
+        <NewCaseModal open={showNewCaseModal} onOpenChange={setShowNewCaseModal} />
       </div>
     </AppShell>
   );

@@ -2,21 +2,25 @@
 
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
+import { NewCaseModal } from "@/components/cases/new-case-modal";
 import { casesApi } from "@/lib/api";
 import type { Case } from "@/types";
 import { Loader2 } from "lucide-react";
 
 function DashboardContent() {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
 
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNewCaseModal, setShowNewCaseModal] = useState(false);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -89,21 +93,11 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-3 grid-cols-3 lg:grid-cols-6">
-        <StatCard value={cases.length} label="dossiers" />
-        <StatCard value={cases.filter(c => c.status === "nouveau" || c.status === "pending").length} label="nouveaux" />
-        <StatCard value={cases.filter(c => c.status === "en_analyse" || c.status === "analyzing").length} label="en analyse" />
-        <StatCard value={cases.filter(c => c.status === "termine" || c.status === "summarized").length} label="terminés" />
-        <StatCard value={cases.filter(c => c.status === "en_erreur" || c.status === "error").length} label="en erreur" />
-        <StatCard value={cases.filter(c => c.status === "archive" || c.status === "archived").length} label="archivés" />
-      </div>
-
       {/* Cases Table */}
       {cases.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
           <p>Aucun dossier pour le moment.</p>
-          <p className="text-sm mt-2">Utilisez le bouton "+ Nouveau dossier" en haut à droite pour commencer.</p>
+          <p className="text-sm mt-2">Utilisez le bouton "+ Nouveau dossier" pour commencer.</p>
         </div>
       ) : (
         <DataTable
@@ -111,8 +105,12 @@ function DashboardContent() {
           data={cases}
           onDeleteSelected={handleDeleteSelected}
           initialFilter={searchQuery}
+          onNewCase={() => setShowNewCaseModal(true)}
+          newCaseLabel={t("nav.newCase")}
         />
       )}
+
+      <NewCaseModal open={showNewCaseModal} onOpenChange={setShowNewCaseModal} />
     </div>
   );
 }
@@ -128,19 +126,5 @@ export default function DashboardPage() {
         <DashboardContent />
       </Suspense>
     </AppShell>
-  );
-}
-
-interface StatCardProps {
-  value: number;
-  label: string;
-}
-
-function StatCard({ value, label }: StatCardProps) {
-  return (
-    <div className="bg-card rounded-lg border px-3 py-2 text-center">
-      <span className="text-lg font-semibold">{value}</span>
-      <span className="text-sm ml-1">{label}</span>
-    </div>
   );
 }

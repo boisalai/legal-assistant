@@ -156,9 +156,11 @@ export interface Document {
   nom_fichier: string;        // File name
   type_fichier: string;       // File type (pdf, docx, txt, audio, etc.)
   taille: number;             // Size in bytes
-  chemin_stockage: string;    // Storage path
+  chemin_stockage: string;    // Storage path (legacy)
+  file_path: string;          // Absolute path to file on disk
   hash_sha256: string;        // File hash
   uploaded_at: string;
+  file_exists: boolean;       // Whether the file exists on disk
 
   // Document metadata
   type_mime?: string;         // MIME type
