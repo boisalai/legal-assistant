@@ -86,7 +86,13 @@
 
 /* Hide Next.js Dev Tools button in development mode */
 button[data-nextjs-dev-tools-button="true"],
-button#next-logo {
+button#next-logo,
+[data-nextjs-dialog],
+[data-nextjs-dialog-overlay],
+nextjs-portal,
+#__next-build-watcher,
+[class*="nextjs"],
+body > div:last-child > button:has(svg) {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;

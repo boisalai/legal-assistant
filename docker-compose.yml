@@ -20,11 +20,11 @@ services:
       - ./backend/data/surreal:/init
 
     # Commande de demarrage
-    # --allow-all pour developpement (pas d'auth)
     command:
       - start
       - --log=trace
-      - --allow-all
+      - --user=root
+      - --pass=root
       - file:/data/legal.db
 
     healthcheck:

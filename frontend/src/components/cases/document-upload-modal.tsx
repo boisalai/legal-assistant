@@ -73,6 +73,7 @@ export function DocumentUploadModal({
 
   const uploadFiles = async () => {
     setIsUploading(true);
+    let hasSuccess = false;
 
     for (let i = 0; i < files.length; i++) {
       const uploadFile = files[i];
@@ -97,6 +98,7 @@ export function DocumentUploadModal({
               : f
           )
         );
+        hasSuccess = true;
       } catch (error) {
         // Update status to error
         setFiles((prev) =>
@@ -118,14 +120,14 @@ export function DocumentUploadModal({
 
     setIsUploading(false);
 
-    // Check if at least one upload was successful
-    const hasSuccess = files.some((f) => f.status === "success");
+    // Close modal after successful upload(s)
     if (hasSuccess) {
       // Wait a bit to show success message, then close
       setTimeout(() => {
         onUploadComplete();
-        handleClose();
-      }, 500);
+        setFiles([]);
+        onClose();
+      }, 800);
     }
   };
 

@@ -120,12 +120,15 @@ except ImportError as e:
 # ROUTES
 # ============================================================
 
-from routes import auth_router, judgments_router
+from routes import auth_router, judgments_router, documents_router, analysis_router, chat_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(judgments_router, tags=["Judgments"])
+app.include_router(documents_router, tags=["Documents"])
+app.include_router(analysis_router, tags=["Analysis"])
+app.include_router(chat_router, tags=["Chat"])
 
-logger.info("Routes configured: /api/auth, /api/judgments")
+logger.info("Routes configured: /api/auth, /api/judgments, /api/judgments/{id}/documents, /api/analysis, /api/chat")
 
 
 # ============================================================

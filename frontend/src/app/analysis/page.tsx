@@ -35,13 +35,20 @@ import {
 import { casesApi, analysisApi } from "@/lib/api";
 import type { Case } from "@/types";
 
-// Status configuration
+// Status configuration - supports both legacy (French) and new (English) statuses
 const statusConfig: Record<string, { label: string; color: string }> = {
-  nouveau: { label: "À analyser", color: "bg-blue-500" },
+  // Legacy French statuses
+  nouveau: { label: "À résumer", color: "bg-blue-500" },
   en_analyse: { label: "En cours", color: "bg-yellow-500" },
-  termine: { label: "Terminé", color: "bg-green-500" },
+  termine: { label: "Résumé", color: "bg-green-500" },
   en_erreur: { label: "En erreur", color: "bg-red-500" },
   archive: { label: "Archivé", color: "bg-gray-500" },
+  // New English statuses for judgments
+  pending: { label: "En attente", color: "bg-blue-500" },
+  analyzing: { label: "En analyse", color: "bg-yellow-500" },
+  summarized: { label: "Résumé", color: "bg-green-500" },
+  error: { label: "En erreur", color: "bg-red-500" },
+  archived: { label: "Archivé", color: "bg-gray-500" },
 };
 
 export default function AnalysisPage() {
@@ -81,21 +88,21 @@ export default function AnalysisPage() {
     }
   };
 
-  // Filter cases
+  // Filter cases - use status field (statut is deprecated alias)
   const filteredCases = cases.filter((c) => {
     if (filter === "all") return true;
-    if (filter === "pending") return c.statut === "nouveau";
-    if (filter === "in_progress") return c.statut === "en_analyse";
-    if (filter === "completed") return ["analyse_complete", "complete", "valide"].includes(c.statut);
+    if (filter === "pending") return c.status === "nouveau" || c.status === "pending";
+    if (filter === "in_progress") return c.status === "en_analyse" || c.status === "analyzing";
+    if (filter === "completed") return ["termine", "summarized", "archive", "archived"].includes(c.status);
     return true;
   });
 
   // Stats
   const stats = {
     total: cases.length,
-    pending: cases.filter((c) => c.statut === "nouveau").length,
-    inProgress: cases.filter((c) => c.statut === "en_analyse").length,
-    completed: cases.filter((c) => ["analyse_complete", "complete", "valide"].includes(c.statut)).length,
+    pending: cases.filter((c) => c.status === "nouveau" || c.status === "pending").length,
+    inProgress: cases.filter((c) => c.status === "en_analyse" || c.status === "analyzing").length,
+    completed: cases.filter((c) => ["termine", "summarized", "archive", "archived"].includes(c.status)).length,
   };
 
   const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
@@ -243,10 +250,10 @@ export default function AnalysisPage() {
             ) : (
               <div className="space-y-2">
                 {filteredCases.map((caseItem) => {
-                  const status = statusConfig[caseItem.statut] || statusConfig.nouveau;
-                  const urlId = caseItem.id.replace("dossier:", "");
+                  const status = statusConfig[caseItem.status] || statusConfig.nouveau;
+                  const urlId = caseItem.id.replace("dossier:", "").replace("judgment:", "");
                   const isAnalyzing = analyzing === caseItem.id;
-                  const canAnalyze = caseItem.statut === "nouveau";
+                  const canAnalyze = caseItem.status === "nouveau" || caseItem.status === "pending";
 
                   return (
                     <div

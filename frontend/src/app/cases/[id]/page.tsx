@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/layout";
 import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
@@ -18,9 +19,9 @@ export default function CaseDetailPage() {
   const params = useParams();
   const router = useRouter();
 
-  // Reconstruct full ID with "dossier:" prefix if not present
+  // Use the raw ID - the API will handle the judgment: prefix
   const rawId = params.id as string;
-  const caseId = rawId.startsWith("dossier:") ? rawId : `dossier:${rawId}`;
+  const caseId = rawId;
 
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -43,7 +44,7 @@ export default function CaseDetailPage() {
         // Documents endpoint may not exist yet
       }
 
-      if (["analyse_complete", "complete"].includes(data.statut)) {
+      if (["termine", "summarized", "analyse_complete", "complete"].includes(data.status)) {
         try {
           const checklistData = await analysisApi.getChecklist(caseId);
           setChecklist(checklistData);
@@ -64,19 +65,20 @@ export default function CaseDetailPage() {
 
   // Poll for updates during analysis
   useEffect(() => {
-    if (caseData?.statut === "en_analyse") {
+    if (caseData?.status === "en_analyse" || caseData?.status === "analyzing") {
       const interval = setInterval(fetchCaseDetails, 5000);
       return () => clearInterval(interval);
     }
-  }, [caseData?.statut, fetchCaseDetails]);
+  }, [caseData?.status, fetchCaseDetails]);
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
       await casesApi.delete(caseId);
+      toast.success("Dossier supprimé avec succès");
       router.push("/cases");
     } catch (err) {
-      alert("Erreur lors de la suppression");
+      toast.error("Erreur lors de la suppression");
       setDeleting(false);
     }
   };
@@ -97,18 +99,30 @@ export default function CaseDetailPage() {
   const handleAnalyze = async () => {
     try {
       await analysisApi.start(caseId);
+      toast.success("Analyse demarree");
       await fetchCaseDetails();
     } catch (err) {
-      alert(`Erreur: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
     }
   };
 
-  const handleUpdateSummary = async (summary: string) => {
+  const handleAnalysisComplete = useCallback(async () => {
+    toast.success("Analyse terminee!");
+    await fetchCaseDetails();
+  }, [fetchCaseDetails]);
+
+  const handleDocumentCreated = useCallback(async () => {
+    // Refresh documents list when a new document is created via chat (e.g., transcription)
+    await fetchCaseDetails();
+  }, [fetchCaseDetails]);
+
+  const handleUpdateCase = async (data: { description?: string; type_transaction?: string }) => {
     try {
-      const updated = await casesApi.update(caseId, { summary } as any);
+      const updated = await casesApi.update(caseId, data as any);
       setCaseData(updated);
+      toast.success("Dossier mis à jour avec succès");
     } catch (err) {
-      alert(`Erreur: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la mise à jour");
       throw err;
     }
   };
@@ -117,19 +131,21 @@ export default function CaseDetailPage() {
     try {
       await documentsApi.delete(caseId, docId);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      toast.success("Document supprimé");
     } catch (err) {
-      alert(`Erreur: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la suppression");
     }
   };
 
   const handleDownloadDocument = (docId: string) => {
-    // Trigger download
-    window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/dossiers/${caseId}/documents/${docId}/download`, "_blank");
+    // Trigger download using the correct API URL
+    const url = documentsApi.getDownloadUrl(caseId, docId);
+    window.open(url, "_blank");
   };
 
   const handlePreviewDocument = (docId: string) => {
     // TODO: Open preview modal
-    alert(`Prévisualisation du document ${docId}`);
+    toast.info("Prévisualisation non disponible pour le moment");
   };
 
   if (loading) {
@@ -147,7 +163,7 @@ export default function CaseDetailPage() {
       <AppShell>
         <div className="flex flex-col items-center justify-center h-full gap-4">
           <p className="text-lg text-destructive">
-            {error || "Dossier introuvable"}
+            {error?.replace("Jugement", "Dossier") || "Dossier introuvable"}
           </p>
           <Button asChild>
             <Link href="/cases">
@@ -160,7 +176,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  const isAnalyzing = caseData.statut === "en_analyse";
+  const isAnalyzing = caseData.status === "en_analyse" || caseData.status === "analyzing";
 
   return (
     <AppShell>
@@ -177,11 +193,12 @@ export default function CaseDetailPage() {
                 onUploadDocuments={handleUploadDocuments}
                 onRecordAudio={handleRecordAudio}
                 onAnalyze={handleAnalyze}
-                onUpdateSummary={handleUpdateSummary}
+                onUpdateCase={handleUpdateCase}
                 onDeleteDocument={handleDeleteDocument}
                 onDownloadDocument={handleDownloadDocument}
                 onPreviewDocument={handlePreviewDocument}
                 onDelete={handleDelete}
+                onAnalysisComplete={handleAnalysisComplete}
                 deleting={deleting}
                 isAnalyzing={isAnalyzing}
               />
@@ -192,7 +209,13 @@ export default function CaseDetailPage() {
 
             {/* Right Panel: AI Assistant */}
             <Panel defaultSize={40} minSize={30}>
-              <AssistantPanel caseId={caseId} />
+              <AssistantPanel
+                caseId={caseId}
+                onAnalyze={handleAnalyze}
+                isAnalyzing={isAnalyzing}
+                hasDocuments={documents.length > 0}
+                onDocumentCreated={handleDocumentCreated}
+              />
             </Panel>
           </PanelGroup>
         </div>

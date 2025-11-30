@@ -256,6 +256,9 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
                     <Badge variant="outline" className="shrink-0 text-xs">
                       {typeLabel.toUpperCase()}
                     </Badge>
+                    {doc.texte_extrait && (
+                      <span className="text-xs text-muted-foreground">Texte extrait</span>
+                    )}
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"

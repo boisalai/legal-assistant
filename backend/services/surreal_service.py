@@ -90,9 +90,14 @@ class SurrealDBService:
             # Note: connect() est appelé automatiquement, pas besoin de l'appeler
             logger.info(f"Connected to {self.url}")
 
-            # Authentification
-            await self.db.signin({"username": self.username, "password": self.password})
-            logger.info(f"Authenticated as {self.username}")
+            # Authentification (si credentials fournis)
+            if self.username and self.password:
+                try:
+                    await self.db.signin({"username": self.username, "password": self.password})
+                    logger.info(f"Authenticated as {self.username}")
+                except Exception as auth_err:
+                    # En mode --allow-all, l'auth peut échouer mais la connexion reste valide
+                    logger.warning(f"Auth skipped (allow-all mode?): {auth_err}")
 
             # Sélection du namespace et de la database
             await self.db.use(self.namespace, self.database)

@@ -39,6 +39,7 @@ from routes.auth import active_sessions
 
 class JudgmentBase(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     citation: Optional[str] = None
     court: Optional[str] = None
     decision_date: Optional[str] = None
@@ -82,6 +83,35 @@ class SummaryResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
+async def get_judgment_by_id(service, judgment_id: str) -> Optional[dict]:
+    """
+    Fetch a judgment by ID using SurrealQL query.
+    Returns the judgment dict or None if not found.
+    """
+    # Normalize ID
+    record_id = judgment_id.replace("judgment:", "")
+
+    query_result = await service.query(
+        "SELECT * FROM judgment WHERE id = type::thing('judgment', $record_id)",
+        {"record_id": record_id}
+    )
+
+    if not query_result or len(query_result) == 0:
+        return None
+
+    first_result = query_result[0]
+    if isinstance(first_result, dict) and "result" in first_result:
+        items = first_result["result"]
+    elif isinstance(first_result, list):
+        items = first_result
+    elif isinstance(first_result, dict):
+        items = [first_result]
+    else:
+        return None
+
+    return items[0] if items else None
+
+
 async def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
     """Get current user ID from token."""
     if not token:
@@ -90,7 +120,15 @@ async def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> 
 
 
 async def require_auth(token: Optional[str] = Depends(oauth2_scheme)) -> str:
-    """Require authentication."""
+    """Require authentication (relaxed in debug mode)."""
+    # In debug mode, allow unauthenticated access with a default user
+    if settings.debug:
+        if not token:
+            return "user:dev_user"
+        user_id = active_sessions.get(token)
+        return user_id or "user:dev_user"
+
+    # Production mode: strict authentication
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -146,6 +184,7 @@ async def list_judgments(
                     judgments.append(JudgmentResponse(
                         id=str(item.get("id", "")),
                         title=item.get("title"),
+                        description=item.get("description"),
                         citation=item.get("citation"),
                         court=item.get("court"),
                         decision_date=item.get("decision_date"),
@@ -176,16 +215,13 @@ async def create_judgment(
     court: Optional[str] = Form(None),
     decision_date: Optional[str] = Form(None),
     legal_domain: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
     user_id: str = Depends(require_auth)
 ):
     """
-    Cree un nouveau jugement (upload PDF ou texte).
+    Cree un nouveau jugement/dossier.
+    Peut etre cree vide (juste avec titre) ou avec un fichier PDF/texte.
     """
-    if not file and not text:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Fournir un fichier PDF ou du texte"
-        )
 
     judgment_id = str(uuid.uuid4())[:8]
     file_path = None
@@ -232,6 +268,7 @@ async def create_judgment(
         now = datetime.utcnow().isoformat()
         judgment_data = {
             "title": title or (file.filename if file else "Sans titre"),
+            "description": description,
             "citation": citation,
             "court": court,
             "decision_date": decision_date,
@@ -277,19 +314,18 @@ async def get_judgment(
         if not judgment_id.startswith("judgment:"):
             judgment_id = f"judgment:{judgment_id}"
 
-        result = await service.select(judgment_id)
+        item = await get_judgment_by_id(service, judgment_id)
 
-        if not result:
+        if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Jugement non trouve"
+                detail="Dossier non trouve"
             )
-
-        item = result[0] if isinstance(result, list) else result
 
         return JudgmentResponse(
             id=str(item.get("id", judgment_id)),
             title=item.get("title"),
+            description=item.get("description"),
             citation=item.get("citation"),
             court=item.get("court"),
             decision_date=item.get("decision_date"),
@@ -306,6 +342,100 @@ async def get_judgment(
         raise
     except Exception as e:
         logger.error(f"Error getting judgment: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+class JudgmentUpdate(BaseModel):
+    """Model for updating a judgment."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    citation: Optional[str] = None
+    court: Optional[str] = None
+    decision_date: Optional[str] = None
+    legal_domain: Optional[str] = None
+
+
+@router.put("/{judgment_id}", response_model=JudgmentResponse)
+@router.patch("/{judgment_id}", response_model=JudgmentResponse)
+async def update_judgment(
+    judgment_id: str,
+    update_data: JudgmentUpdate,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Met a jour un jugement.
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+
+        # Check existence and ownership
+        item = await get_judgment_by_id(service, judgment_id)
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dossier non trouve"
+            )
+
+        # In debug mode, skip ownership check
+        if not settings.debug and item.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Non autorise"
+            )
+
+        # Build update dict (only non-None values)
+        now = datetime.utcnow().isoformat()
+        updates = {"updated_at": now}
+
+        if update_data.title is not None:
+            updates["title"] = update_data.title
+        if update_data.description is not None:
+            updates["description"] = update_data.description
+        if update_data.citation is not None:
+            updates["citation"] = update_data.citation
+        if update_data.court is not None:
+            updates["court"] = update_data.court
+        if update_data.decision_date is not None:
+            updates["decision_date"] = update_data.decision_date
+        if update_data.legal_domain is not None:
+            updates["legal_domain"] = update_data.legal_domain
+
+        # Update in database
+        await service.merge(judgment_id, updates)
+
+        # Fetch updated record
+        updated_item = await get_judgment_by_id(service, judgment_id)
+
+        logger.info(f"Judgment updated: {judgment_id}")
+
+        return JudgmentResponse(
+            id=str(updated_item.get("id", judgment_id)),
+            title=updated_item.get("title"),
+            description=updated_item.get("description"),
+            citation=updated_item.get("citation"),
+            court=updated_item.get("court"),
+            decision_date=updated_item.get("decision_date"),
+            legal_domain=updated_item.get("legal_domain"),
+            text=updated_item.get("text"),
+            file_path=updated_item.get("file_path"),
+            status=updated_item.get("status", "pending"),
+            created_at=updated_item.get("created_at", ""),
+            updated_at=updated_item.get("updated_at"),
+            user_id=updated_item.get("user_id"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating judgment: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -329,14 +459,13 @@ async def delete_judgment(
             judgment_id = f"judgment:{judgment_id}"
 
         # Check ownership
-        result = await service.select(judgment_id)
-        if not result:
+        item = await get_judgment_by_id(service, judgment_id)
+        if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Jugement non trouve"
+                detail="Dossier non trouve"
             )
 
-        item = result[0] if isinstance(result, list) else result
         if item.get("user_id") != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -383,20 +512,19 @@ async def summarize_judgment(
             judgment_id = f"judgment:{judgment_id}"
 
         # Get judgment
-        result = await service.select(judgment_id)
-        if not result:
+        item = await get_judgment_by_id(service, judgment_id)
+        if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Jugement non trouve"
+                detail="Dossier non trouve"
             )
 
-        item = result[0] if isinstance(result, list) else result
         judgment_text = item.get("text")
 
         if not judgment_text:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le jugement n'a pas de texte a analyser"
+                detail="Le dossier n'a pas de texte a analyser. Ajoutez des documents puis lancez l'analyse."
             )
 
         # Get model configuration
