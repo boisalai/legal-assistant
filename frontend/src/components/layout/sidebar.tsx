@@ -10,26 +10,19 @@ import {
   FolderOpen,
   MessageSquare,
   FileSearch,
-  Calculator,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Scale,
-  Users,
-  Bell,
-  User as UserIcon,
   HelpCircle,
-  Search as SearchIcon,
   MoreVertical,
-  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -65,13 +58,6 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
-const secondaryNavItems: NavItem[] = [
-  {
-    titleKey: "nav.settings",
-    href: "/settings",
-    icon: Settings,
-  },
-];
 
 export function Sidebar() {
   const t = useTranslations();
@@ -125,13 +111,13 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen border-r bg-card transition-all duration-300",
+        "flex flex-col h-screen bg-sidebar text-sidebar-foreground transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
       {/* Logo */}
       <div className={cn(
-        "flex items-center h-14 px-4 border-b",
+        "flex items-center px-4 py-4",
         collapsed ? "justify-center" : "justify-between"
       )}>
         {collapsed ? (
@@ -140,21 +126,21 @@ export function Sidebar() {
             className="flex items-center gap-2"
             aria-label="Déployer le menu"
           >
-            <Scale className="h-6 w-6 text-primary" />
+            <Scale className="h-6 w-6 text-sidebar-foreground" />
           </button>
         ) : (
           <Link
             href="/dashboard"
             className="flex items-center gap-2"
           >
-            <Scale className="h-6 w-6 text-primary" />
-            <span className="font-semibold text-lg">{t("common.appName")}</span>
+            <Scale className="h-6 w-6 text-sidebar-foreground" />
+            <span className="font-semibold text-lg text-sidebar-foreground">{t("common.appName")}</span>
           </Link>
         )}
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8", collapsed && "hidden")}
+          className={cn("h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground", collapsed && "hidden")}
           onClick={() => setCollapsed(!collapsed)}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -171,10 +157,10 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "bg-sidebar-accent text-sidebar-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                 collapsed && "justify-center px-2"
               )}
               title={collapsed ? title : undefined}
@@ -183,7 +169,7 @@ export function Sidebar() {
               <item.icon className="h-5 w-5 shrink-0" />
               {!collapsed && <span>{title}</span>}
               {!collapsed && item.badge !== undefined && (
-                <span className="ml-auto bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-auto bg-sidebar-accent text-sidebar-foreground text-xs px-2 py-0.5 rounded-full">
                   {item.badge}
                 </span>
               )}
@@ -192,60 +178,29 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom Section */}
-      <div className="px-2 py-2 border-t space-y-1">
-        {/* Settings */}
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            pathname === "/settings"
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            collapsed && "justify-center px-2"
-          )}
-          title={collapsed ? "Settings" : undefined}
-          onClick={(e) => handleNavClick(e, "/settings")}
-        >
-          <Settings className="h-5 w-5 shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </Link>
-
-        {/* Get Help */}
-        <button
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full",
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
-            collapsed && "justify-center px-2"
-          )}
-          title={collapsed ? "Get Help" : undefined}
-          onClick={() => window.open("https://docs.example.com", "_blank")}
-        >
-          <HelpCircle className="h-5 w-5 shrink-0" />
-          {!collapsed && <span>Get Help</span>}
-        </button>
-
-        {/* User Profile with Menu */}
+      {/* Bottom Section - User Profile with Menu */}
+      <div className="px-2 py-2 border-t border-sidebar-border">
+        {/* User Profile with Menu - Expanded mode */}
         {!collapsed && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 hover:bg-muted rounded-md transition-colors w-full text-left">
+              <button className="flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent rounded-md transition-colors w-full text-left">
                 {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                <div className="w-8 h-8 rounded-full bg-sidebar-foreground flex items-center justify-center text-sidebar text-xs font-semibold shrink-0">
                   {getUserInitials(userName)}
                 </div>
 
                 {/* Name and Email */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{userName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                  <p className="text-sm font-medium truncate text-sidebar-foreground">{userName}</p>
+                  <p className="text-xs text-sidebar-foreground/70 truncate">{userEmail}</p>
                 </div>
 
                 {/* More Menu Icon */}
-                <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <MoreVertical className="h-4 w-4 shrink-0 text-sidebar-foreground/70" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="start" side="top" className="w-56">
               {/* User Info Header */}
               <div className="flex items-center gap-2 px-2 py-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
@@ -258,22 +213,16 @@ export function Sidebar() {
               </div>
               <DropdownMenuSeparator />
 
-              {/* Account */}
-              <DropdownMenuItem onClick={() => router.push("/settings/account")}>
-                <UserIcon className="h-4 w-4 mr-2" />
-                Account
+              {/* Settings */}
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
               </DropdownMenuItem>
 
-              {/* Billing */}
-              <DropdownMenuItem onClick={() => router.push("/settings/billing")}>
-                <CreditCard className="h-4 w-4 mr-2" />
-                Billing
-              </DropdownMenuItem>
-
-              {/* Notifications */}
-              <DropdownMenuItem onClick={() => router.push("/settings/notifications")}>
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
+              {/* Get Help */}
+              <DropdownMenuItem onClick={() => window.open("https://docs.example.com", "_blank")}>
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Get Help
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
@@ -291,14 +240,14 @@ export function Sidebar() {
         {collapsed && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-full flex justify-center px-2 py-2 hover:bg-muted rounded-md transition-colors">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
+              <button className="w-full flex justify-center px-2 py-2 hover:bg-sidebar-accent rounded-md transition-colors">
+                <div className="w-8 h-8 rounded-full bg-sidebar-foreground flex items-center justify-center text-sidebar text-xs font-semibold">
                   {getUserInitials(userName)}
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {/* Same menu as above */}
+            <DropdownMenuContent align="start" side="right" className="w-56">
+              {/* User Info Header */}
               <div className="flex items-center gap-2 px-2 py-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
                   {getUserInitials(userName)}
@@ -309,19 +258,22 @@ export function Sidebar() {
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/settings/account")}>
-                <UserIcon className="h-4 w-4 mr-2" />
-                Account
+
+              {/* Settings */}
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/settings/billing")}>
-                <CreditCard className="h-4 w-4 mr-2" />
-                Billing
+
+              {/* Get Help */}
+              <DropdownMenuItem onClick={() => window.open("https://docs.example.com", "_blank")}>
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Get Help
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/settings/notifications")}>
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
-              </DropdownMenuItem>
+
               <DropdownMenuSeparator />
+
+              {/* Log out */}
               <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                 <LogOut className="h-4 w-4 mr-2" />
                 Log out
@@ -333,11 +285,11 @@ export function Sidebar() {
 
       {/* Expand Button (when collapsed) */}
       {collapsed && (
-        <div className="p-2 border-t">
+        <div className="p-2 border-t border-sidebar-border">
           <Button
             variant="ghost"
             size="icon"
-            className="w-full h-8"
+            className="w-full h-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
             onClick={() => setCollapsed(false)}
           >
             <ChevronRight className="h-4 w-4" />

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -69,9 +72,29 @@ export function LLMSettingsModal({
   config,
   onConfigChange,
 }: LLMSettingsModalProps) {
+  // Local state to track changes before saving
+  const [localConfig, setLocalConfig] = useState<LLMConfig>(config);
+
+  // Reset local config when modal opens with new config
+  useEffect(() => {
+    if (open) {
+      setLocalConfig(config);
+    }
+  }, [open, config]);
+
+  const handleCancel = () => {
+    setLocalConfig(config); // Reset to original
+    onClose();
+  };
+
+  const handleSave = () => {
+    onConfigChange(localConfig);
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={handleCancel}>
+      <DialogContent className="max-w-md [&>button]:hidden">
         <DialogHeader>
           <DialogTitle>Paramètres LLM</DialogTitle>
           <DialogDescription>
@@ -84,9 +107,9 @@ export function LLMSettingsModal({
           <div className="space-y-2">
             <Label htmlFor="model">Modèle</Label>
             <Select
-              value={config.model}
+              value={localConfig.model}
               onValueChange={(value) =>
-                onConfigChange({ ...config, model: value })
+                setLocalConfig({ ...localConfig, model: value })
               }
             >
               <SelectTrigger id="model">
@@ -107,7 +130,7 @@ export function LLMSettingsModal({
             <div className="flex items-center justify-between">
               <Label htmlFor="temperature">Température</Label>
               <span className="text-sm text-muted-foreground">
-                {config.temperature.toFixed(1)}
+                {localConfig.temperature.toFixed(1)}
               </span>
             </div>
             <Slider
@@ -115,9 +138,9 @@ export function LLMSettingsModal({
               min={0}
               max={2}
               step={0.1}
-              value={[config.temperature]}
+              value={[localConfig.temperature]}
               onValueChange={(value) =>
-                onConfigChange({ ...config, temperature: value[0] })
+                setLocalConfig({ ...localConfig, temperature: value[0] })
               }
             />
             <p className="text-xs text-muted-foreground">
@@ -130,7 +153,7 @@ export function LLMSettingsModal({
             <div className="flex items-center justify-between">
               <Label htmlFor="maxTokens">Max tokens</Label>
               <span className="text-sm text-muted-foreground">
-                {config.maxTokens}
+                {localConfig.maxTokens}
               </span>
             </div>
             <Slider
@@ -138,9 +161,9 @@ export function LLMSettingsModal({
               min={100}
               max={4000}
               step={100}
-              value={[config.maxTokens]}
+              value={[localConfig.maxTokens]}
               onValueChange={(value) =>
-                onConfigChange({ ...config, maxTokens: value[0] })
+                setLocalConfig({ ...localConfig, maxTokens: value[0] })
               }
             />
             <p className="text-xs text-muted-foreground">
@@ -153,7 +176,7 @@ export function LLMSettingsModal({
             <div className="flex items-center justify-between">
               <Label htmlFor="topP">Top P</Label>
               <span className="text-sm text-muted-foreground">
-                {config.topP.toFixed(2)}
+                {localConfig.topP.toFixed(2)}
               </span>
             </div>
             <Slider
@@ -161,9 +184,9 @@ export function LLMSettingsModal({
               min={0}
               max={1}
               step={0.05}
-              value={[config.topP]}
+              value={[localConfig.topP]}
               onValueChange={(value) =>
-                onConfigChange({ ...config, topP: value[0] })
+                setLocalConfig({ ...localConfig, topP: value[0] })
               }
             />
             <p className="text-xs text-muted-foreground">
@@ -171,6 +194,15 @@ export function LLMSettingsModal({
             </p>
           </div>
         </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancel}>
+            Annuler
+          </Button>
+          <Button onClick={handleSave}>
+            Sauvegarder
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -138,8 +138,9 @@ class DocumentExtractionService:
     Service d'extraction de texte multi-format.
 
     Methodes d'extraction par type:
-    - PDF: pypdf (rapide), Docling (avance), OCR (scans)
-    - Word: python-docx
+    - PDF, Word, PowerPoint, Excel, images: MarkItDown (recommande)
+    - PDF: pypdf (fallback rapide), Docling (avance), OCR (scans)
+    - Word: python-docx (fallback)
     - Texte: lecture directe
     - Audio: Whisper (transcription)
     """
@@ -149,11 +150,20 @@ class DocumentExtractionService:
 
     def _check_dependencies(self):
         """Verifie les dependances disponibles."""
+        self._has_markitdown = False
         self._has_pypdf = False
         self._has_docx = False
         self._has_docling = False
         self._has_whisper = False
         self._has_pillow = False
+
+        try:
+            from markitdown import MarkItDown
+            self._has_markitdown = True
+            self._markitdown = MarkItDown()
+            logger.info("MarkItDown disponible - utilisation pour l'extraction de documents")
+        except ImportError:
+            logger.warning("markitdown non installe - utilisation des methodes alternatives")
 
         try:
             import pypdf
@@ -259,14 +269,47 @@ class DocumentExtractionService:
         elif method == "docling-vlm" and self._has_docling:
             return await self._extract_pdf_docling(file_path, use_vlm=True)
 
-        # Par defaut: pypdf (rapide)
+        # Par defaut: MarkItDown (meilleure qualite)
+        if self._has_markitdown:
+            return await self._extract_with_markitdown(file_path)
+
+        # Fallback: pypdf (rapide mais moins bon)
         if self._has_pypdf:
             return await self._extract_pdf_pypdf(file_path)
 
         return ExtractionResult(
             success=False,
-            error="Aucune bibliotheque PDF disponible (installer pypdf ou docling)"
+            error="Aucune bibliotheque PDF disponible (installer markitdown, pypdf ou docling)"
         )
+
+    async def _extract_with_markitdown(self, file_path: Path) -> ExtractionResult:
+        """Extraction avec MarkItDown (PDF, Word, PowerPoint, Excel, images)."""
+        try:
+            result = self._markitdown.convert(str(file_path))
+
+            if not result or not result.text_content:
+                return ExtractionResult(
+                    success=False,
+                    error="MarkItDown n'a pas pu extraire de texte",
+                    extraction_method="markitdown"
+                )
+
+            return ExtractionResult(
+                success=True,
+                text=result.text_content,
+                metadata={
+                    "source": str(file_path),
+                    "title": getattr(result, "title", None),
+                },
+                extraction_method="markitdown"
+            )
+        except Exception as e:
+            logger.error(f"Erreur extraction MarkItDown: {e}")
+            return ExtractionResult(
+                success=False,
+                error=str(e),
+                extraction_method="markitdown"
+            )
 
     async def _extract_pdf_pypdf(self, file_path: Path) -> ExtractionResult:
         """Extraction PDF avec pypdf."""
@@ -329,10 +372,15 @@ class DocumentExtractionService:
 
     async def _extract_word(self, file_path: Path) -> ExtractionResult:
         """Extrait le texte d'un document Word."""
+        # Utiliser MarkItDown si disponible (meilleure qualite)
+        if self._has_markitdown:
+            return await self._extract_with_markitdown(file_path)
+
+        # Fallback: python-docx
         if not self._has_docx:
             return ExtractionResult(
                 success=False,
-                error="python-docx non installe",
+                error="Aucune bibliotheque Word disponible (installer markitdown ou python-docx)",
                 extraction_method="docx"
             )
 

@@ -448,8 +448,10 @@ async def delete_judgment(
     user_id: str = Depends(require_auth)
 ):
     """
-    Supprime un jugement.
+    Supprime un jugement et tous ses fichiers uploades.
     """
+    import shutil
+
     try:
         service = get_surreal_service()
         if not service.db:
@@ -466,13 +468,26 @@ async def delete_judgment(
                 detail="Dossier non trouve"
             )
 
-        if item.get("user_id") != user_id:
+        # In debug mode, skip ownership check
+        if not settings.debug and item.get("user_id") != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Non autorise"
             )
 
-        # Delete file if exists
+        # Get the record ID without the "judgment:" prefix
+        record_id = judgment_id.replace("judgment:", "")
+
+        # Delete the entire uploads directory for this judgment
+        uploads_dir = settings.upload_dir / record_id
+        if uploads_dir.exists() and uploads_dir.is_dir():
+            try:
+                shutil.rmtree(uploads_dir)
+                logger.info(f"Deleted uploads directory: {uploads_dir}")
+            except Exception as e:
+                logger.warning(f"Could not delete uploads directory {uploads_dir}: {e}")
+
+        # Also delete individual file if exists (legacy support)
         file_path = item.get("file_path")
         if file_path:
             try:

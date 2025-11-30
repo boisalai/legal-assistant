@@ -15,11 +15,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   FileText,
-  Download,
   Trash2,
   Eye,
   Upload,
@@ -30,21 +28,42 @@ import {
   FileType2,
   FileCode2,
   Mic,
+  Database,
+  Brain,
+  Loader2,
+  MoreVertical,
+  DatabaseBackup,
+  Youtube,
+  FileDown,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
+import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
 
 interface DocumentsTabProps {
   caseId: string;
   documents: Document[];
   onDocumentsChange: () => void;
+  onPreviewDocument?: (docId: string) => void;
 }
 
-export function DocumentsTab({ caseId, documents, onDocumentsChange }: DocumentsTabProps) {
+export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDocument }: DocumentsTabProps) {
   const [uploading, setUploading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<"transcribe" | "extract" | "clear" | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
 
   const handleUpload = useCallback(async () => {
     if (files.length === 0) return;
@@ -63,24 +82,112 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
     }
   }, [caseId, files, onDocumentsChange]);
 
-  const handleDelete = async (documentId: string) => {
-    setDeletingId(documentId);
-    try {
-      await documentsApi.delete(caseId, documentId);
-      onDocumentsChange();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur lors de la suppression");
-    } finally {
-      setDeletingId(null);
+  const handlePreview = (document: Document) => {
+    if (onPreviewDocument) {
+      onPreviewDocument(document.id);
+    } else {
+      // Fallback to open in new tab
+      documentsApi.preview(caseId, document.id);
     }
   };
 
-  const handlePreview = (document: Document) => {
-    documentsApi.preview(caseId, document.id);
+  // Check if file is audio
+  const isAudioFile = (doc: Document) => {
+    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const audioExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
+    return audioExtensions.includes(ext) || doc.type_mime?.includes("audio");
   };
 
-  const handleDownload = (document: Document) => {
-    documentsApi.download(caseId, document.id, document.nom_fichier);
+  // Check if file can have text extracted (PDF, Word, text files)
+  const canExtractText = (doc: Document) => {
+    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const extractableExtensions = ["pdf", "doc", "docx", "txt", "rtf", "md"];
+    return extractableExtensions.includes(ext);
+  };
+
+  // Check if file can be transcribed to markdown (audio, PDF, Word)
+  const canTranscribeToMarkdown = (doc: Document) => {
+    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const transcribableExtensions = ["pdf", "doc", "docx", "mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
+    return transcribableExtensions.includes(ext) || doc.type_mime?.includes("audio");
+  };
+
+  // Handle transcription for audio files
+  const handleTranscribe = async (doc: Document) => {
+    setProcessingId(doc.id);
+    setProcessingAction("transcribe");
+    try {
+      await documentsApi.transcribeWithWorkflow(caseId, doc.id, {
+        language: "fr",
+        createMarkdown: true,
+      });
+      onDocumentsChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de la transcription");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
+  };
+
+  // Handle text extraction for documents (PDF, Word, etc.)
+  const handleExtractText = async (doc: Document) => {
+    setProcessingId(doc.id);
+    setProcessingAction("extract");
+    try {
+      const result = await documentsApi.extract(caseId, doc.id);
+      if (result.success) {
+        onDocumentsChange();
+      } else {
+        alert(result.error || "Erreur lors de l'extraction");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de l'extraction");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
+  };
+
+  // Handle clearing extracted text
+  const handleClearText = async (doc: Document) => {
+    setProcessingId(doc.id);
+    setProcessingAction("clear");
+    try {
+      await documentsApi.clearText(caseId, doc.id);
+      onDocumentsChange();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de la suppression du texte");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
+  };
+
+  // Handle document deletion (also clears extracted text from DB if present)
+  const handleConfirmDelete = async () => {
+    if (docToDelete) {
+      setDeletingId(docToDelete.id);
+      try {
+        // If document has extracted text, clear it first
+        if (docToDelete.texte_extrait) {
+          try {
+            await documentsApi.clearText(caseId, docToDelete.id);
+          } catch (err) {
+            // Continue with deletion even if clearing text fails
+            console.warn("Failed to clear text before deletion:", err);
+          }
+        }
+        await documentsApi.delete(caseId, docToDelete.id);
+        onDocumentsChange();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erreur lors de la suppression");
+      } finally {
+        setDeletingId(null);
+        setDocToDelete(null);
+        setDeleteDialogOpen(false);
+      }
+    }
   };
 
   // Determine file icon based on type/extension - uniform Lucide icons
@@ -161,6 +268,14 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
         onUploadComplete={onDocumentsChange}
       />
 
+      {/* YouTube Download Modal */}
+      <YouTubeDownloadModal
+        open={youtubeModalOpen}
+        onClose={() => setYoutubeModalOpen(false)}
+        caseId={caseId}
+        onDownloadComplete={onDocumentsChange}
+      />
+
       {/* Upload Section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -173,10 +288,16 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
               Glissez-déposez vos fichiers ou cliquez pour les sélectionner
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setUploadModalOpen(true)}>
-            <Mic className="h-4 w-4 mr-2" />
-            Enregistrer un audio
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setYoutubeModalOpen(true)}>
+              <Youtube className="h-4 w-4 mr-2" />
+              YouTube
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setUploadModalOpen(true)}>
+              <Mic className="h-4 w-4 mr-2" />
+              Enregistrer
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <FileUpload
@@ -247,6 +368,11 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{doc.nom_fichier}</p>
+                      {doc.file_path && (
+                        <p className="text-xs text-muted-foreground/60 truncate" title={doc.file_path}>
+                          {doc.file_path}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{formatFileSize(doc.taille)}</span>
                         <span>•</span>
@@ -256,58 +382,85 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
                     <Badge variant="outline" className="shrink-0 text-xs">
                       {typeLabel.toUpperCase()}
                     </Badge>
-                    {doc.texte_extrait && (
-                      <span className="text-xs text-muted-foreground">Texte extrait</span>
+                    {/* Status badges */}
+                    {processingId === doc.id && (
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        {processingAction === "extract" ? "Extraction..." : processingAction === "transcribe" ? "Transcription..." : "Suppression..."}
+                      </Badge>
                     )}
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="Prévisualiser"
-                        onClick={() => handlePreview(doc)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="Télécharger"
-                        onClick={() => handleDownload(doc)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            title="Supprimer"
+                    {doc.texte_extrait && processingId !== doc.id && (
+                      <Database className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    {/* Dropdown menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {/* Preview */}
+                        <DropdownMenuItem onClick={() => handlePreview(doc)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Visualiser
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Transcribe to markdown (audio, PDF, Word) */}
+                        {canTranscribeToMarkdown(doc) && !doc.texte_extrait && (
+                          <DropdownMenuItem
+                            onClick={() => handleTranscribe(doc)}
+                            disabled={processingId === doc.id}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Le document "{doc.nom_fichier}" sera supprimé définitivement.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(doc.id)}
-                              disabled={deletingId === doc.id}
-                            >
-                              {deletingId === doc.id ? "Suppression..." : "Supprimer"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                            <FileDown className="h-4 w-4 mr-2" />
+                            Transcrire en markdown
+                          </DropdownMenuItem>
+                        )}
+
+                        {/* Extract text to database */}
+                        {canExtractText(doc) && !doc.texte_extrait && (
+                          <DropdownMenuItem
+                            onClick={() => handleExtractText(doc)}
+                            disabled={processingId === doc.id}
+                          >
+                            <Database className="h-4 w-4 mr-2" />
+                            Charger dans la base de données
+                          </DropdownMenuItem>
+                        )}
+
+                        {/* Clear text from DB */}
+                        {doc.texte_extrait && (
+                          <DropdownMenuItem
+                            onClick={() => handleClearText(doc)}
+                            disabled={processingId === doc.id}
+                            className="text-orange-600"
+                          >
+                            <DatabaseBackup className="h-4 w-4 mr-2" />
+                            Retirer de la base de données
+                          </DropdownMenuItem>
+                        )}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Delete document */}
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setDocToDelete(doc);
+                            setDeleteDialogOpen(true);
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Retirer du dossier
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })}
@@ -315,6 +468,28 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange }: Documents
           )}
         </CardContent>
       </Card>
+
+      {/* AlertDialog for document deletion */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer ce document ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le document « {docToDelete?.nom_fichier} » sera retiré de ce dossier.
+              Le fichier original ne sera pas supprimé de votre disque.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDocToDelete(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deletingId === docToDelete?.id}
+            >
+              {deletingId === docToDelete?.id ? "Retrait..." : "Retirer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
