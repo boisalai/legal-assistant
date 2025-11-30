@@ -61,11 +61,18 @@ class DocumentResponse(BaseModel):
     file_path: str
     created_at: str
     texte_extrait: Optional[str] = None
+    file_exists: bool = True  # Whether the file exists on disk
 
 
 class DocumentListResponse(BaseModel):
     documents: list[DocumentResponse]
     total: int
+    missing_files: list[str] = []  # List of document IDs with missing files
+
+
+class RegisterDocumentRequest(BaseModel):
+    """Request to register a document by file path (no upload/copy)."""
+    file_path: str  # Absolute path to the file on disk
 
 
 # ============================================================================
@@ -96,10 +103,17 @@ def get_mime_type(filename: str) -> str:
 @router.get("/{judgment_id}/documents", response_model=DocumentListResponse)
 async def list_documents(
     judgment_id: str,
+    verify_files: bool = True,
+    auto_remove_missing: bool = True,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
     Liste les documents d'un dossier.
+
+    Args:
+        judgment_id: ID du dossier
+        verify_files: Si True, verifie que les fichiers existent sur le disque
+        auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
     """
     try:
         service = get_surreal_service()
@@ -117,10 +131,26 @@ async def list_documents(
         )
 
         documents = []
+        missing_files = []
+        docs_to_remove = []
+
         if result and len(result) > 0:
             items = result[0].get("result", result) if isinstance(result[0], dict) else result
             if isinstance(items, list):
                 for item in items:
+                    file_path = item.get("file_path", "")
+                    file_exists = True
+
+                    # Check if file exists on disk
+                    if verify_files and file_path:
+                        file_exists = Path(file_path).exists()
+                        if not file_exists:
+                            doc_id = str(item.get("id", ""))
+                            missing_files.append(doc_id)
+                            if auto_remove_missing:
+                                docs_to_remove.append(doc_id)
+                                continue  # Skip adding to response
+
                     documents.append(DocumentResponse(
                         id=str(item.get("id", "")),
                         judgment_id=item.get("judgment_id", judgment_id),
@@ -128,12 +158,26 @@ async def list_documents(
                         type_fichier=item.get("type_fichier", ""),
                         type_mime=item.get("type_mime", ""),
                         taille=item.get("taille", 0),
-                        file_path=item.get("file_path", ""),
+                        file_path=file_path,
                         created_at=item.get("created_at", ""),
                         texte_extrait=item.get("texte_extrait"),
+                        file_exists=file_exists,
                     ))
 
-        return DocumentListResponse(documents=documents, total=len(documents))
+        # Auto-remove documents with missing files
+        if docs_to_remove:
+            for doc_id in docs_to_remove:
+                try:
+                    await service.delete(doc_id)
+                    logger.info(f"Auto-removed document with missing file: {doc_id}")
+                except Exception as e:
+                    logger.warning(f"Could not auto-remove document {doc_id}: {e}")
+
+        return DocumentListResponse(
+            documents=documents,
+            total=len(documents),
+            missing_files=missing_files
+        )
 
     except Exception as e:
         logger.error(f"Error listing documents: {e}")
@@ -225,6 +269,106 @@ async def upload_document(
         raise
     except Exception as e:
         logger.error(f"Error uploading document: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/{judgment_id}/documents/register", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+async def register_document(
+    judgment_id: str,
+    request: RegisterDocumentRequest,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Enregistre un document par son chemin de fichier (sans copie).
+
+    Le fichier reste a son emplacement d'origine sur le disque.
+    L'application stocke uniquement une reference vers ce fichier.
+    Le texte est automatiquement extrait pour permettre l'analyse par l'IA.
+    """
+    file_path = Path(request.file_path)
+
+    # Verify file exists
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Le fichier n'existe pas: {request.file_path}"
+        )
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Le chemin n'est pas un fichier: {request.file_path}"
+        )
+
+    # Check file type
+    filename = file_path.name
+    if not is_allowed_file(filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Type de fichier non supporte. Extensions acceptees: {', '.join(ALLOWED_EXTENSIONS.keys())}"
+        )
+
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize judgment ID
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+
+        # Get file info
+        file_size = file_path.stat().st_size
+        ext = get_file_extension(filename)
+
+        # Check file size
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
+            )
+
+        # Generate document ID
+        doc_id = str(uuid.uuid4())[:8]
+
+        # NOTE: No automatic text extraction on file registration
+        # User must explicitly trigger extraction/transcription via the UI or assistant
+
+        # Create document record in database (no file copy!)
+        now = datetime.utcnow().isoformat()
+        document_data = {
+            "judgment_id": judgment_id,
+            "nom_fichier": filename,
+            "type_fichier": ext.lstrip('.'),
+            "type_mime": get_mime_type(filename),
+            "taille": file_size,
+            "file_path": str(file_path.absolute()),  # Store absolute path
+            "user_id": user_id,
+            "created_at": now,
+        }
+
+        await service.create("document", document_data, record_id=doc_id)
+        logger.info(f"Document registered (no copy): {doc_id} -> {file_path}")
+
+        return DocumentResponse(
+            id=f"document:{doc_id}",
+            judgment_id=judgment_id,
+            nom_fichier=filename,
+            type_fichier=ext.lstrip('.'),
+            type_mime=get_mime_type(filename),
+            taille=file_size,
+            file_path=str(file_path.absolute()),
+            created_at=now,
+            file_exists=True,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -357,18 +501,15 @@ async def delete_document(
                         await service.merge(audio_doc_id, {"texte_extrait": None})
                         logger.info(f"Cleared texte_extrait from source audio document: {audio_doc_id}")
 
-        # Delete file from disk
+        # NOTE: We no longer delete files from disk!
+        # Documents are now references to files at their original location.
+        # Only the database record is deleted.
         file_path = item.get("file_path")
-        if file_path:
-            try:
-                Path(file_path).unlink(missing_ok=True)
-                logger.info(f"File deleted: {file_path}")
-            except Exception as e:
-                logger.warning(f"Could not delete file: {e}")
+        logger.info(f"Document reference removed (file NOT deleted): {doc_id} -> {file_path}")
 
-        # Delete from database
+        # Delete from database only
         await service.delete(doc_id)
-        logger.info(f"Document deleted: {doc_id}")
+        logger.info(f"Document record deleted: {doc_id}")
 
     except HTTPException:
         raise
@@ -384,10 +525,15 @@ async def delete_document(
 async def download_document(
     judgment_id: str,
     doc_id: str,
+    inline: bool = False,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Telecharge un document.
+    Telecharge un document ou l'affiche inline.
+
+    Args:
+        inline: Si True, affiche le fichier dans le navigateur (pour iframe/preview)
+                Si False, force le telechargement
     """
     try:
         service = get_surreal_service()
@@ -427,11 +573,22 @@ async def download_document(
                 detail="Fichier non trouve sur le disque"
             )
 
-        return FileResponse(
-            path=file_path,
-            filename=item.get("nom_fichier", "document"),
-            media_type=item.get("type_mime", "application/octet-stream"),
-        )
+        media_type = item.get("type_mime", "application/octet-stream")
+
+        if inline:
+            # For inline display (iframe/preview), don't set filename
+            # This results in Content-Disposition: inline
+            return FileResponse(
+                path=file_path,
+                media_type=media_type,
+            )
+        else:
+            # For download, set filename which triggers attachment disposition
+            return FileResponse(
+                path=file_path,
+                filename=item.get("nom_fichier", "document"),
+                media_type=media_type,
+            )
 
     except HTTPException:
         raise
@@ -445,6 +602,174 @@ async def download_document(
 
 # Audio file extensions that can be transcribed
 AUDIO_EXTENSIONS = {'.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.aac'}
+
+
+class ExtractionResponse(BaseModel):
+    success: bool
+    text: str = ""
+    method: str = ""
+    error: str = ""
+
+
+@router.post("/{judgment_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
+async def extract_document_text(
+    judgment_id: str,
+    doc_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Extrait le texte d'un document (PDF, Word, texte, markdown).
+
+    Pour les fichiers audio, utilisez l'endpoint /transcribe.
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+        if not doc_id.startswith("document:"):
+            doc_id = f"document:{doc_id}"
+
+        # Get document
+        clean_id = doc_id.replace("document:", "")
+        result = await service.query(
+            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
+            {"doc_id": clean_id}
+        )
+
+        if not result or len(result) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouve"
+            )
+
+        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        if not items or len(items) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouve"
+            )
+
+        item = items[0]
+        file_path = item.get("file_path")
+
+        if not file_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chemin du fichier non trouve"
+            )
+
+        if not Path(file_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Fichier non trouve sur le disque"
+            )
+
+        # Check if it's an audio file (should use transcribe endpoint instead)
+        ext = Path(file_path).suffix.lower()
+        if ext in AUDIO_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Utilisez l'endpoint /transcribe pour les fichiers audio"
+            )
+
+        # Extract text
+        from services.document_extraction_service import get_extraction_service
+
+        extraction_service = get_extraction_service()
+        extraction_result = await extraction_service.extract(file_path)
+
+        if not extraction_result.success:
+            logger.error(f"Extraction failed for {file_path}: {extraction_result.error}")
+            return ExtractionResponse(
+                success=False,
+                error=extraction_result.error or "Erreur d'extraction inconnue"
+            )
+
+        # Update document with extracted text
+        now = datetime.utcnow().isoformat()
+        await service.merge(doc_id, {
+            "texte_extrait": extraction_result.text,
+            "extraction_method": extraction_result.extraction_method,
+            "updated_at": now,
+        })
+
+        logger.info(f"Text extracted for document {doc_id}: {len(extraction_result.text)} chars via {extraction_result.extraction_method}")
+
+        return ExtractionResponse(
+            success=True,
+            text=extraction_result.text[:500] + "..." if len(extraction_result.text) > 500 else extraction_result.text,
+            method=extraction_result.extraction_method
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting document: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.delete("/{judgment_id}/documents/{doc_id}/text")
+async def clear_document_text(
+    judgment_id: str,
+    doc_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Efface le texte extrait d'un document.
+
+    Supprime le champ texte_extrait du document dans la base de données.
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+        if not doc_id.startswith("document:"):
+            doc_id = f"document:{doc_id}"
+
+        # Get document to verify it exists
+        clean_id = doc_id.replace("document:", "")
+        result = await service.query(
+            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
+            {"doc_id": clean_id}
+        )
+
+        if not result or len(result) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouvé"
+            )
+
+        # Clear texte_extrait
+        now = datetime.utcnow().isoformat()
+        await service.merge(doc_id, {
+            "texte_extrait": None,
+            "extraction_method": None,
+            "updated_at": now,
+        })
+
+        logger.info(f"Cleared texte_extrait for document {doc_id}")
+
+        return {"success": True, "message": "Texte extrait supprimé"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error clearing document text: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 class TranscriptionResponse(BaseModel):
@@ -591,6 +916,13 @@ from fastapi.responses import StreamingResponse
 class TranscribeWorkflowRequest(BaseModel):
     language: str = "fr"
     create_markdown: bool = True
+    raw_mode: bool = False  # Si True, pas de formatage LLM - juste la transcription Whisper brute
+
+
+class YouTubeDownloadRequest(BaseModel):
+    """Request pour télécharger l'audio d'une vidéo YouTube."""
+    url: str
+    auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
 
 
 @router.post("/{judgment_id}/documents/{doc_id}/transcribe-workflow")
@@ -702,7 +1034,8 @@ async def transcribe_document_workflow(
                         audio_path=file_path,
                         judgment_id=judgment_id,
                         language=request.language,
-                        create_markdown_doc=request.create_markdown
+                        create_markdown_doc=request.create_markdown,
+                        raw_mode=request.raw_mode
                     )
                     await progress_queue.put({
                         "type": "complete",
@@ -753,6 +1086,168 @@ async def transcribe_document_workflow(
         raise
     except Exception as e:
         logger.error(f"Error starting transcription workflow: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# ============================================================================
+# YouTube Download
+# ============================================================================
+
+class YouTubeInfoResponse(BaseModel):
+    """Informations sur une vidéo YouTube."""
+    title: str
+    duration: int
+    uploader: str
+    thumbnail: str
+    url: str
+
+
+class YouTubeDownloadResponse(BaseModel):
+    """Réponse du téléchargement YouTube."""
+    success: bool
+    document_id: str = ""
+    filename: str = ""
+    title: str = ""
+    duration: int = 0
+    error: str = ""
+
+
+@router.post("/{judgment_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
+async def get_youtube_info(
+    judgment_id: str,
+    request: YouTubeDownloadRequest,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Récupère les informations d'une vidéo YouTube sans la télécharger.
+    """
+    try:
+        from services.youtube_service import get_youtube_service, YTDLP_AVAILABLE
+
+        if not YTDLP_AVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="yt-dlp n'est pas installé. Exécuter: uv add yt-dlp"
+            )
+
+        youtube_service = get_youtube_service()
+
+        if not youtube_service.is_valid_youtube_url(request.url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="URL YouTube invalide"
+            )
+
+        info = await youtube_service.get_video_info(request.url)
+
+        return YouTubeInfoResponse(
+            title=info.title,
+            duration=info.duration,
+            uploader=info.uploader,
+            thumbnail=info.thumbnail,
+            url=info.url,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting YouTube info: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/{judgment_id}/documents/youtube", response_model=YouTubeDownloadResponse)
+async def download_youtube_audio(
+    judgment_id: str,
+    request: YouTubeDownloadRequest,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Télécharge l'audio d'une vidéo YouTube et l'ajoute comme document.
+
+    Le fichier est téléchargé en MP3 et enregistré dans le dossier du jugement.
+    """
+    try:
+        from services.youtube_service import get_youtube_service, YTDLP_AVAILABLE
+
+        if not YTDLP_AVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="yt-dlp n'est pas installé. Exécuter: uv add yt-dlp"
+            )
+
+        youtube_service = get_youtube_service()
+
+        if not youtube_service.is_valid_youtube_url(request.url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="URL YouTube invalide"
+            )
+
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize judgment ID
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+
+        # Create upload directory for this judgment
+        upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        # Download audio
+        logger.info(f"Downloading YouTube audio: {request.url}")
+        result = await youtube_service.download_audio(request.url, str(upload_dir))
+
+        if not result.success:
+            return YouTubeDownloadResponse(
+                success=False,
+                error=result.error or "Erreur de téléchargement inconnue"
+            )
+
+        # Create document record in database
+        doc_id = str(uuid.uuid4())[:8]
+        now = datetime.utcnow().isoformat()
+
+        file_path = Path(result.file_path)
+        document_data = {
+            "judgment_id": judgment_id,
+            "nom_fichier": result.filename,
+            "type_fichier": "mp3",
+            "type_mime": "audio/mpeg",
+            "taille": file_path.stat().st_size if file_path.exists() else 0,
+            "file_path": str(file_path.absolute()),
+            "user_id": user_id,
+            "created_at": now,
+            "source": "youtube",
+            "source_url": request.url,
+            "metadata": {
+                "youtube_title": result.title,
+                "duration_seconds": result.duration,
+            }
+        }
+
+        await service.create("document", document_data, record_id=doc_id)
+        logger.info(f"YouTube audio saved as document: {doc_id}")
+
+        return YouTubeDownloadResponse(
+            success=True,
+            document_id=f"document:{doc_id}",
+            filename=result.filename,
+            title=result.title,
+            duration=result.duration,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading YouTube audio: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/layout";
 import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
 import { AssistantPanel } from "@/components/cases/assistant-panel";
+import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
+import { LinkFileModal } from "@/components/cases/link-file-modal";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { casesApi, documentsApi, analysisApi } from "@/lib/api";
@@ -31,6 +33,8 @@ export default function CaseDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [audioModalOpen, setAudioModalOpen] = useState(false);
+  const [linkFileModalOpen, setLinkFileModalOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
 
   const fetchCaseDetails = useCallback(async () => {
     try {
@@ -91,6 +95,10 @@ export default function CaseDetailPage() {
     setAudioModalOpen(true);
   };
 
+  const handleLinkFile = () => {
+    setLinkFileModalOpen(true);
+  };
+
   const handleUploadComplete = async () => {
     // Refresh documents list
     await fetchCaseDetails();
@@ -131,21 +139,21 @@ export default function CaseDetailPage() {
     try {
       await documentsApi.delete(caseId, docId);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
-      toast.success("Document supprimé");
+      toast.success("Document retiré");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la suppression");
+      toast.error(err instanceof Error ? err.message : "Erreur lors du retrait");
     }
   };
 
-  const handleDownloadDocument = (docId: string) => {
-    // Trigger download using the correct API URL
-    const url = documentsApi.getDownloadUrl(caseId, docId);
-    window.open(url, "_blank");
+  const handlePreviewDocument = (docId: string) => {
+    const doc = documents.find((d) => d.id === docId);
+    if (doc) {
+      setPreviewDocument(doc);
+    }
   };
 
-  const handlePreviewDocument = (docId: string) => {
-    // TODO: Open preview modal
-    toast.info("Prévisualisation non disponible pour le moment");
+  const handleClosePreview = () => {
+    setPreviewDocument(null);
   };
 
   if (loading) {
@@ -179,7 +187,7 @@ export default function CaseDetailPage() {
   const isAnalyzing = caseData.status === "en_analyse" || caseData.status === "analyzing";
 
   return (
-    <AppShell>
+    <AppShell noPadding>
       <div className="flex flex-col h-full">
         {/* Split View */}
         <div className="flex-1 overflow-hidden">
@@ -192,13 +200,14 @@ export default function CaseDetailPage() {
                 checklist={checklist}
                 onUploadDocuments={handleUploadDocuments}
                 onRecordAudio={handleRecordAudio}
+                onLinkFile={handleLinkFile}
                 onAnalyze={handleAnalyze}
                 onUpdateCase={handleUpdateCase}
                 onDeleteDocument={handleDeleteDocument}
-                onDownloadDocument={handleDownloadDocument}
                 onPreviewDocument={handlePreviewDocument}
                 onDelete={handleDelete}
                 onAnalysisComplete={handleAnalysisComplete}
+                onDocumentsChange={fetchCaseDetails}
                 deleting={deleting}
                 isAnalyzing={isAnalyzing}
               />
@@ -207,15 +216,42 @@ export default function CaseDetailPage() {
             {/* Resize Handle */}
             <PanelResizeHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
 
-            {/* Right Panel: AI Assistant */}
+            {/* Right Panel: Document Preview (top) + AI Assistant (bottom) */}
             <Panel defaultSize={40} minSize={30}>
-              <AssistantPanel
-                caseId={caseId}
-                onAnalyze={handleAnalyze}
-                isAnalyzing={isAnalyzing}
-                hasDocuments={documents.length > 0}
-                onDocumentCreated={handleDocumentCreated}
-              />
+              {previewDocument ? (
+                <PanelGroup direction="vertical">
+                  {/* Document Preview Panel (top) */}
+                  <Panel defaultSize={50} minSize={20}>
+                    <DocumentPreviewPanel
+                      document={previewDocument}
+                      caseId={caseId}
+                      onClose={handleClosePreview}
+                    />
+                  </Panel>
+
+                  {/* Vertical Resize Handle */}
+                  <PanelResizeHandle className="h-px bg-border hover:bg-primary/50 transition-colors" />
+
+                  {/* AI Assistant Panel (bottom) */}
+                  <Panel defaultSize={50} minSize={20}>
+                    <AssistantPanel
+                      caseId={caseId}
+                      onAnalyze={handleAnalyze}
+                      isAnalyzing={isAnalyzing}
+                      hasDocuments={documents.length > 0}
+                      onDocumentCreated={handleDocumentCreated}
+                    />
+                  </Panel>
+                </PanelGroup>
+              ) : (
+                <AssistantPanel
+                  caseId={caseId}
+                  onAnalyze={handleAnalyze}
+                  isAnalyzing={isAnalyzing}
+                  hasDocuments={documents.length > 0}
+                  onDocumentCreated={handleDocumentCreated}
+                />
+              )}
             </Panel>
           </PanelGroup>
         </div>
@@ -232,6 +268,12 @@ export default function CaseDetailPage() {
           onClose={() => setAudioModalOpen(false)}
           caseId={caseId}
           onUploadComplete={handleUploadComplete}
+        />
+        <LinkFileModal
+          open={linkFileModalOpen}
+          onClose={() => setLinkFileModalOpen(false)}
+          caseId={caseId}
+          onLinkComplete={handleUploadComplete}
         />
       </div>
     </AppShell>

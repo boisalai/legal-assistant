@@ -235,6 +235,15 @@ Transcription brute:
 
             if hasattr(format_result, 'content') and format_result.content:
                 formatted_markdown = format_result.content
+                # Strip wrapper markdown code blocks if present
+                # The LLM sometimes wraps the entire output in ```markdown ... ```
+                formatted_markdown = formatted_markdown.strip()
+                if formatted_markdown.startswith("```markdown"):
+                    formatted_markdown = formatted_markdown[len("```markdown"):].strip()
+                elif formatted_markdown.startswith("```"):
+                    formatted_markdown = formatted_markdown[3:].strip()
+                if formatted_markdown.endswith("```"):
+                    formatted_markdown = formatted_markdown[:-3].strip()
             else:
                 # Fallback: créer un markdown basique
                 formatted_markdown = self._create_basic_markdown(
@@ -298,16 +307,18 @@ Transcription brute:
         markdown_content: str,
         duration: float,
         language: str,
+        audio_file_path: str = "",
     ) -> Optional[dict]:
         """
         Étape 3: Sauvegarde du document markdown.
+
+        Le fichier markdown est sauvegardé dans le même répertoire que le fichier audio source.
         """
         self._emit_step_start("saving")
         self._emit_progress("saving", "Création du document markdown...", 80)
 
         try:
             from services.surreal_service import get_surreal_service
-            from config.settings import settings
 
             service = get_surreal_service()
             if not service.db:
@@ -321,12 +332,17 @@ Transcription brute:
             base_name = Path(audio_filename).stem
             md_filename = f"{base_name}.md"
 
-            # Créer le répertoire
-            upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
-            upload_dir.mkdir(parents=True, exist_ok=True)
+            # Save in the same directory as the original audio file
+            if audio_file_path:
+                save_dir = Path(audio_file_path).parent
+            else:
+                # Fallback to default upload directory if no audio path
+                from config.settings import settings
+                save_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                save_dir.mkdir(parents=True, exist_ok=True)
 
             # Sauvegarder le fichier
-            file_path = upload_dir / md_filename
+            file_path = save_dir / md_filename
             file_path.write_text(markdown_content, encoding="utf-8")
 
             logger.info(f"Markdown file saved: {file_path}")
@@ -379,13 +395,14 @@ Transcription brute:
         language: str = "fr",
         create_markdown_doc: bool = True,
         original_filename: str = "",
+        raw_mode: bool = False,
     ) -> TranscriptionWorkflowResult:
         """
         Exécute le workflow de transcription complet.
 
         Le workflow enchaîne 3 étapes:
         1. Transcription Whisper (fonction Python)
-        2. Formatage markdown (Agent LLM)
+        2. Formatage markdown (Agent LLM) - sauté si raw_mode=True
         3. Sauvegarde (fonction Python)
 
         Args:
@@ -394,6 +411,7 @@ Transcription brute:
             language: Langue de l'audio
             create_markdown_doc: Si True, crée un document markdown dans le dossier
             original_filename: Nom original du fichier (si différent du nom sur disque)
+            raw_mode: Si True, sauvegarde la transcription brute sans formatage LLM
 
         Returns:
             TranscriptionWorkflowResult avec tous les détails
@@ -420,12 +438,16 @@ Transcription brute:
             result.steps_completed.append("transcription")
 
             # ============================================================
-            # STEP 2: Formatage avec Agent LLM
+            # STEP 2: Formatage avec Agent LLM (sauté si raw_mode=True)
             # ============================================================
-            format_result = self._format_step(transcription_result, audio_filename)
-
-            result.formatted_markdown = format_result.get("formatted_markdown", "")
-            result.steps_completed.append("formatting")
+            if raw_mode:
+                # Mode brut: utiliser directement le texte Whisper sans formatage
+                result.formatted_markdown = transcription_result["text"]
+                self._emit_progress("formatting", "Mode brut - pas de formatage LLM", 75)
+            else:
+                format_result = self._format_step(transcription_result, audio_filename)
+                result.formatted_markdown = format_result.get("formatted_markdown", "")
+                result.steps_completed.append("formatting")
 
             # ============================================================
             # STEP 3: Sauvegarde du document markdown
@@ -437,6 +459,7 @@ Transcription brute:
                     markdown_content=result.formatted_markdown,
                     duration=result.duration_seconds,
                     language=result.language,
+                    audio_file_path=audio_path,  # Pass original audio path
                 )
 
                 if doc_result:
@@ -512,6 +535,7 @@ async def transcribe_audio_to_markdown(
     language: str = "fr",
     model: Optional[Any] = None,
     on_progress: Optional[Callable[[str, str, int], None]] = None,
+    raw_mode: bool = False,
 ) -> TranscriptionWorkflowResult:
     """
     Fonction helper pour transcrire un audio et créer un document markdown.
@@ -522,6 +546,7 @@ async def transcribe_audio_to_markdown(
         language: Langue de l'audio
         model: Modèle LLM optionnel
         on_progress: Callback de progression optionnel
+        raw_mode: Si True, sauvegarde la transcription brute sans formatage LLM
 
     Returns:
         TranscriptionWorkflowResult
@@ -535,4 +560,5 @@ async def transcribe_audio_to_markdown(
         audio_path=audio_path,
         judgment_id=judgment_id,
         language=language,
+        raw_mode=raw_mode,
     )

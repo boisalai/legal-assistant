@@ -178,6 +178,12 @@ export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, 
     return modelId;
   };
 
+  // Check if message looks like a transcription request
+  const isTranscriptionRequest = (message: string): boolean => {
+    const keywords = ["transcri", "audio", "fichier audio", "enregistrement", "dictée", "voix"];
+    return keywords.some(kw => message.toLowerCase().includes(kw));
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -192,41 +198,114 @@ export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, 
     setIsLoading(true);
 
     try {
-      let assistantResponse: string;
-
       if (backendConnected) {
-        // Use real backend chat API
-        // Build history for context
-        const history: ApiChatMessage[] = messages.map((msg) => ({
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-        }));
+        // Check if this might be a transcription request - use streaming
+        const useStreaming = isTranscriptionRequest(currentMessage);
 
-        // Call chat API with current model configuration
-        const response = await chatApi.send(currentMessage, {
-          caseId,
-          model: config.model,
-          history,
-        });
+        if (useStreaming) {
+          // Use streaming API for transcription requests
+          const history: ApiChatMessage[] = messages.map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          }));
 
-        assistantResponse = response.message;
+          const response = await chatApi.stream(currentMessage, {
+            caseId,
+            model: config.model,
+            history,
+          });
 
-        // If a document was created during the chat (e.g., transcription), notify parent
-        if (response.document_created && onDocumentCreated) {
-          onDocumentCreated();
+          // Read SSE stream
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error("No response body");
+          }
+
+          const decoder = new TextDecoder();
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const text = decoder.decode(value);
+              const lines = text.split("\n");
+
+              let eventType = "";
+              for (const line of lines) {
+                if (line.startsWith("event: ")) {
+                  eventType = line.slice(7).trim();
+                } else if (line.startsWith("data: ")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+
+                    switch (eventType) {
+                      case "complete_message":
+                        // Add each complete message as a separate assistant message
+                        setMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: data.content },
+                        ]);
+                        break;
+                      case "document_created":
+                        // Notify parent that a document was created
+                        if (onDocumentCreated) {
+                          onDocumentCreated();
+                        }
+                        break;
+                      case "error":
+                        setMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: `Erreur: ${data.error}` },
+                        ]);
+                        break;
+                      case "done":
+                        // Streaming complete
+                        break;
+                    }
+                  } catch {
+                    // Ignore JSON parse errors for incomplete data
+                  }
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        } else {
+          // Use regular chat API for non-transcription requests
+          const history: ApiChatMessage[] = messages.map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          }));
+
+          const response = await chatApi.send(currentMessage, {
+            caseId,
+            model: config.model,
+            history,
+          });
+
+          const assistantMessage: Message = {
+            role: "assistant",
+            content: response.message,
+          };
+
+          setMessages((prev) => [...prev, assistantMessage]);
+
+          // If a document was created during the chat (e.g., transcription), notify parent
+          if (response.document_created && onDocumentCreated) {
+            onDocumentCreated();
+          }
         }
       } else {
         // Simulated response when backend is not available
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        assistantResponse = `Le backend n'est pas disponible. Démarrez le serveur backend pour utiliser l'assistant IA. Votre question était: "${currentMessage}"`;
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: `Le backend n'est pas disponible. Démarrez le serveur backend pour utiliser l'assistant IA. Votre question était: "${currentMessage}"`,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
       }
-
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: assistantResponse,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage: Message = {
         role: "assistant",
@@ -318,7 +397,7 @@ export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, 
               </div>
             )}
             <div
-              className={`max-w-[80%] rounded-lg p-4 ${
+              className={`max-w-[80%] rounded-lg px-3 py-2 ${
                 message.role === "user"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted"

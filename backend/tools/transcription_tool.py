@@ -87,6 +87,101 @@ async def _find_audio_document(judgment_id: str, filename: Optional[str] = None)
     return audio_docs[0] if audio_docs else None
 
 
+async def transcribe_audio_streaming(
+    case_id: str,
+    audio_filename: Optional[str] = None,
+    language: str = "fr",
+    raw_mode: bool = False
+) -> dict:
+    """
+    Transcribe audio and return structured result for streaming.
+
+    Returns a dict with:
+    - success: bool
+    - transcript_text: str (if success)
+    - original_filename: str
+    - markdown_filename: str (if markdown created)
+    - document_id: str (if document created)
+    - error: str (if failed)
+
+    Args:
+        case_id: ID of the case
+        audio_filename: Optional specific filename to transcribe
+        language: Language code for transcription
+        raw_mode: If True, skip LLM formatting and save raw Whisper output
+    """
+    try:
+        # Find the audio document
+        document = await _find_audio_document(case_id, audio_filename)
+
+        if not document:
+            if audio_filename:
+                return {"success": False, "error": f"Fichier audio '{audio_filename}' non trouvé dans ce dossier."}
+            return {"success": False, "error": "Aucun fichier audio trouvé dans ce dossier."}
+
+        doc_name = document.get("nom_fichier", "")
+        doc_id = document.get("id", "")
+        file_path = document.get("file_path", "")
+
+        # Check if already transcribed
+        if document.get("texte_extrait"):
+            return {
+                "success": True,
+                "transcript_text": document["texte_extrait"],
+                "original_filename": doc_name,
+                "already_transcribed": True
+            }
+
+        if not file_path or not Path(file_path).exists():
+            return {"success": False, "error": f"Fichier audio '{doc_name}' non accessible."}
+
+        # Normalize judgment_id
+        judgment_id = case_id
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+
+        # Import and run the transcription workflow
+        from workflows.transcribe_audio import TranscriptionWorkflow
+
+        workflow = TranscriptionWorkflow(
+            whisper_model="large-v3-turbo"
+        )
+
+        result = await workflow.run(
+            audio_path=file_path,
+            judgment_id=judgment_id,
+            language=language,
+            create_markdown_doc=True,
+            original_filename=doc_name,
+            raw_mode=raw_mode
+        )
+
+        if result.success:
+            # Note: We no longer store transcription in the audio source document
+            # The transcription is stored in the markdown file created by the workflow
+
+            md_filename = f"{Path(doc_name).stem}.md"
+
+            return {
+                "success": True,
+                "transcript_text": result.transcript_text,
+                "original_filename": doc_name,
+                "markdown_filename": md_filename,
+                "document_id": result.document_id if hasattr(result, 'document_id') else None,
+                "raw_mode": raw_mode
+            }
+        else:
+            return {"success": False, "error": result.error or "Erreur inconnue"}
+
+    except ImportError as e:
+        if "whisper" in str(e).lower():
+            return {"success": False, "error": "Whisper n'est pas installé. Exécutez: uv sync --extra whisper"}
+        raise
+    except Exception as e:
+        logger.error(f"Transcription streaming error: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
 @tool(name="transcribe_audio")
 async def transcribe_audio(
     case_id: str,
@@ -151,13 +246,10 @@ async def transcribe_audio(
         if result.success:
             response = f"J'ai transcrit le fichier audio '{doc_name}'.\n\n"
 
-            if result.formatted_markdown:
-                # Update the document with the transcription (use merge to preserve other fields)
-                service = get_surreal_service()
-                await service.merge(doc_id, {
-                    "texte_extrait": result.transcript_text
-                })
+            # Note: We no longer store transcription in the audio source document
+            # The transcription is stored in the markdown file created by the workflow
 
+            if result.formatted_markdown:
                 response += f"Un document markdown '{Path(doc_name).stem}.md' a été créé avec le contenu formaté.\n\n"
                 response += f"**Aperçu de la transcription:**\n\n{result.transcript_text[:800]}"
                 if len(result.transcript_text) > 800:

@@ -11,9 +11,10 @@
 
 2. **Gestion des documents**
    - Upload de fichiers (PDF, Word, images, audio)
-   - Téléchargement et prévisualisation
+   - Téléchargement et prévisualisation inline (PDF s'affiche dans le navigateur)
    - Suppression avec nettoyage des fichiers
    - Indicateur "Texte extrait" pour les fichiers transcrits
+   - Liaison de fichiers locaux (File System Access API)
 
 3. **Transcription audio**
    - Whisper MLX (modèle large-v3-turbo recommandé)
@@ -28,8 +29,14 @@
 
 5. **Configuration LLM**
    - Interface UI pour changer de modèle
-   - Persistance des paramètres dans SurrealDB
+   - Persistance des paramètres dans localStorage
    - Chargement automatique de ANTHROPIC_API_KEY depuis .env
+
+6. **Interface utilisateur (UI/UX)**
+   - Panel de prévisualisation de documents avec affichage inline PDF
+   - Panel Assistant IA avec split vertical lors de la prévisualisation
+   - Panneaux redimensionnables (react-resizable-panels)
+   - Messages chat avec padding réduit pour une meilleure densité
 
 ### Architecture technique
 
@@ -44,11 +51,25 @@ Voir `ARCHITECTURE.md` pour la documentation complète :
 
 | Fichier | Description |
 |---------|-------------|
-| `backend/workflows/transcribe_audio.py` | Workflow de transcription avec pattern Agno |
-| `backend/routes/documents.py` | Gestion documents + synchronisation transcription/audio |
-| `backend/services/llm_settings.py` | Persistance config LLM |
-| `frontend/src/components/cases/tabs/documents-tab.tsx` | UI documents avec indicateur transcription |
-| `ARCHITECTURE.md` | Documentation technique complète |
+| `backend/routes/documents.py` | Endpoint download avec paramètre `inline` pour affichage navigateur |
+| `frontend/src/app/cases/[id]/page.tsx` | Split panel vertical : document preview + assistant IA |
+| `frontend/src/components/cases/document-preview-panel.tsx` | Prévisualisation avec `?inline=true` pour PDF |
+| `frontend/src/components/cases/assistant-panel.tsx` | Chat avec padding réduit (`px-3 py-2`) |
+| `frontend/src/hooks/use-file-system-access.ts` | Hook pour lier des fichiers locaux |
+
+### Dernières modifications (session actuelle)
+
+1. **Prévisualisation PDF inline** : Les PDF s'affichent maintenant dans le navigateur au lieu de se télécharger
+   - Backend : ajout paramètre `inline: bool` dans `/download` endpoint
+   - Frontend : ajout `?inline=true` à l'URL de téléchargement
+
+2. **Split panel vertical** : Quand on prévisualise un document, le panneau droit se divise :
+   - Haut : prévisualisation du document
+   - Bas : Assistant IA (qui reste toujours visible)
+   - Séparateur horizontal redimensionnable
+   - Fermer la prévisualisation (X) restaure l'Assistant IA en pleine hauteur
+
+3. **Padding des bulles de chat réduit** : `p-4` → `px-3 py-2` pour des messages plus compacts
 
 ---
 

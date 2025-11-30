@@ -5,17 +5,21 @@ Provides conversational AI chat endpoint for case discussions.
 Uses Agno Agent with tools for enhanced capabilities.
 """
 
+import asyncio
+import json
 import logging
-from typing import Optional
+import time
+from typing import Optional, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agno.agent import Agent
 
 from services.model_factory import create_model
 from services.surreal_service import get_surreal_service
-from tools.transcription_tool import transcribe_audio, get_tools_description
+from tools.transcription_tool import transcribe_audio, transcribe_audio_streaming, get_tools_description
 
 logger = logging.getLogger(__name__)
 
@@ -290,3 +294,191 @@ Contenu des documents:"""
             status_code=500,
             detail=f"Erreur lors de la génération de la réponse: {str(e)}"
         )
+
+
+@router.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Stream chat messages with progressive responses.
+
+    Uses SSE (Server-Sent Events) to send multiple messages:
+    - message: Regular text message parts
+    - complete_message: A complete standalone message
+    - document_created: Notification when a document is created
+    - done: Final event when streaming is complete
+    """
+    logger.info(f"Chat stream request: model={request.model_id}, case_id={request.case_id}")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            # Check if user is asking for transcription
+            is_transcription_request = _is_transcription_request(request.message)
+
+            if is_transcription_request and request.case_id:
+                # Handle transcription with streaming messages
+                async for event in _handle_transcription_stream(request):
+                    yield event
+            else:
+                # Regular chat - just stream the response
+                async for event in _handle_regular_chat_stream(request):
+                    yield event
+
+        except Exception as e:
+            logger.error(f"Chat stream error: {e}", exc_info=True)
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+def _is_transcription_request(message: str) -> bool:
+    """Check if the message is asking for audio transcription."""
+    message_lower = message.lower()
+    transcription_keywords = [
+        "transcri", "transcrire", "transcription",
+        "audio", "fichier audio", "enregistrement",
+        "dictée", "voix", "parole",
+    ]
+    return any(kw in message_lower for kw in transcription_keywords)
+
+
+async def _handle_transcription_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
+    """Handle transcription request with streaming progress messages."""
+    # Find audio filename in the message
+    audio_filename = _extract_audio_filename(request.message)
+
+    # Send immediate acknowledgment (Message 1)
+    if audio_filename:
+        ack_message = f"Je vais transcrire le fichier audio **{audio_filename}** pour vous. Veuillez patienter un instant..."
+    else:
+        ack_message = "Je vais transcrire le fichier audio pour vous. Veuillez patienter un instant..."
+
+    yield f"event: complete_message\ndata: {json.dumps({'content': ack_message, 'role': 'assistant'})}\n\n"
+
+    # Start transcription with timing
+    start_time = time.time()
+
+    try:
+        # Run the transcription
+        result = await transcribe_audio_streaming(
+            case_id=request.case_id,
+            audio_filename=audio_filename,
+            language="fr"
+        )
+
+        elapsed_time = time.time() - start_time
+
+        if result.get("success"):
+            # Send completion notification (Message 2)
+            doc_name = result.get("original_filename", audio_filename or "audio")
+            md_filename = result.get("markdown_filename", f"{doc_name.rsplit('.', 1)[0]}.md")
+            completion_message = f"La transcription du fichier audio **{doc_name}** a été complétée avec succès en **{elapsed_time:.0f} secondes**. Le fichier **{md_filename}** a été créé."
+
+            yield f"event: complete_message\ndata: {json.dumps({'content': completion_message, 'role': 'assistant'})}\n\n"
+            yield f"event: document_created\ndata: {json.dumps({'document_id': result.get('document_id')})}\n\n"
+
+            # Send summary (Message 3)
+            transcript_text = result.get("transcript_text", "")
+            if transcript_text:
+                # Generate a brief summary
+                summary = _generate_transcript_summary(transcript_text)
+                summary_message = f"**Résumé de la transcription:**\n\n{summary}"
+                yield f"event: complete_message\ndata: {json.dumps({'content': summary_message, 'role': 'assistant'})}\n\n"
+        else:
+            error_message = result.get("error", "Erreur inconnue lors de la transcription")
+            yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur: {error_message}', 'role': 'assistant'})}\n\n"
+
+    except Exception as e:
+        logger.error(f"Transcription stream error: {e}", exc_info=True)
+        yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur lors de la transcription: {str(e)}', 'role': 'assistant'})}\n\n"
+
+
+def _extract_audio_filename(message: str) -> Optional[str]:
+    """Extract audio filename from user message."""
+    import re
+    # Look for common audio file patterns
+    patterns = [
+        r'["\']([^"\']+\.(mp3|wav|m4a|ogg|webm|flac|aac))["\']',  # Quoted filename
+        r'\b(\S+\.(mp3|wav|m4a|ogg|webm|flac|aac))\b',  # Unquoted filename
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _generate_transcript_summary(text: str, max_length: int = 500) -> str:
+    """Generate a brief summary of the transcript."""
+    # For now, just return the first part of the transcript
+    # TODO: Use LLM to generate proper summary
+    if len(text) <= max_length:
+        return text
+
+    # Find a good break point
+    truncated = text[:max_length]
+    last_period = truncated.rfind('.')
+    last_newline = truncated.rfind('\n')
+
+    break_point = max(last_period, last_newline)
+    if break_point > max_length // 2:
+        return truncated[:break_point + 1] + "\n\n*[Transcription complète disponible dans le fichier]*"
+
+    return truncated + "...\n\n*[Transcription complète disponible dans le fichier]*"
+
+
+async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
+    """Handle regular chat with streaming response."""
+    try:
+        # Create the model
+        model = create_model(request.model_id)
+
+        # Get tools description
+        tools_desc = get_tools_description()
+
+        # System prompt (simplified version)
+        system_content = f"""Tu es un assistant juridique expert. Tu aides les utilisateurs avec leurs questions juridiques de manière professionnelle et précise.
+
+Directives:
+- Réponds toujours en français
+- Sois concis mais complet
+- Si tu n'es pas sûr de quelque chose, dis-le clairement
+
+{tools_desc}"""
+
+        # Build conversation
+        conversation_prompt = ""
+        for msg in request.history:
+            role_name = "Utilisateur" if msg.role == "user" else "Assistant"
+            conversation_prompt += f"\n{role_name}: {msg.content}\n"
+        conversation_prompt += f"\nUtilisateur: {request.message}"
+
+        # Create agent without tools for regular chat
+        agent = Agent(
+            name="LegalAssistant",
+            model=model,
+            instructions=system_content,
+            markdown=True,
+        )
+
+        # Get response
+        response = await agent.arun(conversation_prompt)
+
+        if response and hasattr(response, 'content') and response.content:
+            yield f"event: complete_message\ndata: {json.dumps({'content': response.content, 'role': 'assistant'})}\n\n"
+        else:
+            error_msg = "Désolé, je n'ai pas pu générer une réponse."
+            yield f"event: complete_message\ndata: {json.dumps({'content': error_msg, 'role': 'assistant'})}\n\n"
+
+    except Exception as e:
+        logger.error(f"Regular chat stream error: {e}", exc_info=True)
+        yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur: {str(e)}', 'role': 'assistant'})}\n\n"

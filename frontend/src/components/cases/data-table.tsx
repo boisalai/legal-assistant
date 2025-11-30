@@ -50,13 +50,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronDown, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   onDeleteSelected?: (ids: string[]) => void;
   initialFilter?: string;
+  onNewCase?: () => void;
+  newCaseLabel?: string;
 }
 
 // Filter options
@@ -82,6 +84,8 @@ export function DataTable<TData extends { id: string }, TValue>({
   data,
   onDeleteSelected,
   initialFilter = "",
+  onNewCase,
+  newCaseLabel = "Nouveau dossier",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -222,9 +226,12 @@ export function DataTable<TData extends { id: string }, TValue>({
           )}
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} dossier(s)
-        </div>
+        {onNewCase && (
+          <Button className="gap-2" onClick={onNewCase}>
+            <Plus className="h-4 w-4" />
+            {newCaseLabel}
+          </Button>
+        )}
       </div>
 
       {/* Table */}
