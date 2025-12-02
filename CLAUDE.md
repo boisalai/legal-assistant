@@ -1,6 +1,6 @@
 # Legal Assistant - Notes de développement
 
-## État actuel du projet (2025-11-30)
+## État actuel du projet (2025-12-01)
 
 ### Fonctionnalités implémentées
 
@@ -38,6 +38,14 @@
    - Panneaux redimensionnables (react-resizable-panels)
    - Messages chat avec padding réduit pour une meilleure densité
 
+7. **Indexation vectorielle et recherche sémantique**
+   - Embeddings via sentence-transformers (BGE-M3)
+   - Accélération GPU avec MPS (Apple Silicon) / CUDA / CPU
+   - Chunking intelligent avec overlap (400 mots, 50 mots d'overlap)
+   - Recherche sémantique dans les documents via outil `semantic_search`
+   - Indexation automatique lors de l'extraction/transcription
+   - Retry automatique (3 tentatives) pour robustesse
+
 ### Architecture technique
 
 Voir `ARCHITECTURE.md` pour la documentation complète :
@@ -57,19 +65,35 @@ Voir `ARCHITECTURE.md` pour la documentation complète :
 | `frontend/src/components/cases/assistant-panel.tsx` | Chat avec padding réduit (`px-3 py-2`) |
 | `frontend/src/hooks/use-file-system-access.ts` | Hook pour lier des fichiers locaux |
 
-### Dernières modifications (session actuelle)
+### Dernières modifications (session du 2025-12-01)
 
-1. **Prévisualisation PDF inline** : Les PDF s'affichent maintenant dans le navigateur au lieu de se télécharger
-   - Backend : ajout paramètre `inline: bool` dans `/download` endpoint
-   - Frontend : ajout `?inline=true` à l'URL de téléchargement
+#### Améliorations de robustesse et migration vers embeddings locaux
 
-2. **Split panel vertical** : Quand on prévisualise un document, le panneau droit se divise :
-   - Haut : prévisualisation du document
-   - Bas : Assistant IA (qui reste toujours visible)
-   - Séparateur horizontal redimensionnable
-   - Fermer la prévisualisation (X) restaure l'Assistant IA en pleine hauteur
+1. **Fix : UI affichant "échec" alors que l'extraction réussissait**
+   - Problème : Le frontend ne détectait pas correctement la fin du stream SSE
+   - Solution : Ajout d'un flag `receivedComplete` et gestion d'erreurs améliorée
+   - Fichiers : `frontend/src/lib/api.ts` (fonctions `transcribeWithWorkflow` et `extractPDFToMarkdown`)
 
-3. **Padding des bulles de chat réduit** : `p-4` → `px-3 py-2` pour des messages plus compacts
+2. **Fix : Crashes intermittents d'Ollama pendant l'indexation**
+   - Problème : Ollama retournait des erreurs EOF aléatoires
+   - Solution : Retry automatique (3 tentatives, 2s de délai) + gestion d'erreurs robuste
+   - Fichiers : `backend/services/document_indexing_service.py`
+
+3. **Migration : Ollama → sentence-transformers local avec MPS**
+   - Pourquoi : Plus stable, plus rapide (GPU), meilleur contrôle
+   - Changements :
+     - Modèle par défaut : `ollama:bge-m3` → `local:BAAI/bge-m3`
+     - Détection automatique GPU : MPS (Apple Silicon) / CUDA / CPU
+     - Réduction chunks : 500 → 400 mots pour plus de robustesse
+   - Fichiers :
+     - `backend/pyproject.toml` : Ajout `sentence-transformers` et `torch` en dépendances par défaut
+     - `backend/services/embedding_service.py` : Support MPS/CUDA/CPU automatique
+     - `backend/services/document_indexing_service.py` : Changement provider par défaut
+
+4. **Simplification : Dépendances de développement par défaut**
+   - `sentence-transformers`, `torch`, `mlx-whisper` installés par défaut
+   - Plus besoin de `--extra embeddings` ou `--extra whisper` en développement
+   - Un simple `uv sync` suffit pour avoir tous les outils
 
 ---
 
@@ -140,8 +164,28 @@ npm run dev -- -p 3001
 - **Port SurrealDB** : 8002 (modifié de 8001)
 - **Port Backend** : 8000
 - **Port Frontend** : 3001
-- **Whisper** : Nécessite `uv sync --extra whisper` pour l'installation
+- **Installation** : `uv sync` installe toutes les dépendances de développement (whisper, embeddings)
+- **Embeddings** : BGE-M3 via sentence-transformers avec accélération GPU (MPS/CUDA/CPU auto-détecté)
+- **Whisper** : MLX Whisper optimisé Apple Silicon
 - **Variables d'environnement** : Voir `.env.example` ou `ARCHITECTURE.md`
+
+### Configuration embeddings
+
+```python
+# backend/services/document_indexing_service.py
+embedding_provider = "local"           # local, ollama, ou openai
+embedding_model = "BAAI/bge-m3"       # Modèle HuggingFace
+chunk_size = 400                       # Mots par chunk
+chunk_overlap = 50                     # Mots d'overlap
+```
+
+### Logs à surveiller lors du démarrage
+
+```
+MPS (Metal Performance Shaders) detecte - utilisation du GPU Apple Silicon
+Chargement du modele local: BAAI/bge-m3 sur mps
+Modele BAAI/bge-m3 charge sur mps
+```
 
 ## Conventions
 

@@ -1,0 +1,23 @@
+#V2
+-- Migration: Create document_embedding table for vector search
+-- Purpose: Store document chunks and their vector embeddings for semantic search
+-- Create document_embedding table
+DEFINE TABLE document_embedding SCHEMAFULL;
+-- Fields
+DEFINE FIELD document_id ON document_embedding TYPE record<document>;
+DEFINE FIELD judgment_id ON document_embedding TYPE string;
+DEFINE FIELD chunk_index ON document_embedding TYPE int;
+DEFINE FIELD chunk_text ON document_embedding TYPE string;
+DEFINE FIELD embedding ON document_embedding TYPE array;
+DEFINE FIELD embedding_model ON document_embedding TYPE string;
+DEFINE FIELD embedding_dimensions ON document_embedding TYPE int;
+DEFINE FIELD word_count ON document_embedding TYPE int;
+DEFINE FIELD created_at ON document_embedding TYPE datetime;
+-- Indexes
+DEFINE INDEX idx_document_id ON document_embedding FIELDS document_id;
+DEFINE INDEX idx_judgment_id ON document_embedding FIELDS judgment_id;
+DEFINE INDEX idx_embedding_model ON document_embedding FIELDS embedding_model;
+-- Vector search index (if supported by SurrealDB version)
+-- Note: SurrealDB supports vector similarity via custom functions
+-- We'll use cosine similarity in the search queries
+SELECT VALUE count() FROM document_embedding GROUP ALL;

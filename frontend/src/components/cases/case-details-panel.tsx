@@ -150,6 +150,7 @@ export function CaseDetailsPanel({
   const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
   const [transcribingDocId, setTranscribingDocId] = useState<string | null>(null);
   const [clearingDocId, setClearingDocId] = useState<string | null>(null);
+  const [extractingPDFDocId, setExtractingPDFDocId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
 
@@ -160,10 +161,17 @@ export function CaseDetailsPanel({
     return audioExtensions.includes(ext) || doc.type_mime?.includes("audio");
   };
 
+  // Check if document is a PDF file
+  const isPDFFile = (doc: Document) => {
+    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    return ext === "pdf" || doc.type_mime === "application/pdf";
+  };
+
   // Check if a document can have text extracted (non-audio without texte_extrait)
   const canExtractText = (doc: Document) => {
     const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-    const extractableExtensions = ["pdf", "doc", "docx", "txt", "rtf", "md"];
+    // PDF files should use "Extraire en markdown" instead of direct extraction
+    const extractableExtensions = ["doc", "docx", "txt", "rtf", "md"];
     return extractableExtensions.includes(ext);
   };
 
@@ -196,18 +204,48 @@ export function CaseDetailsPanel({
   const handleTranscribe = async (doc: Document) => {
     setTranscribingDocId(doc.id);
     try {
-      await documentsApi.transcribeWithWorkflow(caseData.id, doc.id, {
+      const result = await documentsApi.transcribeWithWorkflow(caseData.id, doc.id, {
         language: "fr",
         createMarkdown: true,
       });
-      toast.success("Transcription terminée");
-      if (onDocumentsChange) {
-        await onDocumentsChange();
+
+      // Only refresh and show success if transcription actually succeeded
+      if (result.success) {
+        // Refresh documents list to get updated state
+        if (onDocumentsChange) {
+          await onDocumentsChange();
+        }
+        toast.success("Transcription terminée");
+      } else {
+        toast.error(result.error || "Erreur lors de la transcription");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de la transcription");
     } finally {
       setTranscribingDocId(null);
+    }
+  };
+
+  // Handle PDF extraction to markdown
+  const handleExtractPDF = async (doc: Document) => {
+    setExtractingPDFDocId(doc.id);
+    try {
+      const result = await documentsApi.extractPDFToMarkdown(caseData.id, doc.id);
+
+      // Only refresh and show success if extraction actually succeeded
+      if (result.success) {
+        // Refresh documents list to get updated state
+        if (onDocumentsChange) {
+          await onDocumentsChange();
+        }
+        toast.success("Markdown créé avec succès");
+      } else {
+        toast.error(result.error || "Erreur lors de l'extraction");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'extraction");
+    } finally {
+      setExtractingPDFDocId(null);
     }
   };
 
@@ -230,8 +268,10 @@ export function CaseDetailsPanel({
   // Handle document deletion (also clears extracted text from DB if present)
   const handleConfirmDelete = async () => {
     if (docToDelete) {
-      // If document has extracted text, clear it first
-      if (docToDelete.texte_extrait) {
+      // Only clear text for non-markdown documents with extracted text
+      // Markdown files store their content in texte_extrait but don't need clearing
+      const isMarkdown = docToDelete.nom_fichier?.endsWith('.md');
+      if (docToDelete.texte_extrait && !isMarkdown) {
         try {
           await documentsApi.clearText(caseData.id, docToDelete.id);
         } catch (err) {
@@ -395,6 +435,48 @@ export function CaseDetailsPanel({
       {/* Liste des documents */}
       <div className="space-y-2">
         <h3 className="font-semibold text-sm">Documents ({documents.length})</h3>
+
+        {/* État de la base de données - Section discrète */}
+        {documents.length > 0 && (() => {
+          const indexedDocs = documents.filter(doc => doc.texte_extrait);
+          const transcriptions = indexedDocs.filter(doc => doc.type_mime?.includes('markdown') || doc.nom_fichier?.endsWith('.md'));
+          const nonIndexedDocs = documents.filter(doc => !doc.texte_extrait);
+
+          // Calculate total words indexed
+          const totalWords = indexedDocs.reduce((sum, doc) => {
+            const text = doc.texte_extrait || '';
+            return sum + text.split(/\s+/).filter(w => w.length > 0).length;
+          }, 0);
+
+          return indexedDocs.length > 0 ? (
+            <div className="px-3 py-2 bg-muted/30 rounded-md border border-muted text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center gap-1.5">
+                    <Database className="h-3.5 w-3.5" />
+                    <span className="font-medium">{indexedDocs.length} indexé{indexedDocs.length > 1 ? 's' : ''}</span>
+                  </span>
+                  {totalWords > 0 && (
+                    <span className="text-muted-foreground/70">
+                      ~{totalWords.toLocaleString()} mots
+                    </span>
+                  )}
+                  {transcriptions.length > 0 && (
+                    <span className="text-muted-foreground/70">
+                      {transcriptions.length} transcription{transcriptions.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {nonIndexedDocs.length > 0 && (
+                    <span className="text-muted-foreground/70">
+                      {nonIndexedDocs.length} non indexé{nonIndexedDocs.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             Aucun document. Ajoutez-en un pour commencer.
@@ -413,14 +495,16 @@ export function CaseDetailsPanel({
                   </p>
                 </div>
                 {/* Status badges */}
-                {(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id) && (
+                {(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id || extractingPDFDocId === doc.id) && (
                   <Badge variant="secondary" className="shrink-0 text-xs">
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    {extractingDocId === doc.id ? "Extraction..." : transcribingDocId === doc.id ? "Transcription..." : "Suppression..."}
+                    {extractingDocId === doc.id ? "Indexation..." : transcribingDocId === doc.id ? "Transcription..." : extractingPDFDocId === doc.id ? "Extraction..." : "Suppression..."}
                   </Badge>
                 )}
-                {doc.texte_extrait && !(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id) && (
-                  <Database className="h-4 w-4 text-muted-foreground shrink-0" />
+                {doc.texte_extrait && !(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id || extractingPDFDocId === doc.id) && (
+                  <div title={`✅ Texte indexé dans SurrealDB\n📄 ${doc.texte_extrait.split(/\s+/).filter((w: string) => w.length > 0).length.toLocaleString()} mots extraits\n🔍 Disponible pour recherche RAG`}>
+                    <Database className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </div>
                 )}
                 {/* Dropdown menu */}
                 <DropdownMenu>
@@ -433,52 +517,81 @@ export function CaseDetailsPanel({
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {/* Preview */}
+                  <DropdownMenuContent align="end" className="w-56">
+                    {/* GESTION DU FICHIER */}
                     <DropdownMenuItem onClick={() => onPreviewDocument(doc.id)}>
                       <Eye className="h-4 w-4 mr-2" />
                       Visualiser
                     </DropdownMenuItem>
 
-                    <DropdownMenuSeparator />
+                    {/* INDEXATION (RAG) */}
+                    {(needsExtraction(doc) || doc.texte_extrait) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {needsExtraction(doc) && (
+                          <DropdownMenuItem
+                            onClick={() => handleExtractText(doc)}
+                            disabled={extractingDocId === doc.id}
+                          >
+                            <Database className="h-4 w-4 mr-2" />
+                            Indexer dans la base de données
+                          </DropdownMenuItem>
+                        )}
+                        {doc.texte_extrait && (
+                          <>
+                            {/* Only show "Réindexer" for non-markdown documents */}
+                            {!doc.nom_fichier?.endsWith('.md') && (
+                              <DropdownMenuItem
+                                onClick={() => handleExtractText(doc)}
+                                disabled={extractingDocId === doc.id}
+                              >
+                                <Database className="h-4 w-4 mr-2" />
+                                Réindexer (mettre à jour)
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => handleClearText(doc)}
+                              disabled={clearingDocId === doc.id}
+                              className="text-orange-600"
+                            >
+                              <DatabaseBackup className="h-4 w-4 mr-2" />
+                              Retirer de la base de données
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </>
+                    )}
 
-                    {/* Transcribe audio */}
+                    {/* PDF (si applicable) */}
+                    {isPDFFile(doc) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleExtractPDF(doc)}
+                          disabled={extractingPDFDocId === doc.id}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Extraire en markdown
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    {/* AUDIO (si applicable) */}
                     {isAudioFile(doc) && !doc.texte_extrait && (
-                      <DropdownMenuItem
-                        onClick={() => handleTranscribe(doc)}
-                        disabled={transcribingDocId === doc.id}
-                      >
-                        <Mic className="h-4 w-4 mr-2" />
-                        Transcrire en markdown
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleTranscribe(doc)}
+                          disabled={transcribingDocId === doc.id}
+                        >
+                          <Mic className="h-4 w-4 mr-2" />
+                          Transcrire en markdown
+                        </DropdownMenuItem>
+                      </>
                     )}
 
-                    {/* Extract text */}
-                    {needsExtraction(doc) && (
-                      <DropdownMenuItem
-                        onClick={() => handleExtractText(doc)}
-                        disabled={extractingDocId === doc.id}
-                      >
-                        <Database className="h-4 w-4 mr-2" />
-                        Charger dans la base de données
-                      </DropdownMenuItem>
-                    )}
-
-                    {/* Clear text from DB */}
-                    {doc.texte_extrait && (
-                      <DropdownMenuItem
-                        onClick={() => handleClearText(doc)}
-                        disabled={clearingDocId === doc.id}
-                        className="text-orange-600"
-                      >
-                        <DatabaseBackup className="h-4 w-4 mr-2" />
-                        Retirer de la base de données
-                      </DropdownMenuItem>
-                    )}
-
+                    {/* DANGER */}
                     <DropdownMenuSeparator />
-
-                    {/* Delete document */}
                     <DropdownMenuItem
                       onClick={() => {
                         setDocToDelete(doc);
@@ -487,7 +600,8 @@ export function CaseDetailsPanel({
                       className="text-destructive"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Retirer du dossier
+                      {/* "Supprimer" for uploaded files, "Retirer" for linked files */}
+                      {doc.file_path?.includes('data/uploads/') ? 'Supprimer du dossier' : 'Retirer du dossier'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -594,16 +708,26 @@ export function CaseDetailsPanel({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retirer ce document ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer ce document ?' : 'Retirer ce document ?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Le document « {docToDelete?.nom_fichier} » sera retiré de ce dossier.
-              Le fichier original ne sera pas supprimé de votre disque.
+              {docToDelete?.file_path?.includes('data/uploads/') ? (
+                <>
+                  Le document « {docToDelete?.nom_fichier} » sera définitivement supprimé du dossier et du disque.
+                </>
+              ) : (
+                <>
+                  Le document « {docToDelete?.nom_fichier} » sera retiré de ce dossier.
+                  Le fichier original ne sera pas supprimé de votre disque.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDocToDelete(null)}>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete}>
-              Retirer
+              {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer' : 'Retirer'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

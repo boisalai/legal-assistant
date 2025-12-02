@@ -11,15 +11,17 @@ import {
   Loader2,
   AlertCircle,
   Brain,
+  Database,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LLMSettingsModal } from "./llm-settings-modal";
 import { Markdown } from "@/components/ui/markdown";
-import { chatApi, healthApi, type ChatMessage as ApiChatMessage } from "@/lib/api";
+import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
 
-interface Message {
+export interface Message {
   role: "user" | "assistant";
   content: string;
+  sources?: DocumentSource[];
 }
 
 interface AssistantPanelProps {
@@ -29,6 +31,8 @@ interface AssistantPanelProps {
   isAnalyzing?: boolean;
   hasDocuments?: boolean;
   onDocumentCreated?: () => void;  // Called when a new document is created via chat
+  messages?: Message[];  // Optional: if provided, messages state is controlled by parent
+  setMessages?: React.Dispatch<React.SetStateAction<Message[]>>;  // Optional: if provided, messages state is controlled by parent
 }
 
 interface LLMConfig {
@@ -109,14 +113,29 @@ const LLM_MODELS = [
   },
 ];
 
-export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, hasDocuments, onDocumentCreated }: AssistantPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([
+export function AssistantPanel({
+  caseId,
+  onSendMessage,
+  onAnalyze,
+  isAnalyzing,
+  hasDocuments,
+  onDocumentCreated,
+  messages: controlledMessages,
+  setMessages: controlledSetMessages
+}: AssistantPanelProps) {
+  // If messages/setMessages are provided as props, use them (controlled mode)
+  // Otherwise, use local state (uncontrolled mode)
+  const [internalMessages, internalSetMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
         "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?",
     },
   ]);
+
+  const messages = controlledMessages ?? internalMessages;
+  const setMessages = controlledSetMessages ?? internalSetMessages;
+
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -288,6 +307,7 @@ export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, 
           const assistantMessage: Message = {
             role: "assistant",
             content: response.message,
+            sources: response.sources || [],
           };
 
           setMessages((prev) => [...prev, assistantMessage]);
@@ -396,17 +416,43 @@ export function AssistantPanel({ caseId, onSendMessage, onAnalyze, isAnalyzing, 
                 <Bot className="h-5 w-5 text-primary-foreground" />
               </div>
             )}
-            <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                message.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}
-            >
-              {message.role === "assistant" ? (
-                <Markdown className="text-sm">{message.content}</Markdown>
-              ) : (
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <div className="flex flex-col gap-2 max-w-[80%]">
+              <div
+                className={`rounded-lg px-3 py-2 ${
+                  message.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                }`}
+              >
+                {message.role === "assistant" ? (
+                  <Markdown className="text-sm">{message.content}</Markdown>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                )}
+              </div>
+
+              {/* Sources consultées - uniquement pour assistant avec sources */}
+              {message.role === "assistant" && message.sources && message.sources.length > 0 && (
+                <div className="px-3 py-2 bg-muted/50 rounded-md border border-muted text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Database className="h-3.5 w-3.5" />
+                    <span className="font-medium">Sources consultées ({message.sources.length})</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {message.sources.map((source, sidx) => (
+                      <li key={sidx} className="flex items-center gap-2">
+                        <span className="text-muted-foreground/70">•</span>
+                        <span className="flex-1">
+                          {source.name}
+                          {source.is_transcription && " (transcription)"}
+                        </span>
+                        <span className="text-muted-foreground/70">
+                          {source.word_count.toLocaleString()} mots
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
             {message.role === "user" && (
