@@ -70,7 +70,8 @@ class EmbeddingService:
             "text-embedding-ada-002": {"dimensions": 1536, "description": "Multilingue, modele legacy", "multilingual": True},
         },
         "local": {
-            # Modeles SentenceTransformers multilingues
+            # Modeles SentenceTransformers multilingues (RECOMMANDÉ)
+            "BAAI/bge-m3": {"dimensions": 1024, "description": "Multilingue (100+ langues), SOTA, recommandé pour juridique FR/EN", "multilingual": True},
             "paraphrase-multilingual-MiniLM-L12-v2": {"dimensions": 384, "description": "Multilingue (50+ langues), rapide", "multilingual": True},
             "paraphrase-multilingual-mpnet-base-v2": {"dimensions": 768, "description": "Multilingue, meilleure qualite", "multilingual": True},
             "distiluse-base-multilingual-cased-v2": {"dimensions": 512, "description": "Multilingue, bon equilibre", "multilingual": True},
@@ -84,7 +85,7 @@ class EmbeddingService:
     DEFAULT_MODEL = {
         "ollama": "bge-m3",  # Excellent pour FR/EN, 100+ langues
         "openai": "text-embedding-3-small",
-        "local": "paraphrase-multilingual-MiniLM-L12-v2"
+        "local": "BAAI/bge-m3"  # BGE-M3 via HuggingFace - SOTA multilingue
     }
 
     def __init__(
@@ -115,15 +116,28 @@ class EmbeddingService:
         self.dimensions = model_info.get("dimensions", 768)
 
     def _load_local_model(self):
-        """Charge le modele SentenceTransformers local."""
+        """Charge le modele SentenceTransformers local avec support MPS/CUDA/CPU."""
         if not SENTENCE_TRANSFORMERS_AVAILABLE:
             return None
 
         if self._local_model is None:
             try:
-                logger.info(f"Chargement du modele local: {self.model}")
-                self._local_model = SentenceTransformer(self.model)
-                logger.info(f"Modele {self.model} charge")
+                import torch
+
+                # Detecter le meilleur device disponible
+                if torch.backends.mps.is_available():
+                    device = "mps"
+                    logger.info("MPS (Metal Performance Shaders) detecte - utilisation du GPU Apple Silicon")
+                elif torch.cuda.is_available():
+                    device = "cuda"
+                    logger.info("CUDA detecte - utilisation du GPU NVIDIA")
+                else:
+                    device = "cpu"
+                    logger.info("Utilisation du CPU (pas de GPU detecte)")
+
+                logger.info(f"Chargement du modele local: {self.model} sur {device}")
+                self._local_model = SentenceTransformer(self.model, device=device)
+                logger.info(f"Modele {self.model} charge sur {device}")
             except Exception as e:
                 logger.error(f"Erreur chargement modele local: {e}")
                 return None

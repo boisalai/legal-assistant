@@ -203,6 +203,24 @@ class SurrealDBService:
         self._ensure_connected()
 
         try:
+            # Validation: s'assurer que record_id ne contient pas déjà le préfixe de table
+            if record_id and ":" in record_id:
+                logger.warning(
+                    f"record_id '{record_id}' contains ':' which may cause malformed IDs. "
+                    f"Removing prefix to avoid 'table:table:id' format."
+                )
+                # Extraire seulement la partie après le dernier ":"
+                record_id = record_id.split(":")[-1]
+
+            # Validation: s'assurer que data ne contient pas de clé "id"
+            if "id" in data:
+                logger.warning(
+                    f"'id' field found in data for table '{table}'. "
+                    f"This will be ignored to prevent ID conflicts. Use record_id parameter instead."
+                )
+                # Créer une copie sans le champ "id"
+                data = {k: v for k, v in data.items() if k != "id"}
+
             thing = f"{table}:{record_id}" if record_id else table
             logger.debug(f"Creating record in '{thing}': {data}")
 
@@ -338,7 +356,8 @@ class SurrealDBService:
         try:
             logger.debug(f"Deleting: {thing}")
             result = await self.db.delete(thing)
-            logger.info(f"Deleted: {result}")
+            # Log seulement l'ID pour éviter d'afficher tout le contenu (ex: gros fichiers markdown)
+            logger.info(f"Deleted: {thing}")
             return result
 
         except Exception as e:

@@ -20,7 +20,9 @@
       "Bash(python3:*)",
       "Bash(npm run build:*)",
       "Bash(xargs ls:*)",
-      "Bash(uv run python3:*)"
+      "Bash(uv run python3:*)",
+      "Bash(PYTHONPATH=/Users/alain/Workspace/GitHub/legal-assistant/backend /Users/alain/Workspace/GitHub/legal-assistant/backend/.venv/bin/python:*)",
+      "Bash(surreal sql:*)"
     ],
     "deny": [],
     "ask": []

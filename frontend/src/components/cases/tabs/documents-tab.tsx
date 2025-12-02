@@ -98,17 +98,25 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     return audioExtensions.includes(ext) || doc.type_mime?.includes("audio");
   };
 
-  // Check if file can have text extracted (PDF, Word, text files)
+  // Check if file can have text extracted (Word, text files)
+  // Note: PDF files should use "Extraire en markdown" instead
   const canExtractText = (doc: Document) => {
     const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-    const extractableExtensions = ["pdf", "doc", "docx", "txt", "rtf", "md"];
+    const extractableExtensions = ["doc", "docx", "txt", "rtf", "md"];
     return extractableExtensions.includes(ext);
   };
 
-  // Check if file can be transcribed to markdown (audio, PDF, Word)
+  // Check if file is a PDF
+  const isPDFFile = (doc: Document) => {
+    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    return ext === "pdf" || doc.type_mime === "application/pdf";
+  };
+
+  // Check if file can be transcribed to markdown (audio files only)
+  // Note: PDF and Word files are handled separately
   const canTranscribeToMarkdown = (doc: Document) => {
     const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-    const transcribableExtensions = ["pdf", "doc", "docx", "mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
+    const transcribableExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
     return transcribableExtensions.includes(ext) || doc.type_mime?.includes("audio");
   };
 
@@ -130,7 +138,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     }
   };
 
-  // Handle text extraction for documents (PDF, Word, etc.)
+  // Handle text extraction for documents (Word, text files, etc. - NOT PDF)
   const handleExtractText = async (doc: Document) => {
     setProcessingId(doc.id);
     setProcessingAction("extract");
@@ -138,6 +146,26 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
       const result = await documentsApi.extract(caseId, doc.id);
       if (result.success) {
         onDocumentsChange();
+      } else {
+        alert(result.error || "Erreur lors de l'extraction");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de l'extraction");
+    } finally {
+      setProcessingId(null);
+      setProcessingAction(null);
+    }
+  };
+
+  // Handle PDF extraction to markdown
+  const handleExtractPDF = async (doc: Document) => {
+    setProcessingId(doc.id);
+    setProcessingAction("extract");
+    try {
+      const result = await documentsApi.extractPDFToMarkdown(caseId, doc.id);
+      if (result.success) {
+        onDocumentsChange();
+        alert("Markdown créé avec succès");
       } else {
         alert(result.error || "Erreur lors de l'extraction");
       }
@@ -412,7 +440,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
 
                         <DropdownMenuSeparator />
 
-                        {/* Transcribe to markdown (audio, PDF, Word) */}
+                        {/* Transcribe audio to markdown */}
                         {canTranscribeToMarkdown(doc) && !doc.texte_extrait && (
                           <DropdownMenuItem
                             onClick={() => handleTranscribe(doc)}
@@ -423,7 +451,18 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
                           </DropdownMenuItem>
                         )}
 
-                        {/* Extract text to database */}
+                        {/* Extract PDF to markdown */}
+                        {isPDFFile(doc) && (
+                          <DropdownMenuItem
+                            onClick={() => handleExtractPDF(doc)}
+                            disabled={processingId === doc.id}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Extraire en markdown
+                          </DropdownMenuItem>
+                        )}
+
+                        {/* Extract text to database (Word, text files - NOT PDF) */}
                         {canExtractText(doc) && !doc.texte_extrait && (
                           <DropdownMenuItem
                             onClick={() => handleExtractText(doc)}

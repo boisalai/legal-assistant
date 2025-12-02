@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from config.settings import settings
@@ -105,6 +105,7 @@ async def list_documents(
     judgment_id: str,
     verify_files: bool = True,
     auto_remove_missing: bool = True,
+    auto_discover: bool = True,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
@@ -114,6 +115,7 @@ async def list_documents(
         judgment_id: ID du dossier
         verify_files: Si True, verifie que les fichiers existent sur le disque
         auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
+        auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
     """
     try:
         service = get_surreal_service()
@@ -133,6 +135,7 @@ async def list_documents(
         documents = []
         missing_files = []
         docs_to_remove = []
+        registered_files = set()  # Track files already in database
 
         if result and len(result) > 0:
             items = result[0].get("result", result) if isinstance(result[0], dict) else result
@@ -150,6 +153,10 @@ async def list_documents(
                             if auto_remove_missing:
                                 docs_to_remove.append(doc_id)
                                 continue  # Skip adding to response
+
+                    # Track this file as registered
+                    if file_path:
+                        registered_files.add(Path(file_path).resolve())
 
                     documents.append(DocumentResponse(
                         id=str(item.get("id", "")),
@@ -172,6 +179,56 @@ async def list_documents(
                     logger.info(f"Auto-removed document with missing file: {doc_id}")
                 except Exception as e:
                     logger.warning(f"Could not auto-remove document {doc_id}: {e}")
+
+        # Auto-discover orphaned files in uploads directory
+        if auto_discover:
+            upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+            if upload_dir.exists() and upload_dir.is_dir():
+                for file_path in upload_dir.iterdir():
+                    if file_path.is_file():
+                        # Check if this file is already registered
+                        if file_path.resolve() not in registered_files:
+                            # Check if file type is allowed
+                            if is_allowed_file(file_path.name):
+                                try:
+                                    # Auto-register this orphaned file
+                                    doc_id = str(uuid.uuid4())[:8]
+                                    ext = get_file_extension(file_path.name)
+                                    file_size = file_path.stat().st_size
+                                    now = datetime.utcnow().isoformat()
+
+                                    document_data = {
+                                        "judgment_id": judgment_id,
+                                        "nom_fichier": file_path.name,
+                                        "type_fichier": ext.lstrip('.'),
+                                        "type_mime": get_mime_type(file_path.name),
+                                        "taille": file_size,
+                                        "file_path": str(file_path.absolute()),
+                                        "user_id": user_id or "system",
+                                        "created_at": now,
+                                        "auto_discovered": True,  # Flag to indicate this was auto-discovered
+                                    }
+
+                                    await service.create("document", document_data, record_id=doc_id)
+                                    logger.info(f"Auto-discovered and registered file: {file_path.name}")
+
+                                    # Add to response
+                                    documents.append(DocumentResponse(
+                                        id=f"document:{doc_id}",
+                                        judgment_id=judgment_id,
+                                        nom_fichier=file_path.name,
+                                        type_fichier=ext.lstrip('.'),
+                                        type_mime=get_mime_type(file_path.name),
+                                        taille=file_size,
+                                        file_path=str(file_path.absolute()),
+                                        created_at=now,
+                                        file_exists=True,
+                                    ))
+                                except Exception as e:
+                                    logger.warning(f"Could not auto-register file {file_path.name}: {e}")
+
+        # Sort documents by created_at descending
+        documents.sort(key=lambda d: d.created_at, reverse=True)
 
         return DocumentListResponse(
             documents=documents,
@@ -442,10 +499,16 @@ async def get_document(
 async def delete_document(
     judgment_id: str,
     doc_id: str,
+    filename: Optional[str] = None,
+    file_path: Optional[str] = None,
     user_id: str = Depends(require_auth)
 ):
     """
     Supprime un document.
+
+    Args:
+        filename: Optional - nom du fichier à supprimer (utilisé si le document n'est pas en base)
+        file_path: Optional - chemin complet du fichier à supprimer (utilisé si le document n'est pas en base)
     """
     try:
         service = get_surreal_service()
@@ -453,63 +516,137 @@ async def delete_document(
             await service.connect()
 
         # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
         # Get document to find file path
         clean_id = doc_id.replace("document:", "")
+        logger.info(f"Attempting to delete document with ID: {doc_id} (clean: {clean_id})")
+
         result = await service.query(
             "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
             {"doc_id": clean_id}
         )
 
-        if not result or len(result) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
+        logger.info(f"Query result type: {type(result)}, length: {len(result) if result else 0}")
+        logger.info(f"Query result content: {result}")
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
+        # Parse SurrealDB response - it can have different structures
+        items = []
+        if result and len(result) > 0:
+            first_item = result[0]
+            if isinstance(first_item, dict):
+                # Check if it's wrapped in a "result" key
+                if "result" in first_item:
+                    items = first_item["result"] if isinstance(first_item["result"], list) else [first_item["result"]]
+                # Check if it has an "id" field directly (it's the document)
+                elif "id" in first_item:
+                    items = result
+            elif isinstance(first_item, list):
+                items = first_item
 
-        item = items[0]
+        logger.info(f"Parsed items: {items}")
 
-        # If this is a transcription document, clear texte_extrait from the source audio
-        if item.get("is_transcription") and item.get("source_audio"):
-            source_audio_filename = item.get("source_audio")
-            judgment_id_for_query = item.get("judgment_id", judgment_id)
-            if not judgment_id_for_query.startswith("judgment:"):
-                judgment_id_for_query = f"judgment:{judgment_id_for_query}"
+        # If document exists in database, handle cleanup
+        if items and len(items) > 0:
+            item = items[0]
+            logger.info(f"Found document to delete: {item.get('nom_fichier', 'unknown')}")
 
-            # Find the source audio document
-            audio_result = await service.query(
-                "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
-                {"judgment_id": judgment_id_for_query, "filename": source_audio_filename}
-            )
+            # If this is a transcription document, clear texte_extrait from the source audio
+            if item.get("is_transcription") and item.get("source_audio"):
+                source_audio_filename = item.get("source_audio")
+                judgment_id_for_query = item.get("judgment_id", judgment_id)
+                if not judgment_id_for_query.startswith("judgment:"):
+                    judgment_id_for_query = f"judgment:{judgment_id_for_query}"
 
-            if audio_result and len(audio_result) > 0:
-                audio_items = audio_result[0].get("result", audio_result) if isinstance(audio_result[0], dict) else audio_result
-                if isinstance(audio_items, list) and len(audio_items) > 0:
-                    audio_doc = audio_items[0]
-                    audio_doc_id = str(audio_doc.get("id", ""))
-                    if audio_doc_id:
-                        # Clear texte_extrait from the audio document
-                        await service.merge(audio_doc_id, {"texte_extrait": None})
-                        logger.info(f"Cleared texte_extrait from source audio document: {audio_doc_id}")
+                # Find the source audio document
+                audio_result = await service.query(
+                    "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
+                    {"judgment_id": judgment_id_for_query, "filename": source_audio_filename}
+                )
 
-        # NOTE: We no longer delete files from disk!
-        # Documents are now references to files at their original location.
-        # Only the database record is deleted.
-        file_path = item.get("file_path")
-        logger.info(f"Document reference removed (file NOT deleted): {doc_id} -> {file_path}")
+                if audio_result and len(audio_result) > 0:
+                    audio_items = audio_result[0].get("result", audio_result) if isinstance(audio_result[0], dict) else audio_result
+                    if isinstance(audio_items, list) and len(audio_items) > 0:
+                        audio_doc = audio_items[0]
+                        audio_doc_id = str(audio_doc.get("id", ""))
+                        if audio_doc_id:
+                            # Clear texte_extrait from the audio document
+                            await service.merge(audio_doc_id, {"texte_extrait": None})
+                            logger.info(f"Cleared texte_extrait from source audio document: {audio_doc_id}")
 
-        # Delete from database only
-        await service.delete(doc_id)
-        logger.info(f"Document record deleted: {doc_id}")
+            # Delete file from disk if it's in data/uploads/ (uploaded files)
+            # But keep linked files (external file_path)
+            file_path = item.get("file_path")
+            if file_path:
+                file_path_obj = Path(file_path)
+                # Check if file is in uploads directory
+                if "data/uploads/" in str(file_path_obj) or str(settings.upload_dir) in str(file_path_obj):
+                    if file_path_obj.exists():
+                        try:
+                            file_path_obj.unlink()
+                            logger.info(f"Deleted uploaded file from disk: {file_path}")
+                        except Exception as e:
+                            logger.warning(f"Could not delete file from disk: {e}")
+                    else:
+                        logger.warning(f"File does not exist on disk: {file_path}")
+                else:
+                    logger.info(f"Linked file kept on disk (external path): {file_path}")
+
+            # Delete from database
+            await service.delete(doc_id)
+            logger.info(f"Document record deleted: {doc_id}")
+        else:
+            # Document not in database, but try to delete file if it exists in uploads
+            logger.warning(f"Document not found in database (may have been auto-removed): {doc_id}")
+
+            # Try to delete orphaned file using provided file_path or filename
+            if file_path:
+                # Use provided file_path directly
+                file_path_obj = Path(file_path)
+                if file_path_obj.exists():
+                    # Check if file is in uploads directory
+                    if "data/uploads/" in str(file_path_obj) or str(settings.upload_dir) in str(file_path_obj):
+                        try:
+                            file_path_obj.unlink()
+                            logger.info(f"Deleted orphaned file from disk using file_path: {file_path}")
+                        except Exception as e:
+                            logger.warning(f"Could not delete orphaned file: {e}")
+                    else:
+                        logger.info(f"Orphaned file is external (not deleting): {file_path}")
+                else:
+                    logger.warning(f"Orphaned file does not exist: {file_path}")
+            elif filename:
+                # Use filename to find file in uploads directory
+                upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                if upload_dir.exists():
+                    file_path_obj = upload_dir / filename
+                    if file_path_obj.exists():
+                        try:
+                            file_path_obj.unlink()
+                            logger.info(f"Deleted orphaned file from disk using filename: {filename}")
+                        except Exception as e:
+                            logger.warning(f"Could not delete orphaned file: {e}")
+                    else:
+                        logger.warning(f"Orphaned file does not exist: {file_path_obj}")
+            else:
+                # Fallback: try to find file with matching ID in name (old behavior)
+                upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                if upload_dir.exists():
+                    # Look for file with matching ID in name
+                    clean_id_short = clean_id[:8] if len(clean_id) > 8 else clean_id
+                    found_any = False
+                    for orphan_file in upload_dir.glob(f"{clean_id_short}*"):
+                        try:
+                            orphan_file.unlink()
+                            logger.info(f"Deleted orphaned file from disk: {orphan_file}")
+                            found_any = True
+                        except Exception as e:
+                            logger.warning(f"Could not delete orphaned file: {e}")
+                    if not found_any:
+                        logger.warning(f"No orphaned files found with ID pattern: {clean_id_short}*")
 
     except HTTPException:
         raise
@@ -1093,6 +1230,272 @@ async def transcribe_document_workflow(
 
 
 # ============================================================================
+# PDF Extraction to Markdown
+# ============================================================================
+
+@router.post("/{judgment_id}/documents/{doc_id}/extract-to-markdown")
+async def extract_pdf_to_markdown(
+    judgment_id: str,
+    doc_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Extrait le texte d'un PDF et le formate en markdown avec sections détectées par LLM.
+
+    Retourne un stream SSE avec les événements de progression:
+    - progress: {step, message, percentage}
+    - step_start: {step}
+    - step_complete: {step, success}
+    - complete: {result}
+    - error: {message}
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+        if not doc_id.startswith("document:"):
+            doc_id = f"document:{doc_id}"
+
+        # Get document
+        clean_id = doc_id.replace("document:", "")
+        result = await service.query(
+            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
+            {"doc_id": clean_id}
+        )
+
+        if not result or len(result) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouve"
+            )
+
+        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        if not items or len(items) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouve"
+            )
+
+        item = items[0]
+        file_path = item.get("file_path")
+
+        if not file_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Chemin du fichier non trouve"
+            )
+
+        # Check if it's a PDF file
+        ext = Path(file_path).suffix.lower()
+        if ext != '.pdf':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ce n'est pas un fichier PDF. Extension: {ext}"
+            )
+
+        if not Path(file_path).exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Fichier PDF non trouve sur le disque"
+            )
+
+        # Create SSE generator
+        async def event_generator():
+            import asyncio
+            import json
+            progress_queue = asyncio.Queue()
+
+            async def run_extraction():
+                try:
+                    # Check if a markdown already exists for this PDF
+                    original_filename = item.get("nom_fichier", "document.pdf")
+                    markdown_filename = Path(original_filename).stem + ".md"
+
+                    # Get judgment directory
+                    judgment_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                    markdown_path = judgment_dir / markdown_filename
+
+                    # Check if markdown file exists on disk
+                    if markdown_path.exists():
+                        await progress_queue.put({
+                            "type": "error",
+                            "data": {"message": f"Un fichier markdown '{markdown_filename}' existe déjà sur le disque pour ce PDF. Supprimez-le d'abord si vous voulez réextraire."}
+                        })
+                        return
+
+                    # Check existing documents in database
+                    docs_result = await service.query(
+                        "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
+                        {"judgment_id": judgment_id, "filename": markdown_filename}
+                    )
+
+                    if docs_result and len(docs_result) > 0:
+                        # Parse result
+                        existing_docs = []
+                        first_item = docs_result[0]
+                        if isinstance(first_item, dict):
+                            if "result" in first_item:
+                                existing_docs = first_item["result"] if isinstance(first_item["result"], list) else []
+                            elif "id" in first_item:
+                                existing_docs = docs_result
+                        elif isinstance(first_item, list):
+                            existing_docs = first_item
+
+                        if existing_docs and len(existing_docs) > 0:
+                            await progress_queue.put({
+                                "type": "error",
+                                "data": {"message": f"Un fichier markdown '{markdown_filename}' existe déjà en base de données pour ce PDF. Supprimez-le d'abord si vous voulez réextraire."}
+                            })
+                            return
+
+                    # Step 1: Extract text with MarkItDown
+                    await progress_queue.put({
+                        "type": "progress",
+                        "data": {"step": "extract", "message": "Extraction du texte avec MarkItDown...", "percentage": 20}
+                    })
+
+                    from services.document_extraction_service import get_extraction_service
+                    extraction_service = get_extraction_service()
+
+                    extraction_result = await extraction_service.extract(
+                        file_path=file_path,
+                        content_type="application/pdf"
+                    )
+
+                    if not extraction_result.success:
+                        await progress_queue.put({
+                            "type": "error",
+                            "data": {"message": extraction_result.error or "Échec de l'extraction"}
+                        })
+                        return
+
+                    await progress_queue.put({
+                        "type": "progress",
+                        "data": {"step": "extract", "message": "Texte extrait avec succès", "percentage": 60}
+                    })
+
+                    # Step 2: Save as markdown file
+                    await progress_queue.put({
+                        "type": "progress",
+                        "data": {"step": "save", "message": "Création du fichier markdown...", "percentage": 70}
+                    })
+
+                    # Ensure judgment directory exists (judgment_dir and markdown_path already defined at the beginning)
+                    judgment_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Write markdown file
+                    with open(markdown_path, "w", encoding="utf-8") as f:
+                        f.write(extraction_result.text)
+
+                    # Step 3: Create document record in SurrealDB
+                    await progress_queue.put({
+                        "type": "progress",
+                        "data": {"step": "save", "message": "Enregistrement dans la base de données...", "percentage": 85}
+                    })
+
+                    doc_id = str(uuid.uuid4())
+                    doc_record = {
+                        # ❌ NE PAS inclure "id" dans doc_record car CREATE va l'ajouter automatiquement
+                        "judgment_id": judgment_id,
+                        "nom_fichier": markdown_filename,
+                        "type_fichier": "md",
+                        "type_mime": "text/markdown",
+                        "taille": len(extraction_result.text.encode('utf-8')),
+                        "file_path": str(markdown_path),
+                        "texte_extrait": extraction_result.text,  # Store for indexing
+                        "is_transcription": False,
+                        "created_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+
+                    # Utiliser service.create() avec record_id pour garantir le bon format
+                    await service.create("document", doc_record, record_id=doc_id)
+
+                    # Index le document pour la recherche sémantique
+                    try:
+                        from services.document_indexing_service import get_document_indexing_service
+
+                        await progress_queue.put({
+                            "type": "progress",
+                            "data": {"step": "save", "message": "Indexation pour recherche sémantique...", "percentage": 90}
+                        })
+
+                        indexing_service = get_document_indexing_service()
+                        index_result = await indexing_service.index_document(
+                            document_id=f"document:{doc_id}",
+                            judgment_id=judgment_id,
+                            text_content=extraction_result.text,
+                            force_reindex=False
+                        )
+
+                        if index_result.get("success"):
+                            logger.info(f"Document indexed: {index_result.get('chunks_created', 0)} chunks")
+                        else:
+                            logger.warning(f"Indexing failed: {index_result.get('error', 'Unknown error')}")
+                    except Exception as e:
+                        # Ne pas bloquer si l'indexation échoue
+                        logger.warning(f"Could not index document: {e}")
+
+                    await progress_queue.put({
+                        "type": "complete",
+                        "data": {
+                            "success": True,
+                            "document_id": f"document:{doc_id}",
+                            "document_path": str(markdown_path),
+                            "page_count": extraction_result.metadata.get("num_pages", 0)
+                        }
+                    })
+
+                except Exception as e:
+                    logger.error(f"Extraction error: {e}", exc_info=True)
+                    await progress_queue.put({
+                        "type": "error",
+                        "data": {"message": str(e)}
+                    })
+                finally:
+                    await progress_queue.put(None)  # Signal end
+
+            # Start extraction
+            task = asyncio.create_task(run_extraction())
+
+            try:
+                while True:
+                    event = await progress_queue.get()
+                    if event is None:
+                        break
+
+                    yield f"event: {event['type']}\n"
+                    yield f"data: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+
+            except asyncio.CancelledError:
+                task.cancel()
+                raise
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting PDF extraction workflow: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# ============================================================================
 # YouTube Download
 # ============================================================================
 
@@ -1252,3 +1655,87 @@ async def download_youtube_audio(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+# ============================================================================
+# DIAGNOSTIC ENDPOINT
+# ============================================================================
+
+class DiagnosticResult(BaseModel):
+    """Résultat du diagnostic de cohérence fichiers/base de données."""
+    total_documents: int
+    missing_files: list[dict]
+    orphan_records: list[dict]
+    ok_count: int
+
+
+@router.get("/{judgment_id}/documents/diagnostic", response_model=DiagnosticResult)
+async def diagnose_documents(
+    judgment_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Diagnostic de cohérence entre base de données et système de fichiers.
+
+    Identifie:
+    - Les enregistrements en base sans fichier physique (orphelins)
+    - Les fichiers physiques sans enregistrement en base (manquants)
+    """
+    service = get_surreal_service()
+    if not service.db:
+        await service.connect()
+
+    # Normaliser judgment_id
+    if not judgment_id.startswith("judgment:"):
+        judgment_id = f"judgment:{judgment_id}"
+
+    # Récupérer tous les documents de la base de données
+    docs_result = await service.query(
+        "SELECT * FROM document WHERE judgment_id = $judgment_id",
+        {"judgment_id": judgment_id}
+    )
+
+    documents = []
+    if docs_result and len(docs_result) > 0:
+        first_item = docs_result[0]
+        if isinstance(first_item, dict):
+            if "result" in first_item:
+                documents = first_item["result"] if isinstance(first_item["result"], list) else []
+            elif "id" in first_item:
+                documents = docs_result
+        elif isinstance(first_item, list):
+            documents = first_item
+
+    missing_files = []
+    ok_count = 0
+
+    # Vérifier chaque document
+    for doc in documents:
+        doc_id = doc.get("id", "unknown")
+        doc_name = doc.get("nom_fichier", "unknown")
+        file_path = doc.get("file_path", "")
+
+        if not file_path:
+            missing_files.append({
+                "id": doc_id,
+                "filename": doc_name,
+                "reason": "Aucun chemin de fichier enregistré"
+            })
+            continue
+
+        if not Path(file_path).exists():
+            missing_files.append({
+                "id": doc_id,
+                "filename": doc_name,
+                "path": file_path,
+                "reason": "Fichier physique manquant"
+            })
+        else:
+            ok_count += 1
+
+    return DiagnosticResult(
+        total_documents=len(documents),
+        missing_files=missing_files,
+        orphan_records=missing_files,  # Alias pour clarté
+        ok_count=ok_count
+    )
