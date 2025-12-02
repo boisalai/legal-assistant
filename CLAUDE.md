@@ -46,6 +46,16 @@
    - Indexation automatique lors de l'extraction/transcription
    - Retry automatique (3 tentatives) pour robustesse
 
+8. **Synthèse vocale (Text-to-Speech)**
+   - Service TTS avec edge-tts (Microsoft Edge TTS)
+   - Support français (13 voix : France, Belgique, Canada, Suisse)
+   - Support anglais (2 voix : Canada)
+   - Génération audio MP3 à partir de documents
+   - Nettoyage automatique du markdown avant synthèse
+   - Configuration des voix par défaut dans Settings
+   - Lecture en un clic depuis le document preview
+   - Sauvegarde automatique des fichiers audio comme documents
+
 ### Architecture technique
 
 Voir `ARCHITECTURE.md` pour la documentation complète :
@@ -59,10 +69,12 @@ Voir `ARCHITECTURE.md` pour la documentation complète :
 
 | Fichier | Description |
 |---------|-------------|
-| `backend/routes/documents.py` | Endpoint download avec paramètre `inline` pour affichage navigateur |
+| `backend/routes/documents.py` | Endpoints download, TTS, et liste des voix disponibles |
+| `backend/services/tts_service.py` | Service de synthèse vocale avec edge-tts |
 | `frontend/src/app/cases/[id]/page.tsx` | Split panel vertical : document preview + assistant IA |
-| `frontend/src/components/cases/document-preview-panel.tsx` | Prévisualisation avec `?inline=true` pour PDF |
+| `frontend/src/components/cases/document-preview-panel.tsx` | Prévisualisation avec bouton "Lire" et player audio TTS |
 | `frontend/src/components/cases/assistant-panel.tsx` | Chat avec padding réduit (`px-3 py-2`) |
+| `frontend/src/app/settings/page.tsx` | Configuration des voix TTS par défaut |
 | `frontend/src/hooks/use-file-system-access.ts` | Hook pour lier des fichiers locaux |
 
 ### Dernières modifications (session du 2025-12-01)
@@ -94,6 +106,46 @@ Voir `ARCHITECTURE.md` pour la documentation complète :
    - `sentence-transformers`, `torch`, `mlx-whisper` installés par défaut
    - Plus besoin de `--extra embeddings` ou `--extra whisper` en développement
    - Un simple `uv sync` suffit pour avoir tous les outils
+
+#### Synthèse vocale (Text-to-Speech)
+
+1. **Service TTS avec edge-tts** (`backend/services/tts_service.py`)
+   - Utilisation de Microsoft Edge TTS (gratuit, voix naturelles)
+   - 15 voix disponibles : 13 françaises (France, Belgique, Canada, Suisse) + 2 anglaises (Canada)
+   - Nettoyage automatique du markdown avant synthèse (suppression de `#`, `**`, `*`, etc.)
+   - Génération de fichiers MP3 avec métadonnées complètes
+   - Support du contrôle de vitesse et volume
+
+2. **API Endpoints** (`backend/routes/documents.py`)
+   - `GET /api/judgments/tts/voices` : Liste des voix disponibles
+   - `POST /api/judgments/{judgment_id}/documents/{doc_id}/tts` : Génération audio TTS
+   - Sauvegarde automatique des fichiers audio comme nouveaux documents
+   - Métadonnées stockées : voix utilisée, langue, durée estimée
+
+3. **Interface utilisateur TTS**
+   - **Document Preview** (`frontend/src/components/cases/document-preview-panel.tsx`) :
+     - Bouton "Lire" dans le header (visible uniquement si `texte_extrait` disponible)
+     - Menu déroulant : choix Français ou English
+     - Player audio intégré avec auto-play
+     - Gestion d'erreurs avec affichage
+   - **Settings** (`frontend/src/app/settings/page.tsx`) :
+     - Section "Synthèse vocale (TTS)"
+     - Sélection de la voix française par défaut (13 choix)
+     - Sélection de la voix anglaise par défaut (2 choix)
+     - Sauvegarde dans localStorage (`tts_voice_fr`, `tts_voice_en`)
+
+4. **Workflow utilisateur**
+   - Configuration initiale : Settings → choisir voix française et anglaise
+   - Utilisation : Document preview → "Lire" → choisir langue
+   - La voix configurée dans Settings est utilisée automatiquement
+   - L'audio généré est sauvegardé et apparaît dans la liste des documents
+
+5. **Voix disponibles**
+   - 🇫🇷 France : Henri, Remy, Vivienne, Denise, Eloise (5 voix)
+   - 🇧🇪 Belgique : Charline, Gerard (2 voix)
+   - 🇨🇦 Canada français : Antoine, Jean, Sylvie, Thierry (4 voix)
+   - 🇨🇭 Suisse : Ariane, Fabrice (2 voix)
+   - 🇨🇦 Canada anglais : Clara, Liam (2 voix)
 
 ---
 
@@ -164,9 +216,10 @@ npm run dev -- -p 3001
 - **Port SurrealDB** : 8002 (modifié de 8001)
 - **Port Backend** : 8000
 - **Port Frontend** : 3001
-- **Installation** : `uv sync` installe toutes les dépendances de développement (whisper, embeddings)
+- **Installation** : `uv sync` installe toutes les dépendances de développement (whisper, embeddings, TTS)
 - **Embeddings** : BGE-M3 via sentence-transformers avec accélération GPU (MPS/CUDA/CPU auto-détecté)
 - **Whisper** : MLX Whisper optimisé Apple Silicon
+- **TTS** : edge-tts (Microsoft Edge TTS) - 15 voix françaises et anglaises
 - **Variables d'environnement** : Voir `.env.example` ou `ARCHITECTURE.md`
 
 ### Configuration embeddings
@@ -179,12 +232,33 @@ chunk_size = 400                       # Mots par chunk
 chunk_overlap = 50                     # Mots d'overlap
 ```
 
+### Configuration TTS
+
+```python
+# backend/services/tts_service.py
+# Voix par défaut
+DEFAULT_VOICES = {
+    "fr": "fr-FR-DeniseNeural",  # Voix féminine française
+    "en": "en-CA-ClaraNeural",   # Voix féminine anglaise (Canada)
+}
+
+# 15 voix disponibles au total
+# Nettoyage automatique du markdown : suppression de #, **, *, liens, code, etc.
+```
+
 ### Logs à surveiller lors du démarrage
 
 ```
+# Embeddings
 MPS (Metal Performance Shaders) detecte - utilisation du GPU Apple Silicon
 Chargement du modele local: BAAI/bge-m3 sur mps
 Modele BAAI/bge-m3 charge sur mps
+
+# TTS
+Service TTS initialisé avec edge-tts
+Génération TTS avec voix fr-FR-DeniseNeural (rate: +0%, volume: +0%)
+Markdown nettoyé: 5432 → 4821 caractères
+Audio généré avec succès: /path/to/file.mp3 (123456 bytes)
 ```
 
 ## Conventions

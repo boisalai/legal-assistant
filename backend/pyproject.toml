@@ -38,6 +38,8 @@ dependencies = [
     "torch>=2.6.0",
     # Whisper pour transcription (développement)
     "mlx-whisper>=0.4.0",
+    # Text-to-Speech avec edge-tts
+    "edge-tts>=7.0.0",
 ]
 
 [project.optional-dependencies]

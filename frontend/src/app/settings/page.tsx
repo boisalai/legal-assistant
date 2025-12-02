@@ -33,6 +33,7 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  Volume2,
 } from "lucide-react";
 import { settingsApi, type LLMModel } from "@/lib/api";
 
@@ -50,6 +51,14 @@ const DEFAULT_EXTRACTION_METHODS = [
   { id: "docling-vlm", name: "Docling VLM", description: "Extraction maximale avec vision", available: false },
 ];
 
+interface TTSVoice {
+  name: string;
+  locale: string;
+  country: string;
+  language: string;
+  gender: string;
+}
+
 export default function SettingsPage() {
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,10 +74,28 @@ export default function SettingsPage() {
   const [useOcr, setUseOcr] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  // TTS Settings
+  const [ttsVoices, setTtsVoices] = useState<TTSVoice[]>([]);
+  const [selectedVoiceFr, setSelectedVoiceFr] = useState("fr-FR-DeniseNeural");
+  const [selectedVoiceEn, setSelectedVoiceEn] = useState("en-CA-ClaraNeural");
+
   // Load settings from backend
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
+      // Load TTS voices first (independent of other settings)
+      try {
+        const voicesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/tts/voices`);
+        if (voicesRes.ok) {
+          const voices = await voicesRes.json();
+          if (Array.isArray(voices)) {
+            setTtsVoices(voices);
+          }
+        }
+      } catch (err) {
+        console.log("Could not load TTS voices", err);
+      }
+
       const [modelsResponse, currentSettings] = await Promise.all([
         settingsApi.getModels(),
         settingsApi.getCurrent(),
@@ -107,6 +134,12 @@ export default function SettingsPage() {
         setSelectedExtraction(currentSettings.analysis.extraction_method);
         setUseOcr(currentSettings.analysis.use_ocr);
       }
+
+      // Load TTS voice preferences from localStorage
+      const savedVoiceFr = localStorage.getItem("tts_voice_fr");
+      const savedVoiceEn = localStorage.getItem("tts_voice_en");
+      if (savedVoiceFr) setSelectedVoiceFr(savedVoiceFr);
+      if (savedVoiceEn) setSelectedVoiceEn(savedVoiceEn);
 
       setApiConnected(true);
     } catch (err) {
@@ -157,6 +190,12 @@ export default function SettingsPage() {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
+  };
+
+  const saveTTSVoices = () => {
+    // Save TTS voice preferences to localStorage
+    localStorage.setItem("tts_voice_fr", selectedVoiceFr);
+    localStorage.setItem("tts_voice_en", selectedVoiceEn);
   };
 
   return (
@@ -340,6 +379,86 @@ export default function SettingsPage() {
                     onCheckedChange={toggleDarkMode}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* TTS Voice Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Volume2 className="h-5 w-5" />
+                  Synthèse vocale (TTS)
+                </CardTitle>
+                <CardDescription>
+                  Choisissez les voix par défaut pour la lecture de documents
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* French Voice */}
+                <div className="space-y-2">
+                  <Label htmlFor="voice-fr">Voix française</Label>
+                  <Select value={selectedVoiceFr} onValueChange={(value) => {
+                    setSelectedVoiceFr(value);
+                    saveTTSVoices();
+                  }}>
+                    <SelectTrigger id="voice-fr">
+                      <SelectValue placeholder="Sélectionner une voix française" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ttsVoices
+                        .filter((v) => v.language === "French")
+                        .map((voice) => (
+                          <SelectItem key={voice.name} value={voice.name}>
+                            <div className="flex items-center gap-2">
+                              <span>{voice.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {voice.country} - {voice.gender}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Voix utilisée par défaut pour lire les documents en français
+                  </p>
+                </div>
+
+                {/* English Voice */}
+                <div className="space-y-2">
+                  <Label htmlFor="voice-en">Voix anglaise</Label>
+                  <Select value={selectedVoiceEn} onValueChange={(value) => {
+                    setSelectedVoiceEn(value);
+                    saveTTSVoices();
+                  }}>
+                    <SelectTrigger id="voice-en">
+                      <SelectValue placeholder="Sélectionner une voix anglaise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ttsVoices
+                        .filter((v) => v.language === "English")
+                        .map((voice) => (
+                          <SelectItem key={voice.name} value={voice.name}>
+                            <div className="flex items-center gap-2">
+                              <span>{voice.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {voice.country} - {voice.gender}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Voix utilisée par défaut pour lire les documents en anglais
+                  </p>
+                </div>
+
+                {ttsVoices.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Chargement des voix disponibles...
+                  </p>
+                )}
               </CardContent>
             </Card>
 
