@@ -1871,6 +1871,8 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "markitdown", extra = ["pdf"] },
+    { name = "mlx" },
+    { name = "mlx-lm" },
     { name = "mlx-whisper" },
     { name = "ollama" },
     { name = "openai" },
@@ -1925,10 +1927,6 @@ hf = [
     { name = "torch" },
     { name = "transformers" },
 ]
-mlx = [
-    { name = "mlx" },
-    { name = "mlx-lm" },
-]
 ollama = [
     { name = "ollama" },
     { name = "requests" },
@@ -1955,10 +1953,10 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=2.13.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.0" },
     { name = "markitdown", extras = ["pdf"], specifier = ">=0.1.3" },
+    { name = "mlx", specifier = ">=0.24.0" },
     { name = "mlx", marker = "extra == 'all-llm'", specifier = ">=0.24.0" },
-    { name = "mlx", marker = "extra == 'mlx'", specifier = ">=0.24.0" },
+    { name = "mlx-lm", specifier = ">=0.22.0" },
     { name = "mlx-lm", marker = "extra == 'all-llm'", specifier = ">=0.22.0" },
-    { name = "mlx-lm", marker = "extra == 'mlx'", specifier = ">=0.22.0" },
     { name = "mlx-whisper", specifier = ">=0.4.0" },
     { name = "mlx-whisper", marker = "extra == 'whisper'", specifier = ">=0.4.0" },
     { name = "ollama", specifier = ">=0.6.1" },
@@ -1996,7 +1994,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
     { name = "yt-dlp", specifier = ">=2025.11.12" },
 ]
-provides-extras = ["dev", "mlx", "hf", "anthropic", "ollama", "docling", "whisper", "whisper-openai", "embeddings", "all-llm"]
+provides-extras = ["dev", "hf", "anthropic", "ollama", "docling", "whisper", "whisper-openai", "embeddings", "all-llm"]
 
 [[package]]
 name = "llvmlite"
