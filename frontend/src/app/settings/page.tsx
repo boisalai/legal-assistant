@@ -290,7 +290,7 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Ollama: Modèles locaux gratuits. Claude: API payante, meilleure qualité.
+                    Ollama: Modèles locaux cross-platform. MLX: Optimisé Apple Silicon (M1/M2/M3). Claude: API payante, meilleure qualité.
                   </p>
                 </div>
               </CardContent>

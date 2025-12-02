@@ -60,12 +60,23 @@ async def lifespan(app: FastAPI):
 
     # === SHUTDOWN ===
     logger.info("Legal Assistant API - Shutting down...")
+
+    # Shutdown MLX server if running
+    try:
+        from services.mlx_server_service import shutdown_mlx_server
+        await shutdown_mlx_server()
+        logger.info("MLX server stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping MLX server: {e}")
+
+    # Shutdown SurrealDB
     try:
         service = get_surreal_service()
         await service.disconnect()
         logger.info("SurrealDB disconnected")
     except Exception as e:
         logger.warning(f"Error during shutdown: {e}")
+
     logger.info("Goodbye!")
 
 
@@ -121,14 +132,16 @@ except ImportError as e:
 # ============================================================
 
 from routes import auth_router, judgments_router, documents_router, analysis_router, chat_router
+from routes.settings import router as settings_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(judgments_router, tags=["Judgments"])
 app.include_router(documents_router, tags=["Documents"])
 app.include_router(analysis_router, tags=["Analysis"])
 app.include_router(chat_router, tags=["Chat"])
+app.include_router(settings_router, tags=["Settings"])
 
-logger.info("Routes configured: /api/auth, /api/judgments, /api/judgments/{id}/documents, /api/analysis, /api/chat")
+logger.info("Routes configured: /api/auth, /api/judgments, /api/judgments/{id}/documents, /api/analysis, /api/chat, /api/settings")
 
 
 # ============================================================

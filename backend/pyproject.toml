@@ -42,6 +42,9 @@ dependencies = [
     "edge-tts>=7.0.0",
     # Docling pour extraction avancée de documents (PDF, tables, OCR)
     "docling>=2.0.0",
+    # MLX-LM pour modèles Hugging Face locaux (Apple Silicon)
+    "mlx>=0.24.0",
+    "mlx-lm>=0.22.0",
 ]
 
 [project.optional-dependencies]
@@ -56,12 +59,7 @@ dev = [
 ]
 
 # Configuration pour les LLMs locaux
-
-# MLX (Apple Silicon - Local)
-mlx = [
-    "mlx>=0.24.0",
-    "mlx-lm>=0.22.0",
-]
+# Note: mlx et mlx-lm sont maintenant installés par défaut (voir dependencies ci-dessus)
 
 # Hugging Face (Transformers - Local)
 hf = [

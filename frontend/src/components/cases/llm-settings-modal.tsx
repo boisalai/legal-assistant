@@ -36,9 +36,23 @@ interface LLMSettingsModalProps {
 
 // Available LLM models
 const LLM_MODELS = [
+  // === MLX (Apple Silicon) ===
+  {
+    value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
+    label: "🍎 Qwen 2.5 3B (MLX) - Recommandé Apple Silicon",
+  },
+  {
+    value: "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
+    label: "🍎 Llama 3.2 3B (MLX) - Ultra-rapide",
+  },
+  {
+    value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+    label: "🍎 Mistral 7B (MLX) - Qualité maximale",
+  },
+  // === Ollama (Cross-platform) ===
   {
     value: "ollama:qwen2.5:7b",
-    label: "Qwen 2.5 7B (Ollama) - Recommandé",
+    label: "Qwen 2.5 7B (Ollama)",
   },
   {
     value: "ollama:llama3.2",
@@ -52,6 +66,7 @@ const LLM_MODELS = [
     value: "ollama:llama3.1:8b",
     label: "Llama 3.1 8B (Ollama)",
   },
+  // === Claude (Anthropic API) ===
   {
     value: "anthropic:claude-sonnet-4-5-20250929",
     label: "Claude Sonnet 4.5 (Anthropic) - Production",
@@ -98,7 +113,7 @@ export function LLMSettingsModal({
         <DialogHeader>
           <DialogTitle>Paramètres LLM</DialogTitle>
           <DialogDescription>
-            Configurez le modèle et les paramètres de génération
+            Configurez le modèle et les paramètres de génération. 🍎 = MLX (Apple Silicon)
           </DialogDescription>
         </DialogHeader>
 
