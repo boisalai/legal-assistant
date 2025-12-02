@@ -2,8 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { X, FileText, Music, Download, ExternalLink, Loader2 } from "lucide-react";
+import { X, FileText, Music, Download, ExternalLink, Loader2, Volume2, Languages } from "lucide-react";
 import { Markdown } from "@/components/ui/markdown";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Document } from "@/types";
 
 interface DocumentPreviewPanelProps {
@@ -21,6 +29,9 @@ export function DocumentPreviewPanel({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+  const [generatingTTS, setGeneratingTTS] = useState(false);
+  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   const ext = document.nom_fichier?.split(".").pop()?.toLowerCase() || "";
   const isAudio = document.type_mime?.includes("audio") || document.type_fichier?.includes("audio") || ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"].includes(ext);
@@ -91,6 +102,58 @@ export function DocumentPreviewPanel({
     }
   };
 
+  const handleGenerateTTS = async (language: string, voice?: string) => {
+    setGeneratingTTS(true);
+    setTtsError(null);
+    setTtsAudioUrl(null);
+
+    try {
+      // Get voice from localStorage if not specified
+      let selectedVoice = voice;
+      if (!selectedVoice) {
+        const savedVoice = language === "fr"
+          ? localStorage.getItem("tts_voice_fr")
+          : localStorage.getItem("tts_voice_en");
+        selectedVoice = savedVoice || undefined;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/${cleanCaseId}/documents/${cleanDocId}/tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            language,
+            voice: selectedVoice,
+            gender: "female", // Fallback if no voice specified
+            rate: "+0%",
+            volume: "+0%",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Erreur lors de la génération TTS");
+      }
+
+      const data = await response.json();
+      if (data.success && data.audio_url) {
+        const fullUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${data.audio_url}`;
+        setTtsAudioUrl(fullUrl);
+      } else {
+        throw new Error(data.error || "Erreur de génération TTS");
+      }
+    } catch (error) {
+      console.error("TTS error:", error);
+      setTtsError(error instanceof Error ? error.message : "Erreur inconnue");
+    } finally {
+      setGeneratingTTS(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
@@ -107,6 +170,39 @@ export function DocumentPreviewPanel({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* TTS Button - Only show if document has extracted text */}
+          {document.texte_extrait && !isAudio && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={generatingTTS}
+                  title="Lire le document"
+                >
+                  {generatingTTS ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 mr-1" />
+                  )}
+                  <span className="text-xs">Lire</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Choisir la langue</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleGenerateTTS("fr")}>
+                  <Languages className="h-4 w-4 mr-2" />
+                  Français
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleGenerateTTS("en")}>
+                  <Languages className="h-4 w-4 mr-2" />
+                  English
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -118,6 +214,51 @@ export function DocumentPreviewPanel({
           </Button>
         </div>
       </div>
+
+      {/* TTS Audio Player */}
+      {ttsAudioUrl && (
+        <div className="px-4 py-3 border-b bg-muted/10">
+          <div className="flex items-center gap-3">
+            <Volume2 className="h-4 w-4 text-purple-500 flex-shrink-0" />
+            <div className="flex-1">
+              <audio
+                controls
+                autoPlay
+                className="w-full h-8"
+                src={ttsAudioUrl}
+              >
+                Votre navigateur ne supporte pas l&apos;élément audio.
+              </audio>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => setTtsAudioUrl(null)}
+              title="Fermer le lecteur"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* TTS Error */}
+      {ttsError && (
+        <div className="px-4 py-2 border-b bg-destructive/10 text-destructive text-sm">
+          <div className="flex items-center justify-between">
+            <span>{ttsError}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => setTtsError(null)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">

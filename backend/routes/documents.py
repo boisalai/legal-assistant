@@ -1658,6 +1658,213 @@ async def download_youtube_audio(
 
 
 # ============================================================================
+# TEXT-TO-SPEECH ENDPOINTS
+# ============================================================================
+
+class TTSVoice(BaseModel):
+    """Voix TTS disponible."""
+    name: str
+    locale: str
+    country: str
+    language: str
+    gender: str
+
+
+@router.get("/tts/voices", response_model=list[TTSVoice])
+async def list_tts_voices(
+    user_id: Optional[str] = Depends(get_current_user_id)
+):
+    """
+    Liste toutes les voix TTS disponibles.
+
+    Retourne la liste des voix supportées pour la synthèse vocale.
+    """
+    try:
+        from services.tts_service import get_tts_service, EDGE_TTS_AVAILABLE
+
+        if not EDGE_TTS_AVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service TTS non disponible. Installer edge-tts: uv add edge-tts"
+            )
+
+        tts_service = get_tts_service()
+        voices = tts_service.get_available_voices()
+
+        return [TTSVoice(**voice) for voice in voices]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing TTS voices: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+class TTSRequest(BaseModel):
+    """Request pour générer l'audio TTS d'un document."""
+    language: str = "fr"  # fr ou en
+    voice: Optional[str] = None  # Voix spécifique (optionnel)
+    gender: str = "female"  # female ou male
+    rate: str = "+0%"  # Vitesse de lecture (-50% à +100%)
+    volume: str = "+0%"  # Volume (-100% à +100%)
+
+
+class TTSResponse(BaseModel):
+    """Réponse de la génération TTS."""
+    success: bool
+    audio_url: str = ""
+    duration: float = 0.0
+    voice: str = ""
+    error: str = ""
+
+
+@router.post("/{judgment_id}/documents/{doc_id}/tts", response_model=TTSResponse)
+async def generate_tts(
+    judgment_id: str,
+    doc_id: str,
+    request: TTSRequest = TTSRequest(),
+    user_id: str = Depends(require_auth)
+):
+    """
+    Génère un fichier audio TTS à partir du texte extrait d'un document.
+
+    Le fichier audio est généré en MP3 et sauvegardé dans le répertoire du jugement.
+    Retourne l'URL pour télécharger/streamer l'audio.
+    """
+    try:
+        from services.tts_service import get_tts_service, EDGE_TTS_AVAILABLE
+
+        if not EDGE_TTS_AVAILABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service TTS non disponible. Installer edge-tts: uv add edge-tts"
+            )
+
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+        if not doc_id.startswith("document:"):
+            doc_id = f"document:{doc_id}"
+
+        # Get document
+        clean_id = doc_id.replace("document:", "")
+        result = await service.query(
+            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
+            {"doc_id": clean_id}
+        )
+
+        if not result or len(result) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouvé"
+            )
+
+        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        if not items or len(items) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document non trouvé"
+            )
+
+        item = items[0]
+
+        # Get extracted text
+        text_content = item.get("texte_extrait")
+        if not text_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ce document n'a pas de texte extrait. Utilisez d'abord l'extraction ou la transcription."
+            )
+
+        # Generate TTS
+        tts_service = get_tts_service()
+
+        # Create output path
+        judgment_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+        judgment_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate filename based on document name
+        original_filename = item.get("nom_fichier", "document")
+        audio_filename = f"{Path(original_filename).stem}_tts.mp3"
+        audio_path = judgment_dir / audio_filename
+
+        logger.info(f"Generating TTS for document {doc_id}: {len(text_content)} chars")
+
+        # Generate audio
+        tts_result = await tts_service.text_to_speech(
+            text=text_content,
+            output_path=str(audio_path),
+            language=request.language,
+            voice=request.voice if request.voice else tts_service.get_voice_for_language(
+                request.language,
+                request.gender
+            ),
+            rate=request.rate,
+            volume=request.volume
+        )
+
+        if not tts_result.success:
+            logger.error(f"TTS generation failed: {tts_result.error}")
+            return TTSResponse(
+                success=False,
+                error=tts_result.error or "Erreur de génération TTS inconnue"
+            )
+
+        # Create document record for the TTS audio
+        tts_doc_id = str(uuid.uuid4())[:8]
+        now = datetime.utcnow().isoformat()
+
+        tts_doc_data = {
+            "judgment_id": judgment_id,
+            "nom_fichier": audio_filename,
+            "type_fichier": "mp3",
+            "type_mime": "audio/mpeg",
+            "taille": Path(tts_result.audio_path).stat().st_size,
+            "file_path": tts_result.audio_path,
+            "user_id": user_id,
+            "created_at": now,
+            "is_tts": True,
+            "source_document": doc_id,
+            "metadata": {
+                "voice": tts_result.voice,
+                "language": tts_result.language,
+                "duration_seconds": tts_result.duration,
+                "generated_at": now
+            }
+        }
+
+        await service.create("document", tts_doc_data, record_id=tts_doc_id)
+        logger.info(f"TTS audio saved as document: {tts_doc_id}")
+
+        # Return URL for downloading/streaming
+        clean_judgment_id = judgment_id.replace("judgment:", "")
+        audio_url = f"/api/judgments/{clean_judgment_id}/documents/document:{tts_doc_id}/download?inline=true"
+
+        return TTSResponse(
+            success=True,
+            audio_url=audio_url,
+            duration=tts_result.duration,
+            voice=tts_result.voice
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating TTS: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# ============================================================================
 # DIAGNOSTIC ENDPOINT
 # ============================================================================
 
