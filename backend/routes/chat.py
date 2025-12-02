@@ -88,11 +88,19 @@ async def chat(request: ChatRequest):
 - Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents du dossier."
 - Même pour des questions générales (ex: "Qu'est-ce que le notariat?"), cherche TOUJOURS dans les documents d'abord
 
+**RÈGLE ABSOLUE - CITATION DES SOURCES**:
+- TOUJOURS indiquer la source de chaque information dans ta réponse
+- Format obligatoire : "Selon [nom du fichier], ..." ou "D'après [nom du fichier], ..."
+- Exemple : "Selon Carter.pdf, l'arrêt Carter c. Canada établit que..."
+- Si plusieurs sources, les citer toutes : "D'après Document1.md et Document2.pdf, ..."
+- NE JAMAIS présenter une information sans citer sa source
+
 Directives générales:
 - Réponds toujours en français
 - Sois concis mais complet
 - Base-toi UNIQUEMENT sur les documents du dossier
 - Adapte ton expertise au contexte du dossier (juridique, académique, technique, etc.)
+- **CITE TOUJOURS tes sources dans chaque phrase**
 
 {tools_desc}
 
