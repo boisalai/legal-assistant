@@ -341,8 +341,46 @@ Transcription brute:
                 save_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
                 save_dir.mkdir(parents=True, exist_ok=True)
 
-            # Sauvegarder le fichier
+            # Définir le chemin du fichier markdown
             file_path = save_dir / md_filename
+
+            # ============================================================
+            # VÉRIFICATION: Fichier markdown existe déjà?
+            # ============================================================
+
+            # Vérifier si le fichier physique existe
+            if file_path.exists():
+                error_msg = f"Un fichier markdown '{md_filename}' existe déjà sur le disque. Veuillez le supprimer d'abord si vous souhaitez retranscrire."
+                logger.warning(error_msg)
+                self._emit_step_complete("saving", False)
+                raise FileExistsError(error_msg)
+
+            # Vérifier si un enregistrement existe déjà en base de données
+            existing_docs_result = await service.query(
+                "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
+                {"judgment_id": judgment_id, "filename": md_filename}
+            )
+
+            existing_docs = []
+            if existing_docs_result and len(existing_docs_result) > 0:
+                first_item = existing_docs_result[0]
+                if isinstance(first_item, dict):
+                    if "result" in first_item:
+                        existing_docs = first_item["result"] if isinstance(first_item["result"], list) else []
+                    elif "id" in first_item:
+                        existing_docs = existing_docs_result
+                elif isinstance(first_item, list):
+                    existing_docs = first_item
+
+            if existing_docs and len(existing_docs) > 0:
+                error_msg = f"Un fichier markdown '{md_filename}' existe déjà en base de données. Veuillez le supprimer d'abord si vous souhaitez retranscrire."
+                logger.warning(error_msg)
+                self._emit_step_complete("saving", False)
+                raise FileExistsError(error_msg)
+
+            # ============================================================
+            # SAUVEGARDE: Créer le fichier markdown
+            # ============================================================
             file_path.write_text(markdown_content, encoding="utf-8")
 
             logger.info(f"Markdown file saved: {file_path}")
@@ -374,7 +412,30 @@ Transcription brute:
 
             logger.info(f"Document record created: document:{doc_id}")
 
-            self._emit_progress("saving", "Document sauvegardé", 95)
+            self._emit_progress("saving", "Document sauvegardé", 90)
+
+            # Index le document pour la recherche sémantique
+            try:
+                from services.document_indexing_service import get_document_indexing_service
+
+                self._emit_progress("saving", "Indexation pour recherche sémantique...", 92)
+                indexing_service = get_document_indexing_service()
+                index_result = await indexing_service.index_document(
+                    document_id=f"document:{doc_id}",
+                    judgment_id=judgment_id,
+                    text_content=markdown_content,
+                    force_reindex=False
+                )
+
+                if index_result.get("success"):
+                    logger.info(f"Document indexed: {index_result.get('chunks_created', 0)} chunks")
+                else:
+                    logger.warning(f"Indexing failed: {index_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                # Ne pas bloquer si l'indexation échoue
+                logger.warning(f"Could not index document: {e}")
+
+            self._emit_progress("saving", "Terminé", 100)
             self._emit_step_complete("saving", True)
 
             return {

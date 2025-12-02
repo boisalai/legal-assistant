@@ -111,15 +111,6 @@ export function DocumentPreviewPanel({
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={handleOpenExternal}
-            title="Ouvrir dans un nouvel onglet"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
             onClick={onClose}
             title="Fermer"
           >

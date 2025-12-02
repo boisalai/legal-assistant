@@ -19,7 +19,11 @@ from agno.agent import Agent
 
 from services.model_factory import create_model
 from services.surreal_service import get_surreal_service
+from services.conversation_service import get_conversation_service
 from tools.transcription_tool import transcribe_audio, transcribe_audio_streaming, get_tools_description
+from tools.document_search_tool import search_documents, list_documents
+from tools.entity_extraction_tool import extract_entities, find_entity
+from tools.semantic_search_tool import semantic_search, index_document_tool, get_index_stats
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +44,20 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] = []
 
 
+class DocumentSource(BaseModel):
+    """Information about a document source used in the response."""
+    name: str
+    type: str
+    word_count: int
+    is_transcription: bool = False
+
+
 class ChatResponse(BaseModel):
     """Response from chat endpoint."""
     message: str
     model_used: str
     document_created: bool = False  # Indicates if a new document was created during the chat
+    sources: list[DocumentSource] = []  # Sources consulted for RAG
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -57,6 +70,8 @@ async def chat(request: ChatRequest):
     """
     logger.info(f"Chat request: model={request.model_id}, case_id={request.case_id}")
 
+    sources_list = []  # Track sources used in RAG
+
     try:
         # Create the model
         model = create_model(request.model_id)
@@ -65,17 +80,51 @@ async def chat(request: ChatRequest):
         tools_desc = get_tools_description()
 
         # System prompt
-        system_content = f"""Tu es un assistant juridique expert. Tu aides les utilisateurs avec leurs questions juridiques de manière professionnelle et précise.
+        system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
 
-Directives:
+**RÈGLE ABSOLUE - RÉPONSES BASÉES UNIQUEMENT SUR LES DOCUMENTS**:
+- Tu dois TOUJOURS chercher la réponse dans les documents du dossier en utilisant `semantic_search`
+- NE JAMAIS répondre avec tes propres connaissances générales
+- Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents du dossier."
+- Même pour des questions générales (ex: "Qu'est-ce que le notariat?"), cherche TOUJOURS dans les documents d'abord
+
+Directives générales:
 - Réponds toujours en français
 - Sois concis mais complet
-- Si tu n'es pas sûr de quelque chose, dis-le clairement
-- Ne donne jamais de conseils juridiques définitifs - recommande de consulter un avocat pour les questions importantes
+- Base-toi UNIQUEMENT sur les documents du dossier
+- Adapte ton expertise au contexte du dossier (juridique, académique, technique, etc.)
 
 {tools_desc}
 
-Si l'utilisateur demande de transcrire un fichier audio, utilise l'outil transcribe_audio avec l'identifiant du dossier actuel."""
+Outils disponibles pour toi:
+- **transcribe_audio**: Transcris un fichier audio en texte
+- **search_documents**: Recherche par mots-clés exacts dans tous les documents
+- **semantic_search**: Recherche sémantique (comprend le sens de la question) - OUTIL PRINCIPAL À UTILISER
+- **list_documents**: Liste tous les documents disponibles dans le dossier actuel
+- **extract_entities**: Extrait des entités structurées (personnes, dates, montants, références)
+- **find_entity**: Recherche une entité spécifique et affiche tous les contextes
+- **index_document_tool**: Indexe manuellement un document pour la recherche sémantique
+- **get_index_stats**: Affiche les statistiques de l'index de recherche sémantique
+
+Quand utiliser les outils - RÈGLES IMPORTANTES:
+
+**RÈGLE #1 - TOUJOURS utiliser la recherche sémantique**:
+- Pour TOUTE question (générale ou spécifique), utilise `semantic_search` en premier
+- Exemples : "Qu'est-ce que le notariat?", "Explique-moi X", "Quel est le prix?", "Résume ce document"
+- Si `semantic_search` ne trouve rien, informe l'utilisateur que l'information n'est pas dans les documents
+
+**RÈGLE #2 - Choix de l'outil de recherche**:
+- `semantic_search`: OUTIL PAR DÉFAUT pour toute question (comprend le sens)
+- `search_documents`: Seulement si l'utilisateur demande explicitement de chercher un mot/phrase EXACT
+
+**RÈGLE #3 - Autres outils**:
+- `list_documents`: Si l'utilisateur demande "quels documents sont disponibles"
+- `transcribe_audio`: Si l'utilisateur demande de transcrire un fichier audio
+- `extract_entities`: Pour extraire des informations structurées des documents
+- `find_entity`: Pour chercher où une entité spécifique est mentionnée
+- `get_index_stats`: Pour vérifier l'état de l'indexation
+
+**En résumé**: Utilise TOUJOURS `semantic_search` pour répondre aux questions. Ne réponds JAMAIS avec tes connaissances générales."""
 
         # If we have a case_id, try to get case context
         if request.case_id:
@@ -156,11 +205,44 @@ Contexte du dossier actuel:
                         logger.info(f"Parsed {len(documents)} documents")
 
                         if documents:
+                            # Build relationship maps FIRST
+                            audio_transcription_map = {}  # audio_filename -> transcription_filename
+                            pdf_extraction_map = {}  # pdf_filename -> extraction_filename
+
+                            # Map transcriptions to audio sources
+                            for doc in documents:
+                                if doc.get("is_transcription") and doc.get("source_audio"):
+                                    source_audio = doc.get("source_audio")
+                                    audio_transcription_map[source_audio] = doc.get("nom_fichier")
+
+                            # Map markdown extractions to PDF sources (heuristic: same base name)
+                            from pathlib import Path
+                            md_files = [d for d in documents if d.get("nom_fichier", "").lower().endswith(".md") and not d.get("is_transcription")]
+                            pdf_files_list = [d for d in documents if d.get("nom_fichier", "").lower().endswith(".pdf")]
+                            for md_doc in md_files:
+                                md_name = md_doc.get("nom_fichier", "")
+                                md_base = Path(md_name).stem
+                                for pdf_doc in pdf_files_list:
+                                    pdf_name = pdf_doc.get("nom_fichier", "")
+                                    pdf_base = Path(pdf_name).stem
+                                    if md_base == pdf_base:
+                                        pdf_extraction_map[pdf_name] = md_name
+                                        break
+
                             system_content += f"""
 - Nombre de documents: {len(documents)}
-- Documents:"""
+
+**IMPORTANT - Comprendre les relations entre documents:**
+- Les fichiers .md avec "[Transcription de X]" sont des versions TEXTE de fichiers audio X - L'AUDIO A DÉJÀ ÉTÉ TRANSCRIT
+- Les fichiers audio avec "[DÉJÀ TRANSCRIT → voir Y]" ont été traités - NE PAS RE-TRANSCRIRE
+- Les fichiers PDF avec "[DÉJÀ EXTRAIT → voir Z]" ont été traités - NE PAS RE-EXTRAIRE
+- Si un fichier audio montre "[DÉJÀ TRANSCRIT → voir Y]", cela signifie que le contenu audio est disponible dans Y
+- RÈGLE ABSOLUE: Si tu vois "[DÉJÀ TRANSCRIT]" ou "[DÉJÀ EXTRAIT]", NE JAMAIS proposer de refaire l'opération
+
+- Documents (liste résumée - utilise l'outil `list_documents` pour plus de détails):"""
                             # Collect document contents for context
                             doc_contents = []
+                            sources_list = []  # Track sources for response
                             for doc in documents:
                                 doc_name = doc.get("nom_fichier", "Document inconnu")
                                 doc_type = doc.get("type_fichier", "").upper()
@@ -175,14 +257,33 @@ Contexte du dossier actuel:
 
                                 # Check if this is a transcription or audio file
                                 is_transcription = doc.get("is_transcription", False)
+                                source_audio = doc.get("source_audio", "")
                                 is_audio = doc_type in ["MP3", "WAV", "M4A", "OGG", "WEBM"]
+                                is_pdf = doc_type == "PDF"
                                 texte_extrait = doc.get("texte_extrait", "")
 
-                                # Build status note
-                                if is_transcription:
-                                    status_note = " [Transcription audio]"
-                                elif is_audio and not texte_extrait:
-                                    status_note = " [Audio non transcrit]"
+                                # Build status note with relationships
+                                if is_transcription and source_audio:
+                                    status_note = f" [Transcription de {source_audio}]"
+                                elif is_audio:
+                                    transcription_file = audio_transcription_map.get(doc_name)
+                                    if transcription_file:
+                                        status_note = f" [DÉJÀ TRANSCRIT → voir {transcription_file}]"
+                                    else:
+                                        status_note = " [Non transcrit]"
+                                elif is_pdf:
+                                    extraction_file = pdf_extraction_map.get(doc_name)
+                                    if extraction_file:
+                                        status_note = f" [DÉJÀ EXTRAIT → voir {extraction_file}]"
+                                    else:
+                                        status_note = " [PDF non extrait]"
+                                elif texte_extrait and doc_name in pdf_extraction_map.values():
+                                    # This is a PDF extraction
+                                    source_pdf = [k for k, v in pdf_extraction_map.items() if v == doc_name]
+                                    if source_pdf:
+                                        status_note = f" [Extraction de {source_pdf[0]}]"
+                                    else:
+                                        status_note = " [Contenu disponible]"
                                 elif texte_extrait:
                                     status_note = " [Contenu disponible]"
                                 else:
@@ -193,11 +294,19 @@ Contexte du dossier actuel:
 
                                 # Collect extracted text for later inclusion
                                 if texte_extrait:
+                                    word_count = len(texte_extrait.split())
                                     doc_contents.append({
                                         "name": doc_name,
                                         "content": texte_extrait,
                                         "is_transcription": is_transcription
                                     })
+                                    # Track this source
+                                    sources_list.append(DocumentSource(
+                                        name=doc_name,
+                                        type=doc_type,
+                                        word_count=word_count,
+                                        is_transcription=is_transcription
+                                    ))
                                 elif is_audio:
                                     # Add a note that this audio file hasn't been transcribed
                                     doc_contents.append({
@@ -243,13 +352,22 @@ Contenu des documents:"""
 
         logger.info(f"Sending conversation to agent with {len(request.history)} history messages")
 
-        # Create an Agent with the transcription tool
+        # Create an Agent with all available tools
         # Pass case_id in the context for the tool to use
         agent = Agent(
             name="LegalAssistant",
             model=model,
             instructions=system_content,
-            tools=[transcribe_audio],
+            tools=[
+                transcribe_audio,
+                search_documents,
+                semantic_search,
+                list_documents,
+                extract_entities,
+                find_entity,
+                index_document_tool,
+                get_index_stats
+            ],
             markdown=True,
         )
 
@@ -269,6 +387,30 @@ Contenu des documents:"""
 
         logger.info(f"Got response: {len(assistant_message)} chars")
 
+        # Save conversation to database if we have a case_id
+        if request.case_id:
+            try:
+                conv_service = get_conversation_service()
+                # Save user message
+                await conv_service.save_message(
+                    judgment_id=request.case_id,
+                    role="user",
+                    content=request.message
+                )
+                # Save assistant response
+                await conv_service.save_message(
+                    judgment_id=request.case_id,
+                    role="assistant",
+                    content=assistant_message,
+                    model_id=request.model_id,
+                    metadata={
+                        "sources": [s.dict() for s in sources_list] if sources_list else []
+                    }
+                )
+                logger.info(f"Saved conversation to database for case {request.case_id}")
+            except Exception as e:
+                logger.warning(f"Failed to save conversation: {e}")
+
         # Detect if a document was created (transcription completed successfully)
         # Check for successful transcription phrases in the response
         document_created = False
@@ -285,7 +427,8 @@ Contenu des documents:"""
         return ChatResponse(
             message=assistant_message,
             model_used=request.model_id,
-            document_created=document_created
+            document_created=document_created,
+            sources=sources_list
         )
 
     except Exception as e:
@@ -446,12 +589,13 @@ async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[st
         tools_desc = get_tools_description()
 
         # System prompt (simplified version)
-        system_content = f"""Tu es un assistant juridique expert. Tu aides les utilisateurs avec leurs questions juridiques de manière professionnelle et précise.
+        system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
 
 Directives:
 - Réponds toujours en français
 - Sois concis mais complet
 - Si tu n'es pas sûr de quelque chose, dis-le clairement
+- Adapte ton expertise au contexte (juridique, académique, technique, etc.)
 
 {tools_desc}"""
 
@@ -482,3 +626,99 @@ Directives:
     except Exception as e:
         logger.error(f"Regular chat stream error: {e}", exc_info=True)
         yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur: {str(e)}', 'role': 'assistant'})}\n\n"
+
+
+@router.get("/chat/history/{case_id}")
+async def get_chat_history(case_id: str, limit: int = 50, offset: int = 0):
+    """
+    Get conversation history for a case.
+
+    Args:
+        case_id: ID of the case
+        limit: Maximum number of messages to retrieve (default: 50)
+        offset: Number of messages to skip (default: 0)
+
+    Returns:
+        List of messages with role, content, timestamp, and metadata
+    """
+    try:
+        conv_service = get_conversation_service()
+        messages = await conv_service.get_conversation_history(
+            judgment_id=case_id,
+            limit=limit,
+            offset=offset
+        )
+
+        return {
+            "case_id": case_id,
+            "messages": messages,
+            "count": len(messages)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get chat history: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération de l'historique: {str(e)}"
+        )
+
+
+@router.delete("/chat/history/{case_id}")
+async def clear_chat_history(case_id: str):
+    """
+    Clear all conversation history for a case.
+
+    Args:
+        case_id: ID of the case
+
+    Returns:
+        Success status
+    """
+    try:
+        conv_service = get_conversation_service()
+        success = await conv_service.clear_conversation(judgment_id=case_id)
+
+        if success:
+            return {"success": True, "message": "Historique effacé avec succès"}
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Erreur lors de l'effacement de l'historique"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to clear chat history: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'effacement de l'historique: {str(e)}"
+        )
+
+
+@router.get("/chat/stats/{case_id}")
+async def get_chat_stats(case_id: str):
+    """
+    Get conversation statistics for a case.
+
+    Args:
+        case_id: ID of the case
+
+    Returns:
+        Statistics including message count and timestamps
+    """
+    try:
+        conv_service = get_conversation_service()
+        stats = await conv_service.get_conversation_stats(judgment_id=case_id)
+
+        return {
+            "case_id": case_id,
+            **stats
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get chat stats: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération des statistiques: {str(e)}"
+        )

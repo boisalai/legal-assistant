@@ -33,6 +33,11 @@ dependencies = [
     "ollama>=0.6.1",
     "markitdown[pdf]>=0.1.3",
     "yt-dlp>=2025.11.12",
+    # Embeddings locaux (développement)
+    "sentence-transformers>=3.3.0",
+    "torch>=2.6.0",
+    # Whisper pour transcription (développement)
+    "mlx-whisper>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -85,6 +90,12 @@ whisper = [
 # Fallback openai-whisper pour non-Apple Silicon
 whisper-openai = [
     "openai-whisper>=20231117",
+]
+
+# Embeddings locaux (sentence-transformers avec support MPS/CUDA/CPU)
+embeddings = [
+    "sentence-transformers>=3.3.0",
+    "torch>=2.6.0",
 ]
 
 # Installer tous les providers LLM

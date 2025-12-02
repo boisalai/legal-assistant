@@ -285,7 +285,23 @@ class DocumentExtractionService:
     async def _extract_with_markitdown(self, file_path: Path) -> ExtractionResult:
         """Extraction avec MarkItDown (PDF, Word, PowerPoint, Excel, images)."""
         try:
-            result = self._markitdown.convert(str(file_path))
+            # Capturer stdout ET stderr de MarkItDown pour éviter les logs verbeux
+            import sys
+            import io
+            import os
+
+            # Sauvegarder stdout et stderr
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = io.StringIO()
+            sys.stderr = io.StringIO()
+
+            try:
+                result = self._markitdown.convert(str(file_path))
+            finally:
+                # Restaurer stdout et stderr
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
 
             if not result or not result.text_content:
                 return ExtractionResult(

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/layout";
 import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
-import { AssistantPanel } from "@/components/cases/assistant-panel";
+import { AssistantPanel, type Message } from "@/components/cases/assistant-panel";
 import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
@@ -35,6 +35,14 @@ export default function CaseDetailPage() {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [linkFileModalOpen, setLinkFileModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+
+  // Assistant messages - lifted to parent to persist across preview open/close
+  const [assistantMessages, setAssistantMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content: "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?",
+    },
+  ]);
 
   const fetchCaseDetails = useCallback(async () => {
     try {
@@ -137,7 +145,12 @@ export default function CaseDetailPage() {
 
   const handleDeleteDocument = async (docId: string) => {
     try {
-      await documentsApi.delete(caseId, docId);
+      // Find the document to get its filename and file_path
+      const doc = documents.find((d) => d.id === docId);
+      const filename = doc?.nom_fichier;
+      const filePath = doc?.file_path;
+
+      await documentsApi.delete(caseId, docId, filename, filePath);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
       toast.success("Document retiré");
     } catch (err) {
@@ -240,6 +253,8 @@ export default function CaseDetailPage() {
                       isAnalyzing={isAnalyzing}
                       hasDocuments={documents.length > 0}
                       onDocumentCreated={handleDocumentCreated}
+                      messages={assistantMessages}
+                      setMessages={setAssistantMessages}
                     />
                   </Panel>
                 </PanelGroup>
@@ -250,6 +265,8 @@ export default function CaseDetailPage() {
                   isAnalyzing={isAnalyzing}
                   hasDocuments={documents.length > 0}
                   onDocumentCreated={handleDocumentCreated}
+                  messages={assistantMessages}
+                  setMessages={setAssistantMessages}
                 />
               )}
             </Panel>
