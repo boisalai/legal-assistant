@@ -21,3 +21,6 @@ DEFINE INDEX idx_embedding_model ON document_embedding FIELDS embedding_model;
 -- Note: SurrealDB supports vector similarity via custom functions
 -- We'll use cosine similarity in the search queries
 SELECT VALUE count() FROM document_embedding GROUP ALL;
+SELECT * FROM document WHERE judgment_id = 'c9d207fc';
+SELECT * FROM judgment WHERE id = 'judgment:c9d207fc' OR id CONTAINS 'c9d207fc';
+SELECT id, title FROM judgment;

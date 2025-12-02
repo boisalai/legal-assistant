@@ -308,6 +308,7 @@ Transcription brute:
         duration: float,
         language: str,
         audio_file_path: str = "",
+        source_document_id: str = None,
     ) -> Optional[dict]:
         """
         Étape 3: Sauvegarde du document markdown.
@@ -348,35 +349,38 @@ Transcription brute:
             # VÉRIFICATION: Fichier markdown existe déjà?
             # ============================================================
 
-            # Vérifier si le fichier physique existe
+            # Note: Nous ne vérifions plus l'existence car:
+            # 1. Les fichiers markdown dérivés ne sont plus auto-découverts (fix dans routes/documents.py)
+            # 2. Si l'utilisateur veut retranscrire, on écrase simplement l'ancien fichier
+            # 3. Cela évite les problèmes de synchronisation entre fichier physique et DB
+
+            # Si le fichier existe déjà, on va le supprimer et le recréer
             if file_path.exists():
-                error_msg = f"Un fichier markdown '{md_filename}' existe déjà sur le disque. Veuillez le supprimer d'abord si vous souhaitez retranscrire."
-                logger.warning(error_msg)
-                self._emit_step_complete("saving", False)
-                raise FileExistsError(error_msg)
+                logger.info(f"Fichier markdown '{md_filename}' existe déjà, il sera écrasé")
+                # Supprimer l'ancien enregistrement en DB s'il existe
+                try:
+                    existing_docs_result = await service.query(
+                        "SELECT id FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
+                        {"judgment_id": judgment_id, "filename": md_filename}
+                    )
+                    if existing_docs_result and len(existing_docs_result) > 0:
+                        first_item = existing_docs_result[0]
+                        if isinstance(first_item, dict) and "result" in first_item:
+                            existing_docs = first_item["result"] if isinstance(first_item["result"], list) else []
+                        elif isinstance(first_item, dict) and "id" in first_item:
+                            existing_docs = [first_item]
+                        elif isinstance(first_item, list):
+                            existing_docs = first_item
+                        else:
+                            existing_docs = []
 
-            # Vérifier si un enregistrement existe déjà en base de données
-            existing_docs_result = await service.query(
-                "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
-                {"judgment_id": judgment_id, "filename": md_filename}
-            )
-
-            existing_docs = []
-            if existing_docs_result and len(existing_docs_result) > 0:
-                first_item = existing_docs_result[0]
-                if isinstance(first_item, dict):
-                    if "result" in first_item:
-                        existing_docs = first_item["result"] if isinstance(first_item["result"], list) else []
-                    elif "id" in first_item:
-                        existing_docs = existing_docs_result
-                elif isinstance(first_item, list):
-                    existing_docs = first_item
-
-            if existing_docs and len(existing_docs) > 0:
-                error_msg = f"Un fichier markdown '{md_filename}' existe déjà en base de données. Veuillez le supprimer d'abord si vous souhaitez retranscrire."
-                logger.warning(error_msg)
-                self._emit_step_complete("saving", False)
-                raise FileExistsError(error_msg)
+                        for doc in existing_docs:
+                            doc_id = str(doc.get("id", ""))
+                            if doc_id:
+                                await service.delete(doc_id)
+                                logger.info(f"Ancien enregistrement markdown supprimé: {doc_id}")
+                except Exception as e:
+                    logger.warning(f"Erreur lors de la suppression de l'ancien markdown: {e}")
 
             # ============================================================
             # SAUVEGARDE: Créer le fichier markdown
@@ -398,7 +402,10 @@ Transcription brute:
                 "file_path": str(file_path),
                 "texte_extrait": markdown_content,
                 "is_transcription": True,
-                "source_audio": audio_filename,
+                "source_audio": audio_filename,  # Garder pour compatibilité
+                "source_document_id": source_document_id,  # Nouveau champ
+                "is_derived": True,
+                "derivation_type": "transcription",
                 "extraction_method": f"whisper-{self.whisper_model}",
                 "created_at": now,
                 "metadata": {
@@ -457,6 +464,7 @@ Transcription brute:
         create_markdown_doc: bool = True,
         original_filename: str = "",
         raw_mode: bool = False,
+        source_document_id: str = None,
     ) -> TranscriptionWorkflowResult:
         """
         Exécute le workflow de transcription complet.
@@ -473,6 +481,7 @@ Transcription brute:
             create_markdown_doc: Si True, crée un document markdown dans le dossier
             original_filename: Nom original du fichier (si différent du nom sur disque)
             raw_mode: Si True, sauvegarde la transcription brute sans formatage LLM
+            source_document_id: ID du document audio source (pour lier le fichier dérivé)
 
         Returns:
             TranscriptionWorkflowResult avec tous les détails
@@ -521,6 +530,7 @@ Transcription brute:
                     duration=result.duration_seconds,
                     language=result.language,
                     audio_file_path=audio_path,  # Pass original audio path
+                    source_document_id=source_document_id,  # Link to source audio document
                 )
 
                 if doc_result:

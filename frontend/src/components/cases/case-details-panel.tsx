@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import {
   Database,
   MoreVertical,
   DatabaseBackup,
+  RefreshCw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -60,6 +61,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Case, Document, Checklist } from "@/types";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
+import { DocumentsDataTable } from "./documents-data-table";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -153,6 +155,36 @@ export function CaseDetailsPanel({
   const [extractingPDFDocId, setExtractingPDFDocId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [syncingDocuments, setSyncingDocuments] = useState(false);
+  const [syncResultDialogOpen, setSyncResultDialogOpen] = useState(false);
+  const [syncResultMessage, setSyncResultMessage] = useState("");
+  const [syncResultTitle, setSyncResultTitle] = useState("");
+
+  // Handle synchronize documents
+  const handleSyncDocuments = async () => {
+    setSyncingDocuments(true);
+    try {
+      const result = await documentsApi.sync(caseData.id);
+      if (onDocumentsChange) {
+        await onDocumentsChange();
+      }
+
+      if (result.discovered > 0) {
+        setSyncResultTitle("Synchronisation réussie");
+        setSyncResultMessage(`${result.discovered} fichier(s) découvert(s) et ajouté(s).`);
+      } else {
+        setSyncResultTitle("Synchronisation réussie");
+        setSyncResultMessage("Aucun nouveau fichier découvert.");
+      }
+      setSyncResultDialogOpen(true);
+    } catch (err) {
+      setSyncResultTitle("Erreur de synchronisation");
+      setSyncResultMessage(err instanceof Error ? err.message : "Erreur lors de la synchronisation");
+      setSyncResultDialogOpen(true);
+    } finally {
+      setSyncingDocuments(false);
+    }
+  };
 
   // Check if document is an audio file
   const isAudioFile = (doc: Document) => {
@@ -433,182 +465,46 @@ export function CaseDetailsPanel({
         </div>
 
       {/* Liste des documents */}
-      <div className="space-y-2">
-        <h3 className="font-semibold text-sm">Documents ({documents.length})</h3>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm">Documents ({documents.length})</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncDocuments}
+            disabled={syncingDocuments}
+            title="Synchroniser - Découvre les fichiers dans le répertoire du dossier"
+            className="h-7 text-xs"
+          >
+            {syncingDocuments ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <RefreshCw className="h-3 w-3 mr-1" />
+            )}
+            Sync
+          </Button>
+        </div>
 
-        {/* État de la base de données - Section discrète */}
-        {documents.length > 0 && (() => {
-          const indexedDocs = documents.filter(doc => doc.texte_extrait);
-          const transcriptions = indexedDocs.filter(doc => doc.type_mime?.includes('markdown') || doc.nom_fichier?.endsWith('.md'));
-          const nonIndexedDocs = documents.filter(doc => !doc.texte_extrait);
-
-          // Calculate total words indexed
-          const totalWords = indexedDocs.reduce((sum, doc) => {
-            const text = doc.texte_extrait || '';
-            return sum + text.split(/\s+/).filter(w => w.length > 0).length;
-          }, 0);
-
-          return indexedDocs.length > 0 ? (
-            <div className="px-3 py-2 bg-muted/30 rounded-md border border-muted text-xs text-muted-foreground">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-1.5">
-                    <Database className="h-3.5 w-3.5" />
-                    <span className="font-medium">{indexedDocs.length} indexé{indexedDocs.length > 1 ? 's' : ''}</span>
-                  </span>
-                  {totalWords > 0 && (
-                    <span className="text-muted-foreground/70">
-                      ~{totalWords.toLocaleString()} mots
-                    </span>
-                  )}
-                  {transcriptions.length > 0 && (
-                    <span className="text-muted-foreground/70">
-                      {transcriptions.length} transcription{transcriptions.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {nonIndexedDocs.length > 0 && (
-                    <span className="text-muted-foreground/70">
-                      {nonIndexedDocs.length} non indexé{nonIndexedDocs.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : null;
-        })()}
-
-        {documents.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">
-            Aucun document. Ajoutez-en un pour commencer.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                {getFileIcon(doc.type_mime || doc.type_fichier)}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">
-                    {doc.nom_fichier}
-                  </p>
-                  <p className="text-xs text-muted-foreground/60 truncate" title={doc.file_path}>
-                    {formatFileSize(doc.taille)}{doc.file_path && ` • ${doc.file_path}`}
-                  </p>
-                </div>
-                {/* Status badges */}
-                {(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id || extractingPDFDocId === doc.id) && (
-                  <Badge variant="secondary" className="shrink-0 text-xs">
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    {extractingDocId === doc.id ? "Indexation..." : transcribingDocId === doc.id ? "Transcription..." : extractingPDFDocId === doc.id ? "Extraction..." : "Suppression..."}
-                  </Badge>
-                )}
-                {doc.texte_extrait && !(extractingDocId === doc.id || transcribingDocId === doc.id || clearingDocId === doc.id || extractingPDFDocId === doc.id) && (
-                  <div title={`✅ Texte indexé dans SurrealDB\n📄 ${doc.texte_extrait.split(/\s+/).filter((w: string) => w.length > 0).length.toLocaleString()} mots extraits\n🔍 Disponible pour recherche RAG`}>
-                    <Database className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </div>
-                )}
-                {/* Dropdown menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {/* GESTION DU FICHIER */}
-                    <DropdownMenuItem onClick={() => onPreviewDocument(doc.id)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Visualiser
-                    </DropdownMenuItem>
-
-                    {/* INDEXATION (RAG) */}
-                    {(needsExtraction(doc) || doc.texte_extrait) && (
-                      <>
-                        <DropdownMenuSeparator />
-                        {needsExtraction(doc) && (
-                          <DropdownMenuItem
-                            onClick={() => handleExtractText(doc)}
-                            disabled={extractingDocId === doc.id}
-                          >
-                            <Database className="h-4 w-4 mr-2" />
-                            Indexer dans la base de données
-                          </DropdownMenuItem>
-                        )}
-                        {doc.texte_extrait && (
-                          <>
-                            {/* Only show "Réindexer" for non-markdown documents */}
-                            {!doc.nom_fichier?.endsWith('.md') && (
-                              <DropdownMenuItem
-                                onClick={() => handleExtractText(doc)}
-                                disabled={extractingDocId === doc.id}
-                              >
-                                <Database className="h-4 w-4 mr-2" />
-                                Réindexer (mettre à jour)
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => handleClearText(doc)}
-                              disabled={clearingDocId === doc.id}
-                              className="text-orange-600"
-                            >
-                              <DatabaseBackup className="h-4 w-4 mr-2" />
-                              Retirer de la base de données
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </>
-                    )}
-
-                    {/* PDF (si applicable) */}
-                    {isPDFFile(doc) && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleExtractPDF(doc)}
-                          disabled={extractingPDFDocId === doc.id}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Extraire en markdown
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    {/* AUDIO (si applicable) */}
-                    {isAudioFile(doc) && !doc.texte_extrait && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleTranscribe(doc)}
-                          disabled={transcribingDocId === doc.id}
-                        >
-                          <Mic className="h-4 w-4 mr-2" />
-                          Transcrire en markdown
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    {/* DANGER */}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setDocToDelete(doc);
-                        setDeleteDialogOpen(true);
-                      }}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {/* "Supprimer" for uploaded files, "Retirer" for linked files */}
-                      {doc.file_path?.includes('data/uploads/') ? 'Supprimer du dossier' : 'Retirer du dossier'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* DataTable with filters */}
+        <DocumentsDataTable
+          documents={documents}
+          onPreview={onPreviewDocument}
+          onDelete={(doc) => {
+            setDocToDelete(doc);
+            setDeleteDialogOpen(true);
+          }}
+          onExtract={handleExtractText}
+          onExtractPDF={handleExtractPDF}
+          onTranscribe={handleTranscribe}
+          onClearText={handleClearText}
+          extractingDocId={extractingDocId}
+          extractingPDFDocId={extractingPDFDocId}
+          transcribingDocId={transcribingDocId}
+          clearingDocId={clearingDocId}
+          needsExtraction={needsExtraction}
+          isPDFFile={isPDFFile}
+          isAudioFile={isAudioFile}
+        />
 
         {/* Analysis Progress Indicator */}
         <AnalysisProgressIndicator
@@ -729,6 +625,21 @@ export function CaseDetailsPanel({
             <AlertDialogAction onClick={handleConfirmDelete}>
               {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer' : 'Retirer'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Sync Result Dialog */}
+      <AlertDialog open={syncResultDialogOpen} onOpenChange={setSyncResultDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{syncResultTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {syncResultMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setSyncResultDialogOpen(false)}>OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

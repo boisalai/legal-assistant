@@ -53,18 +53,24 @@ async def semantic_search(
         Les passages les plus pertinents avec leur score de pertinence
     """
     try:
+        logger.info(f"[semantic_search] START - case_id={case_id}, query={query[:50]}...")
+
         # Obtenir le service d'indexation
         indexing_service = get_document_indexing_service()
+        logger.info(f"[semantic_search] Got indexing service: {indexing_service}")
 
         # Normaliser case_id
         judgment_id = case_id
         if not judgment_id.startswith("judgment:"):
             judgment_id = f"judgment:{judgment_id}"
 
-        logger.info(f"Semantic search in case {judgment_id}: '{query}'")
+        logger.info(f"[semantic_search] Normalized judgment_id: {judgment_id}")
 
         # Vérifier si des documents sont indexés
+        logger.info(f"[semantic_search] Getting index stats for {judgment_id}...")
         stats = await indexing_service.get_index_stats(judgment_id=judgment_id)
+        logger.info(f"[semantic_search] Stats: {stats}")
+
         if stats.get("total_chunks", 0) == 0:
             return """Les documents de ce dossier ne sont pas encore indexés pour la recherche sémantique.
 
@@ -75,12 +81,14 @@ Pour utiliser la recherche sémantique:
 En attendant, je ne peux pas répondre à votre question car je n'ai pas accès au contenu des documents."""
 
         # Effectuer la recherche sémantique
+        logger.info(f"[semantic_search] Searching with query='{query}', top_k={top_k}...")
         results = await indexing_service.search_similar(
             query_text=query,
             judgment_id=judgment_id,
             top_k=top_k,
             min_similarity=0.5  # Score minimum de similarité
         )
+        logger.info(f"[semantic_search] Found {len(results)} results")
 
         if not results:
             return f"""Je n'ai pas trouvé d'information pertinente sur "{query}" dans les documents du dossier.
@@ -94,17 +102,24 @@ Vous pouvez:
 - Vérifier si les documents du dossier traitent bien de ce sujet"""
 
         # Récupérer les informations des documents sources
+        logger.info(f"[semantic_search] Getting surreal service...")
         surreal_service = get_surreal_service()
+        logger.info(f"[semantic_search] Surreal service DB connected: {surreal_service.db is not None}")
+
         if not surreal_service.db:
+            logger.info(f"[semantic_search] Connecting to SurrealDB...")
             await surreal_service.connect()
 
         # Construire une map document_id -> nom_fichier
         doc_ids = list(set([r["document_id"] for r in results]))
+        logger.info(f"[semantic_search] Fetching names for {len(doc_ids)} unique documents...")
         doc_names = {}
 
         for doc_id in doc_ids:
+            # Use type::thing() to properly handle UUIDs with dashes
             doc_result = await surreal_service.query(
-                f"SELECT nom_fichier FROM {doc_id}"
+                "SELECT nom_fichier FROM type::thing($table, $id)",
+                {"table": "document", "id": doc_id.replace("document:", "")}
             )
             if doc_result and len(doc_result) > 0:
                 first_item = doc_result[0]

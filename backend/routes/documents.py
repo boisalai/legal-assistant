@@ -62,6 +62,9 @@ class DocumentResponse(BaseModel):
     created_at: str
     texte_extrait: Optional[str] = None
     file_exists: bool = True  # Whether the file exists on disk
+    source_document_id: Optional[str] = None  # ID of parent document if this is derived
+    is_derived: Optional[bool] = None  # True if this is a derived file
+    derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
 
 
 class DocumentListResponse(BaseModel):
@@ -105,7 +108,8 @@ async def list_documents(
     judgment_id: str,
     verify_files: bool = True,
     auto_remove_missing: bool = True,
-    auto_discover: bool = True,
+    auto_discover: bool = False,  # Désactivé par défaut pour éviter les duplicatas
+    include_derived: bool = True,  # Inclure les fichiers dérivés par défaut (filtrage dans le frontend)
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
@@ -116,6 +120,7 @@ async def list_documents(
         verify_files: Si True, verifie que les fichiers existent sur le disque
         auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
         auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
+        include_derived: Si True, inclut les fichiers dérivés (transcriptions, extractions, TTS). Par défaut False.
     """
     try:
         service = get_surreal_service()
@@ -127,18 +132,29 @@ async def list_documents(
             judgment_id = f"judgment:{judgment_id}"
 
         # Query documents for this judgment
-        result = await service.query(
-            "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-            {"judgment_id": judgment_id}
-        )
+        if include_derived:
+            # Include all documents
+            result = await service.query(
+                "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
+                {"judgment_id": judgment_id}
+            )
+        else:
+            # Exclude derived documents (only show source documents)
+            # Use "!= true" instead of "= false OR IS NULL" for SurrealDB compatibility
+            result = await service.query(
+                "SELECT * FROM document WHERE judgment_id = $judgment_id AND is_derived != true ORDER BY created_at DESC",
+                {"judgment_id": judgment_id}
+            )
 
         documents = []
         missing_files = []
         docs_to_remove = []
-        registered_files = set()  # Track files already in database
+        registered_files = set()  # Track files already in database (by absolute path)
+        registered_filenames = set()  # Track filenames already in database (fallback check)
 
         if result and len(result) > 0:
-            items = result[0].get("result", result) if isinstance(result[0], dict) else result
+            # SurrealDB query() returns a list of results directly
+            items = result
             if isinstance(items, list):
                 for item in items:
                     file_path = item.get("file_path", "")
@@ -154,9 +170,18 @@ async def list_documents(
                                 docs_to_remove.append(doc_id)
                                 continue  # Skip adding to response
 
-                    # Track this file as registered
+                    # Track this file as registered (both by absolute path and filename)
                     if file_path:
-                        registered_files.add(Path(file_path).resolve())
+                        # Try to resolve to absolute path, handle both relative and absolute paths
+                        try:
+                            abs_path = Path(file_path).resolve()
+                            registered_files.add(abs_path)
+                        except Exception:
+                            # If path resolution fails, just add as-is
+                            registered_files.add(Path(file_path))
+
+                        # Also track by filename as a fallback
+                        registered_filenames.add(item.get("nom_fichier", ""))
 
                     documents.append(DocumentResponse(
                         id=str(item.get("id", "")),
@@ -169,6 +194,9 @@ async def list_documents(
                         created_at=item.get("created_at", ""),
                         texte_extrait=item.get("texte_extrait"),
                         file_exists=file_exists,
+                        source_document_id=item.get("source_document_id"),
+                        is_derived=item.get("is_derived"),
+                        derivation_type=item.get("derivation_type"),
                     ))
 
         # Auto-remove documents with missing files
@@ -186,8 +214,19 @@ async def list_documents(
             if upload_dir.exists() and upload_dir.is_dir():
                 for file_path in upload_dir.iterdir():
                     if file_path.is_file():
-                        # Check if this file is already registered
-                        if file_path.resolve() not in registered_files:
+                        # Check if this file is already registered (by path OR by filename)
+                        is_registered = (
+                            file_path.resolve() in registered_files or
+                            file_path.name in registered_filenames
+                        )
+                        if not is_registered:
+                            # Skip markdown files - they are always derived files (transcriptions/extractions)
+                            # and should be created by the transcription/extraction workflows
+                            ext = get_file_extension(file_path.name).lower()
+                            if ext in ['.md', '.markdown']:
+                                logger.debug(f"Skipping auto-discovery of markdown file (derived file): {file_path.name}")
+                                continue
+
                             # Check if file type is allowed
                             if is_allowed_file(file_path.name):
                                 try:
@@ -197,16 +236,20 @@ async def list_documents(
                                     file_size = file_path.stat().st_size
                                     now = datetime.utcnow().isoformat()
 
+                                    # Use relative path (consistent with upload endpoint)
+                                    relative_path = f"data/uploads/{judgment_id.replace('judgment:', '')}/{file_path.name}"
+
                                     document_data = {
                                         "judgment_id": judgment_id,
                                         "nom_fichier": file_path.name,
                                         "type_fichier": ext.lstrip('.'),
                                         "type_mime": get_mime_type(file_path.name),
                                         "taille": file_size,
-                                        "file_path": str(file_path.absolute()),
+                                        "file_path": relative_path,
                                         "user_id": user_id or "system",
                                         "created_at": now,
                                         "auto_discovered": True,  # Flag to indicate this was auto-discovered
+                                        "is_derived": False,  # Source documents are not derived
                                     }
 
                                     await service.create("document", document_data, record_id=doc_id)
@@ -220,9 +263,12 @@ async def list_documents(
                                         type_fichier=ext.lstrip('.'),
                                         type_mime=get_mime_type(file_path.name),
                                         taille=file_size,
-                                        file_path=str(file_path.absolute()),
+                                        file_path=relative_path,
                                         created_at=now,
                                         file_exists=True,
+                                        source_document_id=None,
+                                        is_derived=False,
+                                        derivation_type=None,
                                     ))
                                 except Exception as e:
                                     logger.warning(f"Could not auto-register file {file_path.name}: {e}")
@@ -432,6 +478,70 @@ async def register_document(
         )
 
 
+@router.get("/{judgment_id}/documents/{doc_id}/derived")
+async def get_derived_documents(
+    judgment_id: str,
+    doc_id: str,
+    user_id: Optional[str] = Depends(get_current_user_id)
+):
+    """
+    Récupère tous les fichiers dérivés d'un document source.
+
+    Retourne les transcriptions, extractions PDF, fichiers TTS, etc.
+    créés à partir du document spécifié.
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize IDs
+        if not judgment_id.startswith("judgment:"):
+            judgment_id = f"judgment:{judgment_id}"
+        if not doc_id.startswith("document:"):
+            doc_id = f"document:{doc_id}"
+
+        # Query derived documents
+        result = await service.query(
+            "SELECT * FROM document WHERE source_document_id = $doc_id ORDER BY created_at DESC",
+            {"doc_id": doc_id}
+        )
+
+        derived = []
+        if result and len(result) > 0:
+            # SurrealDB query() returns a list of results directly
+            items = result
+            if isinstance(items, list):
+                for item in items:
+                    file_path = item.get("file_path", "")
+                    file_exists = Path(file_path).exists() if file_path else False
+
+                    derived.append(DocumentResponse(
+                        id=str(item.get("id", "")),
+                        judgment_id=item.get("judgment_id", judgment_id),
+                        nom_fichier=item.get("nom_fichier", ""),
+                        type_fichier=item.get("type_fichier", ""),
+                        type_mime=item.get("type_mime", ""),
+                        taille=item.get("taille", 0),
+                        file_path=file_path,
+                        created_at=item.get("created_at", ""),
+                        texte_extrait=item.get("texte_extrait"),
+                        file_exists=file_exists,
+                        source_document_id=item.get("source_document_id"),
+                        is_derived=item.get("is_derived"),
+                        derivation_type=item.get("derivation_type"),
+                    ))
+
+        return {"derived": derived, "total": len(derived)}
+
+    except Exception as e:
+        logger.error(f"Error getting derived documents: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 @router.get("/{judgment_id}/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(
     judgment_id: str,
@@ -465,7 +575,8 @@ async def get_document(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -568,7 +679,8 @@ async def delete_document(
                 )
 
                 if audio_result and len(audio_result) > 0:
-                    audio_items = audio_result[0].get("result", audio_result) if isinstance(audio_result[0], dict) else audio_result
+                    # SurrealDB query() returns a list of results directly
+                    audio_items = audio_result
                     if isinstance(audio_items, list) and len(audio_items) > 0:
                         audio_doc = audio_items[0]
                         audio_doc_id = str(audio_doc.get("id", ""))
@@ -694,7 +806,8 @@ async def download_document(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -783,7 +896,8 @@ async def extract_document_text(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -954,7 +1068,8 @@ async def transcribe_document(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1103,7 +1218,8 @@ async def transcribe_document_workflow(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1172,7 +1288,8 @@ async def transcribe_document_workflow(
                         judgment_id=judgment_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
-                        raw_mode=request.raw_mode
+                        raw_mode=request.raw_mode,
+                        source_document_id=doc_id  # Link transcription to source audio
                     )
                     await progress_queue.put({
                         "type": "complete",
@@ -1273,7 +1390,8 @@ async def extract_pdf_to_markdown(
                 detail="Document non trouve"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1397,7 +1515,7 @@ async def extract_pdf_to_markdown(
                         "data": {"step": "save", "message": "Enregistrement dans la base de données...", "percentage": 85}
                     })
 
-                    doc_id = str(uuid.uuid4())
+                    new_doc_id = str(uuid.uuid4())
                     doc_record = {
                         # ❌ NE PAS inclure "id" dans doc_record car CREATE va l'ajouter automatiquement
                         "judgment_id": judgment_id,
@@ -1408,12 +1526,15 @@ async def extract_pdf_to_markdown(
                         "file_path": str(markdown_path),
                         "texte_extrait": extraction_result.text,  # Store for indexing
                         "is_transcription": False,
+                        "source_document_id": doc_id,  # Link to source PDF
+                        "is_derived": True,
+                        "derivation_type": "pdf_extraction",
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat(),
                     }
 
                     # Utiliser service.create() avec record_id pour garantir le bon format
-                    await service.create("document", doc_record, record_id=doc_id)
+                    await service.create("document", doc_record, record_id=new_doc_id)
 
                     # Index le document pour la recherche sémantique
                     try:
@@ -1426,7 +1547,7 @@ async def extract_pdf_to_markdown(
 
                         indexing_service = get_document_indexing_service()
                         index_result = await indexing_service.index_document(
-                            document_id=f"document:{doc_id}",
+                            document_id=f"document:{new_doc_id}",
                             judgment_id=judgment_id,
                             text_content=extraction_result.text,
                             force_reindex=False
@@ -1444,7 +1565,7 @@ async def extract_pdf_to_markdown(
                         "type": "complete",
                         "data": {
                             "success": True,
-                            "document_id": f"document:{doc_id}",
+                            "document_id": f"document:{new_doc_id}",
                             "document_path": str(markdown_path),
                             "page_count": extraction_result.metadata.get("num_pages", 0)
                         }
@@ -1766,7 +1887,8 @@ async def generate_tts(
                 detail="Document non trouvé"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1831,7 +1953,10 @@ async def generate_tts(
             "user_id": user_id,
             "created_at": now,
             "is_tts": True,
-            "source_document": doc_id,
+            "source_document": doc_id,  # Garder pour compatibilité
+            "source_document_id": doc_id,  # Nouveau champ
+            "is_derived": True,
+            "derivation_type": "tts",
             "metadata": {
                 "voice": tts_result.voice,
                 "language": tts_result.language,

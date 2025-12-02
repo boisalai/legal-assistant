@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ import {
   DatabaseBackup,
   Youtube,
   FileDown,
+  RefreshCw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,10 +43,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
+import { DerivedFilesSubmenu } from "@/components/cases/derived-files-submenu";
 
 interface DocumentsTabProps {
   caseId: string;
@@ -64,6 +69,30 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [derivedCounts, setDerivedCounts] = useState<Record<string, number>>({});
+
+  // Load derived file counts for all documents
+  useEffect(() => {
+    const loadDerivedCounts = async () => {
+      const counts: Record<string, number> = {};
+      for (const doc of documents) {
+        try {
+          const result = await documentsApi.getDerived(caseId, doc.id);
+          if (result.total > 0) {
+            counts[doc.id] = result.total;
+          }
+        } catch (err) {
+          // Ignore errors, just don't show count
+        }
+      }
+      setDerivedCounts(counts);
+    };
+
+    if (documents.length > 0) {
+      loadDerivedCounts();
+    }
+  }, [documents, caseId]);
 
   const handleUpload = useCallback(async () => {
     if (files.length === 0) return;
@@ -81,6 +110,24 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
       setUploading(false);
     }
   }, [caseId, files, onDocumentsChange]);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const result = await documentsApi.sync(caseId);
+      onDocumentsChange();
+
+      if (result.discovered > 0) {
+        alert(`Synchronisation réussie: ${result.discovered} fichier(s) découvert(s) et ajouté(s).`);
+      } else {
+        alert("Synchronisation réussie: Aucun nouveau fichier découvert.");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur lors de la synchronisation");
+    } finally {
+      setSyncing(false);
+    }
+  }, [caseId, onDocumentsChange]);
 
   const handlePreview = (document: Document) => {
     if (onPreviewDocument) {
@@ -364,14 +411,30 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
 
       {/* Documents List */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Documents ({documents.length})
-          </CardTitle>
-          <CardDescription>
-            Liste des documents attachés à ce dossier
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div className="space-y-1.5">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Documents ({documents.length})
+            </CardTitle>
+            <CardDescription>
+              Liste des documents attachés à ce dossier
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            title="Synchroniser - Découvre les fichiers dans le répertoire du dossier"
+          >
+            {syncing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            <span className="ml-2">Synchroniser</span>
+          </Button>
         </CardHeader>
         <CardContent>
           {documents.length === 0 ? (
@@ -395,7 +458,14 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
                       <Icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{doc.nom_fichier}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{doc.nom_fichier}</p>
+                        {derivedCounts[doc.id] > 0 && (
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            +{derivedCounts[doc.id]}
+                          </Badge>
+                        )}
+                      </div>
                       {doc.file_path && (
                         <p className="text-xs text-muted-foreground/60 truncate" title={doc.file_path}>
                           {doc.file_path}
@@ -437,6 +507,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
                           <Eye className="h-4 w-4 mr-2" />
                           Visualiser
                         </DropdownMenuItem>
+
 
                         <DropdownMenuSeparator />
 
