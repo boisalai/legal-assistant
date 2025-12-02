@@ -44,6 +44,19 @@
    - Interface UI pour changer de modèle
    - Persistance des paramètres dans localStorage
    - Chargement automatique de ANTHROPIC_API_KEY depuis .env
+   - **Choix du modèle selon le cas d'usage** :
+     - **Claude Sonnet 4.5** : Questions complexes nécessitant RAG (recherche sémantique dans les documents)
+       - ✅ Excellente compréhension du contexte
+       - ✅ Citation précise des sources
+       - ✅ Raisonnement juridique de qualité
+       - ✅ Support natif de function calling (appel d'outils)
+       - ❌ Coût par token (API externe)
+     - **Qwen 2.5 7B** : Conversations simples sans accès aux documents
+       - ✅ Gratuit (modèle local via Ollama)
+       - ✅ Rapide pour conversations générales
+       - ✅ Pas de coût API
+       - ❌ Support limité de function calling (n'utilise pas les outils correctement)
+       - ❌ Peut halluciner si demandé de répondre sur des documents
 
 6. **Interface utilisateur (UI/UX)**
    - Panel de prévisualisation de documents avec affichage inline PDF
@@ -154,11 +167,40 @@ doc_result = await surreal_service.query(
 - Chunking intelligent avec overlap
 - Outil `semantic_search` opérationnel
 
-**⚠️ Reste à faire:**
-- Redémarrer le backend pour que le chat utilise la version corrigée
-- Tester le chat complet avec des questions réelles
-- Ajuster les paramètres (top_k, min_similarity, chunk_size) selon la qualité des réponses
-- Documenter les workflows d'utilisation
+#### Amélioration de la citation des sources ✅
+
+**Problème observé** : Claude Sonnet 4.5 répondait correctement mais sans citer explicitement ses sources.
+
+**Solution appliquée** : Ajout d'une règle de citation obligatoire dans le prompt système (`backend/routes/chat.py:91-96`)
+
+```python
+**RÈGLE ABSOLUE - CITATION DES SOURCES**:
+- TOUJOURS indiquer la source de chaque information dans ta réponse
+- Format obligatoire : "Selon [nom du fichier], ..." ou "D'après [nom du fichier], ..."
+- Exemple : "Selon Carter.pdf, l'arrêt Carter c. Canada établit que..."
+- Si plusieurs sources, les citer toutes : "D'après Document1.md et Document2.pdf, ..."
+- NE JAMAIS présenter une information sans citer sa source
+```
+
+#### Limitation identifiée : Qwen 2.5 7B ne supporte pas function calling ⚠️
+
+**Observation** : Qwen 2.5 7B hallucine du contenu au lieu d'utiliser l'outil `semantic_search`.
+
+**Diagnostic** :
+- Qwen 2.5 7B supporte techniquement les outils (tool calling dans le template Ollama)
+- Mais en pratique, le modèle ne comprend pas quand et comment utiliser les outils
+- Résultat : Répond avec ses connaissances générales au lieu de chercher dans les documents
+
+**Décision architecture** : Laisser l'utilisateur choisir le modèle selon le cas d'usage
+- **Claude Sonnet 4.5** : Questions nécessitant RAG (accès aux documents)
+- **Qwen 2.5 7B** : Conversations simples sans accès aux documents
+
+**Documentation créée** : Guide de sélection du modèle ajouté dans CLAUDE.md (voir section "Guide de sélection du modèle LLM")
+
+**Fichiers modifiés** :
+- `backend/routes/chat.py:91-96` : Ajout règle de citation des sources
+- `CLAUDE.md:47-59` : Comparaison Claude vs Qwen dans section Configuration LLM
+- `CLAUDE.md:624-706` : Nouveau guide détaillé de sélection du modèle
 
 ---
 
@@ -607,6 +649,91 @@ Génération TTS avec voix fr-FR-DeniseNeural (rate: +0%, volume: +0%)
 Markdown nettoyé: 5432 → 4821 caractères
 Audio généré avec succès: /path/to/file.mp3 (123456 bytes)
 ```
+
+## Guide de sélection du modèle LLM
+
+### Quand utiliser Claude Sonnet 4.5 ? ✅ **RECOMMANDÉ POUR RAG**
+
+**Cas d'usage :**
+- ✅ Questions nécessitant l'accès aux documents du dossier
+- ✅ Recherche sémantique dans les documents ("Qu'est-ce que...", "Explique...", "Résume l'arrêt X")
+- ✅ Analyse juridique approfondie ("Selon l'arrêt...", "D'après le contrat...")
+- ✅ Citation de sources précises
+- ✅ Extraction d'informations des documents ("Quel est le prix ?", "Qui est mentionné ?")
+- ✅ Raisonnement complexe nécessitant plusieurs étapes
+
+**Avantages :**
+- Support natif de function calling → utilise correctement l'outil `semantic_search`
+- Comprend les instructions de citation des sources
+- Raisonnement juridique de haute qualité
+- Ne hallucine pas de contenu
+
+**Inconvénients :**
+- Coût par token (API Anthropic)
+- Nécessite une connexion Internet
+- Plus lent que Qwen (appels API)
+
+**Exemples de questions :**
+```
+❓ "Résume l'arrêt Carter"
+✅ Claude utilisera semantic_search et citera : "Selon Carter.pdf, ..."
+
+❓ "Qu'est-ce que le notariat ?"
+✅ Claude cherchera dans les documents et citera ses sources
+
+❓ "Quelles sont les obligations du vendeur ?"
+✅ Claude trouvera les passages pertinents et citera les documents
+```
+
+### Quand utiliser Qwen 2.5 7B ? ⚠️ **CONVERSATIONS SIMPLES UNIQUEMENT**
+
+**Cas d'usage :**
+- ✅ Conversations générales ("Bonjour", "Merci", "Comment vas-tu ?")
+- ✅ Questions sur l'assistant lui-même ("Que peux-tu faire ?", "Comment utiliser X ?")
+- ✅ Clarifications ("Peux-tu reformuler ?", "Je ne comprends pas")
+- ✅ Questions simples sans besoin d'accès aux documents
+
+**Avantages :**
+- Gratuit (modèle local via Ollama)
+- Rapide (pas d'appel API)
+- Fonctionne hors ligne
+- Pas de coût
+
+**Inconvénients :**
+- ❌ **NE SUPPORTE PAS function calling correctement** → n'utilise pas `semantic_search`
+- ❌ **Hallucine du contenu** si on lui demande de résumer des documents
+- ❌ Ne cite pas les sources
+- ❌ Raisonnement moins fiable
+
+**⚠️ NE PAS utiliser Qwen pour :**
+```
+❌ "Résume l'arrêt Carter"
+→ Qwen inventera du contenu au lieu d'utiliser semantic_search
+
+❌ "Qu'est-ce que le notariat ?"
+→ Qwen répondra avec ses connaissances générales, pas les documents du dossier
+
+❌ Questions nécessitant des sources précises
+→ Qwen ne citera pas les documents sources
+```
+
+**✅ Utiliser Qwen pour :**
+```
+✅ "Bonjour"
+✅ "Merci pour ton aide"
+✅ "Que peux-tu faire ?"
+✅ "Comment changer de modèle ?"
+```
+
+### Résumé : Quelle est la règle simple ?
+
+**🎯 RÈGLE D'OR :**
+- **Documents du dossier nécessaires ?** → **Claude Sonnet 4.5**
+- **Conversation simple sans documents ?** → **Qwen 2.5 7B**
+
+**💡 En cas de doute :** Choisissez Claude Sonnet 4.5 pour garantir l'accès aux documents et éviter les hallucinations.
+
+---
 
 ## Conventions
 
