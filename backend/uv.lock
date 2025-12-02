@@ -1047,6 +1047,21 @@ wheels = [
 ]
 
 [[package]]
+name = "edge-tts"
+version = "7.2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "certifi" },
+    { name = "tabulate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/d0/db9a841ac29f119ca8e3d2a22325849997c571a4f31f728042c5fdbdff33/edge_tts-7.2.3.tar.gz", hash = "sha256:b85e271181cd52656934069237bfc3853335a17f7e51a4f7116e2936d32e62d2", size = 27308, upload-time = "2025-08-28T21:13:53.376Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c3/c6/9387c3f9decdd9780dfe21b7d9c0831aafd5d6813baf4f17b50afc7b7d77/edge_tts-7.2.3-py3-none-any.whl", hash = "sha256:62c87df25dedb6cd565cbdf87c639e01c466095b1e8f48ab8fa9efbb2123f53c", size = 30349, upload-time = "2025-08-28T21:13:52.145Z" },
+]
+
+[[package]]
 name = "email-validator"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1850,6 +1865,7 @@ source = { editable = "." }
 dependencies = [
     { name = "agno" },
     { name = "anthropic" },
+    { name = "edge-tts" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "fastmcp" },
@@ -1930,6 +1946,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'all-llm'", specifier = ">=0.42.0" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.42.0" },
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.0.0" },
+    { name = "edge-tts", specifier = ">=7.0.0" },
     { name = "email-validator", specifier = ">=2.3.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=33.1.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
