@@ -178,7 +178,8 @@ async def list_judgments(
         # Parse results
         judgments = []
         if result and len(result) > 0:
-            items = result[0].get("result", result) if isinstance(result[0], dict) else result
+            # SurrealDB query() returns a list of results directly
+            items = result
             if isinstance(items, list):
                 for item in items:
                     judgments.append(JudgmentResponse(
@@ -495,7 +496,58 @@ async def delete_judgment(
             except Exception as e:
                 logger.warning(f"Could not delete file: {e}")
 
-        # Delete from database
+        # Delete related data from database (cascade)
+        # 1. Delete conversation history
+        try:
+            await service.query(
+                "DELETE FROM conversation WHERE judgment_id = $judgment_id",
+                {"judgment_id": judgment_id}
+            )
+            logger.info(f"Deleted conversation history for {judgment_id}")
+        except Exception as e:
+            logger.warning(f"Could not delete conversation history: {e}")
+
+        # 2. Delete document chunks (embeddings)
+        try:
+            # Get all documents for this judgment first
+            docs_result = await service.query(
+                "SELECT id FROM document WHERE judgment_id = $judgment_id",
+                {"judgment_id": judgment_id}
+            )
+
+            if docs_result and len(docs_result) > 0:
+                # Parse document IDs
+                doc_ids = []
+                first_item = docs_result[0]
+                if isinstance(first_item, dict) and "result" in first_item:
+                    doc_ids = [doc.get("id") for doc in first_item["result"] if doc.get("id")]
+                elif isinstance(first_item, list):
+                    doc_ids = [doc.get("id") for doc in first_item if doc.get("id")]
+                elif isinstance(first_item, dict):
+                    doc_ids = [doc.get("id") for doc in docs_result if doc.get("id")]
+
+                # Delete chunks for each document
+                for doc_id in doc_ids:
+                    await service.query(
+                        "DELETE FROM document_chunk WHERE document_id = $document_id",
+                        {"document_id": doc_id}
+                    )
+
+                logger.info(f"Deleted document chunks for {len(doc_ids)} documents")
+        except Exception as e:
+            logger.warning(f"Could not delete document chunks: {e}")
+
+        # 3. Delete documents
+        try:
+            await service.query(
+                "DELETE FROM document WHERE judgment_id = $judgment_id",
+                {"judgment_id": judgment_id}
+            )
+            logger.info(f"Deleted documents for {judgment_id}")
+        except Exception as e:
+            logger.warning(f"Could not delete documents: {e}")
+
+        # 4. Delete the judgment itself
         await service.delete(judgment_id)
         logger.info(f"Judgment deleted: {judgment_id}")
 
@@ -632,7 +684,8 @@ async def get_judgment_summary(
                 detail="Aucun resume trouve pour ce jugement"
             )
 
-        items = result[0].get("result", result) if isinstance(result[0], dict) else result
+        # SurrealDB query() returns a list of results directly
+        items = result
         if not items or len(items) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
