@@ -40,6 +40,8 @@ dependencies = [
     "mlx-whisper>=0.4.0",
     # Text-to-Speech avec edge-tts
     "edge-tts>=7.0.0",
+    # Docling pour extraction avancée de documents (PDF, tables, OCR)
+    "docling>=2.0.0",
 ]
 
 [project.optional-dependencies]
