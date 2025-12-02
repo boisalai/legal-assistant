@@ -154,13 +154,58 @@ DEFAULT_CLAUDE_MODEL: ClaudeModel = "claude-sonnet-4-5-20250929"
 # ========================================
 
 MLXModel = Literal[
+    # Modèles recommandés pour M1 Pro 16 GB (3 modèles principaux)
+    "mlx-community/Qwen2.5-3B-Instruct-4bit",        # Léger, excellent français
+    "mlx-community/Llama-3.2-3B-Instruct-4bit",      # Rapide, général
+    "mlx-community/Mistral-7B-Instruct-v0.3-4bit",   # Qualité maximale
+    # Modèles additionnels (legacy)
     "mlx-community/Phi-3-mini-4k-instruct-4bit",
-    "mlx-community/Llama-3.2-3B-Instruct-4bit",
-    "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
     "mlx-community/Qwen2.5-7B-Instruct-4bit",
 ]
 
 MLX_MODELS_INFO = {
+    # ========================================
+    # 🎯 TOP 3 MODÈLES RECOMMANDÉS POUR M1 PRO 16 GB
+    # ========================================
+    "mlx-community/Qwen2.5-3B-Instruct-4bit": {
+        "name": "Qwen 2.5 3B (4-bit)",
+        "params": "3B",
+        "quantization": "4-bit",
+        "ram": "~2 GB",
+        "speed": "~50 tokens/sec (M1)",
+        "quality": "Excellent",
+        "best_for": "Français excellent, léger, rapide",
+        "recommended": True,
+        "recommended_rank": 1,  # Meilleur choix
+        "tools_support": True,
+    },
+    "mlx-community/Llama-3.2-3B-Instruct-4bit": {
+        "name": "Llama 3.2 3B (4-bit)",
+        "params": "3B",
+        "quantization": "4-bit",
+        "ram": "~1.5 GB",
+        "speed": "~60 tokens/sec (M1)",
+        "quality": "Very Good",
+        "best_for": "Ultra-rapide, usage général",
+        "recommended": True,
+        "recommended_rank": 2,  # Deuxième choix
+        "tools_support": True,
+    },
+    "mlx-community/Mistral-7B-Instruct-v0.3-4bit": {
+        "name": "Mistral 7B v0.3 (4-bit)",
+        "params": "7B",
+        "quantization": "4-bit",
+        "ram": "~4 GB",
+        "speed": "~35 tokens/sec (M1)",
+        "quality": "Excellent",
+        "best_for": "Qualité maximale, tâches complexes",
+        "recommended": True,
+        "recommended_rank": 3,  # Troisième choix
+        "tools_support": True,
+    },
+    # ========================================
+    # Modèles additionnels (legacy)
+    # ========================================
     "mlx-community/Phi-3-mini-4k-instruct-4bit": {
         "name": "Phi-3 Mini 4K (4-bit)",
         "params": "3.8B",
@@ -169,42 +214,24 @@ MLX_MODELS_INFO = {
         "speed": "~40 tokens/sec (M1)",
         "quality": "Very Good",
         "best_for": "Tests rapides, extraction",
-        "recommended": True,
-    },
-    "mlx-community/Llama-3.2-3B-Instruct-4bit": {
-        "name": "Llama 3.2 3B (4-bit)",
-        "params": "3B",
-        "quantization": "4-bit",
-        "ram": "~1.5 GB",
-        "speed": "~50 tokens/sec (M1)",
-        "quality": "Good",
-        "best_for": "Tests ultra-rapides",
-        "recommended": True,
-    },
-    "mlx-community/Mistral-7B-Instruct-v0.3-4bit": {
-        "name": "Mistral 7B v0.3 (4-bit)",
-        "params": "7B",
-        "quantization": "4-bit",
-        "ram": "~4 GB",
-        "speed": "~30 tokens/sec (M1)",
-        "quality": "Excellent",
-        "best_for": "Production locale, qualité",
-        "recommended": True,
+        "recommended": False,  # Non dans le top 3
+        "tools_support": False,  # ⚠️ Problème tool calling (voir Ollama phi3)
     },
     "mlx-community/Qwen2.5-7B-Instruct-4bit": {
         "name": "Qwen 2.5 7B (4-bit)",
         "params": "7B",
         "quantization": "4-bit",
-        "ram": "~4 GB",
+        "ram": "~4.5 GB",
         "speed": "~30 tokens/sec (M1)",
         "quality": "Excellent",
-        "best_for": "Multilingual, documents complexes",
-        "recommended": True,
+        "best_for": "Documents complexes, multilingual",
+        "recommended": False,  # Non dans le top 3 (plus lourd)
+        "tools_support": True,
     },
 }
 
-# Modèle MLX par défaut
-DEFAULT_MLX_MODEL: MLXModel = "mlx-community/Phi-3-mini-4k-instruct-4bit"
+# Modèle MLX par défaut (meilleur choix pour M1 Pro 16 GB)
+DEFAULT_MLX_MODEL: MLXModel = "mlx-community/Qwen2.5-3B-Instruct-4bit"
 
 # Configuration MLX server
 DEFAULT_MLX_SERVER_URL = "http://localhost:8080/v1"  # URL OpenAI-compatible

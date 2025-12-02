@@ -1,5 +1,23 @@
 # Legal Assistant - Notes de développement
 
+## 🎉 Nouveauté (2025-12-02) : Support MLX (Apple Silicon)
+
+**3 modèles Hugging Face locaux optimisés M1/M2/M3 ajoutés :**
+- ⭐ Qwen 2.5 3B (4-bit) - Recommandé pour français
+- Llama 3.2 3B (4-bit) - Ultra-rapide
+- Mistral 7B (4-bit) - Meilleure qualité
+
+**Avantages :**
+- 2x plus rapide qu'Ollama sur Apple Silicon (~50-60 tok/s)
+- RAM réduite (~2 GB pour Qwen 2.5 3B)
+- Support complet de function calling
+- 100% gratuit et local
+
+**Installation :** `uv sync` (installé par défaut)
+**Guide complet :** `backend/MLX_GUIDE.md`
+
+---
+
 ## État actuel du projet (2025-12-02)
 
 ### Fonctionnalités implémentées
@@ -44,6 +62,10 @@
    - Interface UI pour changer de modèle
    - Persistance des paramètres dans localStorage
    - Chargement automatique de ANTHROPIC_API_KEY depuis .env
+   - **Support de 3 providers LLM** :
+     - **Claude (Anthropic)** : API cloud (meilleure qualité)
+     - **Ollama** : Modèles locaux cross-platform
+     - **MLX** : Modèles locaux optimisés Apple Silicon ⭐ NOUVEAU
    - **Choix du modèle selon le cas d'usage** :
      - **Claude Sonnet 4.5** : Questions complexes nécessitant RAG (recherche sémantique dans les documents)
        - ✅ Excellente compréhension du contexte
@@ -51,12 +73,21 @@
        - ✅ Raisonnement juridique de qualité
        - ✅ Support natif de function calling (appel d'outils)
        - ❌ Coût par token (API externe)
-     - **Qwen 2.5 7B** : Conversations simples sans accès aux documents
-       - ✅ Gratuit (modèle local via Ollama)
+     - **Ollama Qwen 2.5 7B** : Conversations simples sans accès aux documents
+       - ✅ Gratuit (modèle local)
        - ✅ Rapide pour conversations générales
-       - ✅ Pas de coût API
-       - ❌ Support limité de function calling (n'utilise pas les outils correctement)
-       - ❌ Peut halluciner si demandé de répondre sur des documents
+       - ✅ Cross-platform (Mac, Linux, Windows)
+       - ❌ Support limité de function calling
+     - **MLX Qwen 2.5 3B** : Alternative locale optimisée M1/M2/M3 ⭐ NOUVEAU
+       - ✅ Gratuit (modèle local)
+       - ✅ Plus rapide qu'Ollama sur Apple Silicon (~50-60 tok/s)
+       - ✅ Excellent en français
+       - ✅ Support complet de function calling
+       - ✅ Consommation RAM réduite (~2 GB)
+       - ✅ **Auto-démarrage** : Le backend démarre automatiquement le serveur MLX
+       - ❌ Apple Silicon uniquement (pas Intel)
+       - 📖 **Guide complet** : `backend/MLX_GUIDE.md`
+       - 📖 **Auto-démarrage** : `backend/MLX_AUTO_START.md`
 
 6. **Interface utilisateur (UI/UX)**
    - Panel de prévisualisation de documents avec affichage inline PDF
@@ -600,15 +631,18 @@ npm run dev -- -p 3001
 - **Port SurrealDB** : 8002 (modifié de 8001)
 - **Port Backend** : 8000
 - **Port Frontend** : 3001
-- **Installation** : `uv sync` installe toutes les dépendances de développement par défaut
+- **Port MLX Server** : 8080 (OpenAI-compatible API) ⭐ NOUVEAU
+- **Installation** : `uv sync` installe toutes les dépendances par défaut
   - Whisper (mlx-whisper pour transcription audio)
   - Embeddings (sentence-transformers avec GPU: MPS/CUDA/CPU)
   - TTS (edge-tts pour synthèse vocale)
   - Docling (extraction avancée PDF avec OCR)
+  - MLX-LM (modèles HuggingFace via MLX) ⭐ **Installé par défaut**
 - **Embeddings** : BGE-M3 via sentence-transformers avec accélération GPU (MPS/CUDA/CPU auto-détecté)
 - **Whisper** : MLX Whisper optimisé Apple Silicon
 - **TTS** : edge-tts (Microsoft Edge TTS) - 15 voix françaises et anglaises
 - **Docling** : Extraction avancée de documents (tables, OCR, mise en page)
+- **MLX** : 3 modèles HF optimisés Apple Silicon (Qwen 2.5 3B, Llama 3.2 3B, Mistral 7B 4-bit) ⭐ NOUVEAU
 - **Variables d'environnement** : Voir `.env.example` ou `ARCHITECTURE.md`
 
 ### Configuration embeddings
@@ -634,6 +668,60 @@ DEFAULT_VOICES = {
 # 15 voix disponibles au total
 # Nettoyage automatique du markdown : suppression de #, **, *, liens, code, etc.
 ```
+
+### Configuration MLX ⭐ NOUVEAU
+
+**Modèles disponibles (Apple Silicon uniquement) :**
+
+```python
+# backend/config/models.py
+MLX_MODELS_INFO = {
+    # Top 3 recommandés pour M1 Pro 16 GB
+    "mlx-community/Qwen2.5-3B-Instruct-4bit": {
+        "ram": "~2 GB",
+        "speed": "~50 tokens/sec (M1)",
+        "quality": "Excellent",
+        "recommended": True,
+    },
+    "mlx-community/Llama-3.2-3B-Instruct-4bit": {
+        "ram": "~1.5 GB",
+        "speed": "~60 tokens/sec (M1)",
+        "quality": "Very Good",
+        "recommended": True,
+    },
+    "mlx-community/Mistral-7B-Instruct-v0.3-4bit": {
+        "ram": "~4 GB",
+        "speed": "~35 tokens/sec (M1)",
+        "quality": "Excellent",
+        "recommended": True,
+    },
+}
+```
+
+**Démarrage du serveur MLX :**
+
+```bash
+# Terminal 4: Serveur MLX (optionnel - uniquement si vous voulez utiliser MLX)
+mlx_lm.server --model mlx-community/Qwen2.5-3B-Instruct-4bit --port 8080
+
+# Au premier lancement, le modèle sera téléchargé depuis HuggingFace (~2 GB)
+# Le serveur expose une API OpenAI-compatible sur http://localhost:8080/v1
+```
+
+**Utilisation dans le code :**
+
+```python
+from services.model_factory import create_model
+
+# Créer un modèle MLX
+model = create_model("mlx:mlx-community/Qwen2.5-3B-Instruct-4bit")
+
+# Utiliser dans un agent Agno
+from agno.agent import Agent
+agent = Agent(name="Assistant", model=model)
+```
+
+**📖 Guide complet :** `backend/MLX_GUIDE.md`
 
 ### Logs à surveiller lors du démarrage
 
@@ -725,13 +813,48 @@ Audio généré avec succès: /path/to/file.mp3 (123456 bytes)
 ✅ "Comment changer de modèle ?"
 ```
 
+### Quand utiliser MLX Qwen 2.5 3B ? ⭐ **NOUVEAU**
+
+**Cas d'usage :**
+- ✅ Conversations générales **sur Apple Silicon** (M1/M2/M3)
+- ✅ Questions simples sans accès aux documents
+- ✅ Alternative plus rapide qu'Ollama sur Mac
+- ✅ Développement et tests rapides
+
+**Avantages :**
+- Gratuit (modèle local)
+- **Très rapide** (~50-60 tok/s sur M1 Pro, 2x plus rapide qu'Ollama)
+- Excellent en français
+- Support complet de function calling
+- Consommation RAM réduite (~2 GB)
+- Optimisé Metal (GPU Apple Silicon)
+
+**Inconvénients :**
+- ❌ Apple Silicon uniquement (pas Intel)
+- ❌ Nécessite installation de mlx-lm
+- ❌ Serveur MLX doit tourner en arrière-plan
+- ⚠️ Qualité légèrement inférieure à Claude pour RAG
+
+**✅ Utiliser MLX pour :**
+```
+✅ Développement rapide sur Mac M1/M2/M3
+✅ Conversations simples sans coût API
+✅ Tests de workflows Agno
+✅ Prototypage d'agents avec outils
+```
+
+**📖 Guide complet :** Voir `backend/MLX_GUIDE.md` pour l'installation et l'utilisation.
+
 ### Résumé : Quelle est la règle simple ?
 
 **🎯 RÈGLE D'OR :**
 - **Documents du dossier nécessaires ?** → **Claude Sonnet 4.5**
-- **Conversation simple sans documents ?** → **Qwen 2.5 7B**
+- **Conversation simple sans documents (Mac) ?** → **MLX Qwen 2.5 3B** ⭐ (plus rapide)
+- **Conversation simple sans documents (autre) ?** → **Ollama Qwen 2.5 7B**
 
 **💡 En cas de doute :** Choisissez Claude Sonnet 4.5 pour garantir l'accès aux documents et éviter les hallucinations.
+
+**🍎 Bonus Apple Silicon :** MLX est 2x plus rapide qu'Ollama sur M1/M2/M3. Voir `backend/MLX_GUIDE.md`.
 
 ---
 

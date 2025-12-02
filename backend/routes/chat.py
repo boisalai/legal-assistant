@@ -590,6 +590,26 @@ def _generate_transcript_summary(text: str, max_length: int = 500) -> str:
 async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
     """Handle regular chat with streaming response."""
     try:
+        # Auto-start MLX server if needed
+        if request.model_id.startswith("mlx:"):
+            from services.mlx_server_service import ensure_mlx_server
+            logger.info(f"🍎 Modèle MLX détecté: {request.model_id}")
+            logger.info("⏳ Démarrage automatique du serveur MLX...")
+
+            # Envoyer un message de statut à l'utilisateur
+            yield f"event: message\ndata: {json.dumps({'content': '🍎 Démarrage du serveur MLX...'})}\n\n"
+
+            # Démarrer le serveur MLX (ou vérifier qu'il tourne)
+            mlx_started = await ensure_mlx_server(request.model_id)
+
+            if not mlx_started:
+                error_msg = "❌ Échec du démarrage du serveur MLX. Vérifiez que mlx-lm est installé (uv sync)."
+                logger.error(error_msg)
+                yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
+                return
+
+            yield f"event: message\ndata: {json.dumps({'content': '✅ Serveur MLX prêt\\n\\n'})}\n\n"
+
         # Create the model
         model = create_model(request.model_id)
 
