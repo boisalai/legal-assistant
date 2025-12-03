@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState, useEffect } from "react";
+import { ModelSelector } from "./model-selector";
 
 interface NavItem {
   titleKey: string;
@@ -178,8 +179,13 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom Section - User Profile with Menu */}
-      <div className="px-2 py-2 border-t border-sidebar-border">
+      {/* Bottom Section - Model Selector + User Profile with Menu */}
+      <div className="border-t border-sidebar-border">
+        {/* Model Selector */}
+        <ModelSelector collapsed={collapsed} />
+
+        {/* User Profile with Menu */}
+        <div className="px-2 py-2">
         {/* User Profile with Menu - Expanded mode */}
         {!collapsed && (
           <DropdownMenu>
@@ -281,6 +287,7 @@ export function Sidebar() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        </div>
       </div>
 
       {/* Expand Button (when collapsed) */}

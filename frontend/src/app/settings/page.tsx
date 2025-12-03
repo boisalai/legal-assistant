@@ -23,7 +23,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Settings,
-  Bot,
   FileText,
   Palette,
   Save,
@@ -35,15 +34,7 @@ import {
   RefreshCw,
   Volume2,
 } from "lucide-react";
-import { settingsApi, type LLMModel } from "@/lib/api";
-
-// Default models when API is unavailable
-const DEFAULT_MODELS: LLMModel[] = [
-  { id: "ollama:qwen2.5:7b", name: "Qwen 2.5 7B", provider: "Ollama", recommended: true },
-  { id: "ollama:llama3.2", name: "Llama 3.2", provider: "Ollama" },
-  { id: "ollama:mistral", name: "Mistral 7B", provider: "Ollama" },
-  { id: "anthropic:claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Claude" },
-];
+import { settingsApi } from "@/lib/api";
 
 const DEFAULT_EXTRACTION_METHODS = [
   { id: "pypdf", name: "PyPDF (Standard)", description: "Extraction basique, rapide", available: true },
@@ -67,9 +58,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Settings state
-  const [models, setModels] = useState<LLMModel[]>(DEFAULT_MODELS);
   const [extractionMethods, setExtractionMethods] = useState(DEFAULT_EXTRACTION_METHODS);
-  const [selectedModel, setSelectedModel] = useState("ollama:qwen2.5:7b");
   const [selectedExtraction, setSelectedExtraction] = useState("pypdf");
   const [useOcr, setUseOcr] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -96,41 +85,10 @@ export default function SettingsPage() {
         console.log("Could not load TTS voices", err);
       }
 
-      const [modelsResponse, currentSettings] = await Promise.all([
-        settingsApi.getModels(),
-        settingsApi.getCurrent(),
-      ]);
-
-      // Flatten models from providers
-      // Backend returns providers directly at root level (e.g., { ollama: {...}, anthropic: {...} })
-      // Or wrapped in providers property
-      const providers = modelsResponse.providers || modelsResponse;
-      const allModels: LLMModel[] = [];
-      Object.entries(providers).forEach(([provider, providerData]) => {
-        // Skip non-provider keys
-        if (provider === 'providers' || provider === 'defaults') return;
-
-        // Handle both formats: array or object with models property
-        const data = providerData as { models?: LLMModel[] };
-        const models = Array.isArray(providerData)
-          ? providerData
-          : data.models || [];
-
-        models.forEach((model: LLMModel) => {
-          allModels.push({
-            ...model,
-            provider: provider.charAt(0).toUpperCase() + provider.slice(1),
-          });
-        });
-      });
-
-      if (allModels.length > 0) {
-        setModels(allModels);
-      }
+      const currentSettings = await settingsApi.getCurrent();
 
       // Set current values
       if (currentSettings.analysis) {
-        setSelectedModel(currentSettings.analysis.model_id);
         setSelectedExtraction(currentSettings.analysis.extraction_method);
         setUseOcr(currentSettings.analysis.use_ocr);
       }
@@ -167,7 +125,6 @@ export default function SettingsPage() {
 
     try {
       await settingsApi.update({
-        model_id: selectedModel,
         extraction_method: selectedExtraction,
         use_ocr: useOcr,
       });
@@ -253,49 +210,6 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* AI Model Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  Modèle IA
-                </CardTitle>
-                <CardDescription>
-                  Choisissez le modèle de langage pour l'analyse de documents
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="model">Modèle par défaut</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger id="model">
-                      <SelectValue placeholder="Sélectionner un modèle" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{model.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {model.provider}
-                            </Badge>
-                            {model.recommended && (
-                              <Badge variant="secondary" className="text-xs">
-                                Recommandé
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Ollama: Modèles locaux cross-platform. MLX: Optimisé Apple Silicon (M1/M2/M3). Claude: API payante, meilleure qualité.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Extraction Settings */}
             <Card>
               <CardHeader>
