@@ -45,6 +45,7 @@ dependencies = [
     # MLX-LM pour modèles Hugging Face locaux (Apple Silicon)
     "mlx>=0.24.0",
     "mlx-lm>=0.22.0",
+    "sentencepiece>=0.2.0",
 ]
 
 [project.optional-dependencies]

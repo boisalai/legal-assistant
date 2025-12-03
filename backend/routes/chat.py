@@ -73,6 +73,21 @@ async def chat(request: ChatRequest):
     sources_list = []  # Track sources used in RAG
 
     try:
+        # Auto-start MLX server if needed
+        if request.model_id.startswith("mlx:"):
+            from services.mlx_server_service import ensure_mlx_server
+            logger.info(f"🍎 Modèle MLX détecté: {request.model_id}")
+            logger.info("⏳ Démarrage automatique du serveur MLX...")
+
+            mlx_started = await ensure_mlx_server(request.model_id)
+
+            if not mlx_started:
+                error_msg = "❌ Échec du démarrage du serveur MLX. Vérifiez que mlx-lm est installé (uv sync)."
+                logger.error(error_msg)
+                raise HTTPException(status_code=500, detail=error_msg)
+
+            logger.info("✅ Serveur MLX prêt")
+
         # Create the model
         model = create_model(request.model_id)
 
