@@ -7,14 +7,15 @@ import {
   Send,
   Bot,
   User,
-  Settings2,
   Loader2,
   AlertCircle,
   Brain,
   Database,
+  Cpu,
+  Cloud,
+  Zap,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LLMSettingsModal } from "./llm-settings-modal";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
 
@@ -138,7 +139,6 @@ export function AssistantPanel({
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
   const [checkingBackend, setCheckingBackend] = useState(true);
 
@@ -151,13 +151,17 @@ export function AssistantPanel({
     const savedConfig = loadLLMConfig();
     setConfig(savedConfig);
     setConfigLoaded(true);
-  }, []);
 
-  // Save config to localStorage whenever it changes
-  const handleConfigChange = (newConfig: LLMConfig) => {
-    setConfig(newConfig);
-    saveLLMConfig(newConfig);
-  };
+    // Listen for config changes from ModelSelector
+    const handleConfigChanged = (event: CustomEvent<LLMConfig>) => {
+      setConfig(event.detail);
+    };
+
+    window.addEventListener("llm-config-changed", handleConfigChanged as EventListener);
+    return () => {
+      window.removeEventListener("llm-config-changed", handleConfigChanged as EventListener);
+    };
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -181,6 +185,17 @@ export function AssistantPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Get provider info from model ID
+  const getProviderInfo = (modelId: string): { provider: string; icon: React.ReactNode; label: string } => {
+    if (modelId.startsWith("anthropic:")) {
+      return { provider: "anthropic", icon: <Cloud className="h-3.5 w-3.5" />, label: "Claude" };
+    } else if (modelId.startsWith("mlx:")) {
+      return { provider: "mlx", icon: <Zap className="h-3.5 w-3.5" />, label: "MLX" };
+    } else {
+      return { provider: "ollama", icon: <Cpu className="h-3.5 w-3.5" />, label: "Ollama" };
+    }
+  };
 
   // Format model name for display
   const getModelDisplayName = (modelId: string): string => {
@@ -349,11 +364,14 @@ export function AssistantPanel({
     <div className="flex flex-col h-full border-l">
       {/* Header */}
       <div className="p-4 border-b bg-background flex items-center justify-between">
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">Assistant IA</h2>
-          <span className="text-xs text-muted-foreground/60">
-            {getModelDisplayName(config.model)}
-          </span>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
+            {getProviderInfo(config.model).icon}
+            <span>
+              {getProviderInfo(config.model).label} · {getModelDisplayName(config.model)}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -368,14 +386,6 @@ export function AssistantPanel({
             ) : (
               <Brain className="h-5 w-5" />
             )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSettingsModalOpen(true)}
-            title="Paramètres LLM"
-          >
-            <Settings2 className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -487,14 +497,6 @@ export function AssistantPanel({
           disabled={isLoading}
         />
       </div>
-
-      {/* LLM Settings Modal */}
-      <LLMSettingsModal
-        open={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        config={config}
-        onConfigChange={handleConfigChange}
-      />
     </div>
   );
 }
