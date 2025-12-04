@@ -24,12 +24,12 @@ def _is_audio_file(filename: str) -> bool:
     return ext in AUDIO_EXTENSIONS
 
 
-async def _find_audio_document(judgment_id: str, filename: Optional[str] = None) -> Optional[dict]:
+async def _find_audio_document(case_id: str, filename: Optional[str] = None) -> Optional[dict]:
     """
     Find an audio document in the case.
 
     Args:
-        judgment_id: ID of the case
+        case_id: ID of the case
         filename: Optional specific filename to look for
 
     Returns:
@@ -39,14 +39,14 @@ async def _find_audio_document(judgment_id: str, filename: Optional[str] = None)
     if not service.db:
         await service.connect()
 
-    # Normalize judgment_id
-    if not judgment_id.startswith("judgment:"):
-        judgment_id = f"judgment:{judgment_id}"
+    # Normalize case_id
+    if not case_id.startswith("case:"):
+        case_id = f"judgment:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
-        "SELECT * FROM document WHERE judgment_id = $judgment_id",
-        {"judgment_id": judgment_id}
+        "SELECT * FROM document WHERE case_id = $case_id",
+        {"case_id": case_id}
     )
 
     documents = []
@@ -135,10 +135,10 @@ async def transcribe_audio_streaming(
         if not file_path or not Path(file_path).exists():
             return {"success": False, "error": f"Fichier audio '{doc_name}' non accessible."}
 
-        # Normalize judgment_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        # Normalize case_id
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow
@@ -149,7 +149,7 @@ async def transcribe_audio_streaming(
 
         result = await workflow.run(
             audio_path=file_path,
-            judgment_id=judgment_id,
+            case_id=case_id,
             language=language,
             create_markdown_doc=True,
             original_filename=doc_name,
@@ -223,10 +223,10 @@ async def transcribe_audio(
         if not file_path or not Path(file_path).exists():
             return f"Le fichier audio '{doc_name}' n'est pas accessible sur le disque."
 
-        # Normalize judgment_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        # Normalize case_id
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow
@@ -237,7 +237,7 @@ async def transcribe_audio(
 
         result = await workflow.run(
             audio_path=file_path,
-            judgment_id=judgment_id,
+            case_id=case_id,
             language=language,
             create_markdown_doc=True,
             original_filename=doc_name  # Use original filename, not UUID-based path

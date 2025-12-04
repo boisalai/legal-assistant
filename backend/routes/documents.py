@@ -2,11 +2,11 @@
 Routes pour la gestion des documents d'un dossier.
 
 Endpoints:
-- GET /api/judgments/{judgment_id}/documents - Liste des documents
-- POST /api/judgments/{judgment_id}/documents - Upload d'un document
-- GET /api/judgments/{judgment_id}/documents/{doc_id} - Details d'un document
-- DELETE /api/judgments/{judgment_id}/documents/{doc_id} - Supprimer un document
-- GET /api/judgments/{judgment_id}/documents/{doc_id}/download - Telecharger un document
+- GET /api/cases/{case_id}/documents - Liste des documents
+- POST /api/cases/{case_id}/documents - Upload d'un document
+- GET /api/cases/{case_id}/documents/{doc_id} - Details d'un document
+- DELETE /api/cases/{case_id}/documents/{doc_id} - Supprimer un document
+- GET /api/cases/{case_id}/documents/{doc_id}/download - Telecharger un document
 """
 
 import logging
@@ -25,7 +25,7 @@ from services.surreal_service import get_surreal_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/judgments", tags=["Documents"])
+router = APIRouter(prefix="/api/cases", tags=["Documents"])
 
 # Reuse auth from judgments
 from routes.judgments import require_auth, get_current_user_id
@@ -53,7 +53,7 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB - Pour supporter les enregistrements 
 
 class DocumentResponse(BaseModel):
     id: str
-    judgment_id: str
+    case_id: str
     nom_fichier: str
     type_fichier: str
     type_mime: str
@@ -103,9 +103,9 @@ def get_mime_type(filename: str) -> str:
 # Endpoints
 # ============================================================================
 
-@router.get("/{judgment_id}/documents", response_model=DocumentListResponse)
+@router.get("/{case_id}/documents", response_model=DocumentListResponse)
 async def list_documents(
-    judgment_id: str,
+    case_id: str,
     verify_files: bool = True,
     auto_remove_missing: bool = True,
     auto_discover: bool = False,  # Désactivé par défaut pour éviter les duplicatas
@@ -116,7 +116,7 @@ async def list_documents(
     Liste les documents d'un dossier.
 
     Args:
-        judgment_id: ID du dossier
+        case_id: ID du dossier
         verify_files: Si True, verifie que les fichiers existent sur le disque
         auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
         auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
@@ -128,22 +128,22 @@ async def list_documents(
             await service.connect()
 
         # Normalize judgment ID
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Query documents for this judgment
         if include_derived:
             # Include all documents
             result = await service.query(
-                "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-                {"judgment_id": judgment_id}
+                "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
+                {"case_id": case_id}
             )
         else:
             # Exclude derived documents (only show source documents)
             # Use "!= true" instead of "= false OR IS NULL" for SurrealDB compatibility
             result = await service.query(
-                "SELECT * FROM document WHERE judgment_id = $judgment_id AND is_derived != true ORDER BY created_at DESC",
-                {"judgment_id": judgment_id}
+                "SELECT * FROM document WHERE case_id = $case_id AND is_derived != true ORDER BY created_at DESC",
+                {"case_id": case_id}
             )
 
         documents = []
@@ -185,7 +185,7 @@ async def list_documents(
 
                     documents.append(DocumentResponse(
                         id=str(item.get("id", "")),
-                        judgment_id=item.get("judgment_id", judgment_id),
+                        case_id=item.get("case_id", case_id),
                         nom_fichier=item.get("nom_fichier", ""),
                         type_fichier=item.get("type_fichier", ""),
                         type_mime=item.get("type_mime", ""),
@@ -210,7 +210,7 @@ async def list_documents(
 
         # Auto-discover orphaned files in uploads directory
         if auto_discover:
-            upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+            upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
             if upload_dir.exists() and upload_dir.is_dir():
                 for file_path in upload_dir.iterdir():
                     if file_path.is_file():
@@ -237,10 +237,10 @@ async def list_documents(
                                     now = datetime.utcnow().isoformat()
 
                                     # Use relative path (consistent with upload endpoint)
-                                    relative_path = f"data/uploads/{judgment_id.replace('judgment:', '')}/{file_path.name}"
+                                    relative_path = f"data/uploads/{case_id.replace('judgment:', '')}/{file_path.name}"
 
                                     document_data = {
-                                        "judgment_id": judgment_id,
+                                        "case_id": case_id,
                                         "nom_fichier": file_path.name,
                                         "type_fichier": ext.lstrip('.'),
                                         "type_mime": get_mime_type(file_path.name),
@@ -258,7 +258,7 @@ async def list_documents(
                                     # Add to response
                                     documents.append(DocumentResponse(
                                         id=f"document:{doc_id}",
-                                        judgment_id=judgment_id,
+                                        case_id=case_id,
                                         nom_fichier=file_path.name,
                                         type_fichier=ext.lstrip('.'),
                                         type_mime=get_mime_type(file_path.name),
@@ -290,9 +290,9 @@ async def list_documents(
         )
 
 
-@router.post("/{judgment_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{case_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    judgment_id: str,
+    case_id: str,
     file: UploadFile = File(...),
     user_id: str = Depends(require_auth)
 ):
@@ -323,15 +323,15 @@ async def upload_document(
             await service.connect()
 
         # Normalize judgment ID
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Generate document ID and save file
         doc_id = str(uuid.uuid4())[:8]
         ext = get_file_extension(file.filename)
 
         # Create upload directory
-        upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Save file
@@ -344,7 +344,7 @@ async def upload_document(
         # Create document record in database
         now = datetime.utcnow().isoformat()
         document_data = {
-            "judgment_id": judgment_id,
+            "case_id": case_id,
             "nom_fichier": file.filename,
             "type_fichier": ext.lstrip('.'),
             "type_mime": get_mime_type(file.filename),
@@ -359,7 +359,7 @@ async def upload_document(
 
         return DocumentResponse(
             id=f"document:{doc_id}",
-            judgment_id=judgment_id,
+            case_id=case_id,
             nom_fichier=file.filename,
             type_fichier=ext.lstrip('.'),
             type_mime=get_mime_type(file.filename),
@@ -378,9 +378,9 @@ async def upload_document(
         )
 
 
-@router.post("/{judgment_id}/documents/register", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{case_id}/documents/register", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def register_document(
-    judgment_id: str,
+    case_id: str,
     request: RegisterDocumentRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -420,8 +420,8 @@ async def register_document(
             await service.connect()
 
         # Normalize judgment ID
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Get file info
         file_size = file_path.stat().st_size
@@ -443,7 +443,7 @@ async def register_document(
         # Create document record in database (no file copy!)
         now = datetime.utcnow().isoformat()
         document_data = {
-            "judgment_id": judgment_id,
+            "case_id": case_id,
             "nom_fichier": filename,
             "type_fichier": ext.lstrip('.'),
             "type_mime": get_mime_type(filename),
@@ -458,7 +458,7 @@ async def register_document(
 
         return DocumentResponse(
             id=f"document:{doc_id}",
-            judgment_id=judgment_id,
+            case_id=case_id,
             nom_fichier=filename,
             type_fichier=ext.lstrip('.'),
             type_mime=get_mime_type(filename),
@@ -478,9 +478,9 @@ async def register_document(
         )
 
 
-@router.get("/{judgment_id}/documents/{doc_id}/derived")
+@router.get("/{case_id}/documents/{doc_id}/derived")
 async def get_derived_documents(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
@@ -496,8 +496,8 @@ async def get_derived_documents(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -518,7 +518,7 @@ async def get_derived_documents(
 
                     derived.append(DocumentResponse(
                         id=str(item.get("id", "")),
-                        judgment_id=item.get("judgment_id", judgment_id),
+                        case_id=item.get("case_id", case_id),
                         nom_fichier=item.get("nom_fichier", ""),
                         type_fichier=item.get("type_fichier", ""),
                         type_mime=item.get("type_mime", ""),
@@ -542,9 +542,9 @@ async def get_derived_documents(
         )
 
 
-@router.get("/{judgment_id}/documents/{doc_id}", response_model=DocumentResponse)
+@router.get("/{case_id}/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
@@ -557,8 +557,8 @@ async def get_document(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -587,7 +587,7 @@ async def get_document(
 
         return DocumentResponse(
             id=str(item.get("id", doc_id)),
-            judgment_id=item.get("judgment_id", judgment_id),
+            case_id=item.get("case_id", case_id),
             nom_fichier=item.get("nom_fichier", ""),
             type_fichier=item.get("type_fichier", ""),
             type_mime=item.get("type_mime", ""),
@@ -606,9 +606,9 @@ async def get_document(
         )
 
 
-@router.delete("/{judgment_id}/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{case_id}/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     filename: Optional[str] = None,
     file_path: Optional[str] = None,
@@ -627,8 +627,8 @@ async def delete_document(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -668,14 +668,14 @@ async def delete_document(
             # If this is a transcription document, clear texte_extrait from the source audio
             if item.get("is_transcription") and item.get("source_audio"):
                 source_audio_filename = item.get("source_audio")
-                judgment_id_for_query = item.get("judgment_id", judgment_id)
-                if not judgment_id_for_query.startswith("judgment:"):
-                    judgment_id_for_query = f"judgment:{judgment_id_for_query}"
+                case_id_for_query = item.get("case_id", case_id)
+                if not case_id_for_query.startswith("case:"):
+                    case_id_for_query = f"judgment:{case_id_for_query}"
 
                 # Find the source audio document
                 audio_result = await service.query(
-                    "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
-                    {"judgment_id": judgment_id_for_query, "filename": source_audio_filename}
+                    "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $filename",
+                    {"case_id": case_id_for_query, "filename": source_audio_filename}
                 )
 
                 if audio_result and len(audio_result) > 0:
@@ -732,7 +732,7 @@ async def delete_document(
                     logger.warning(f"Orphaned file does not exist: {file_path}")
             elif filename:
                 # Use filename to find file in uploads directory
-                upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
                 if upload_dir.exists():
                     file_path_obj = upload_dir / filename
                     if file_path_obj.exists():
@@ -745,7 +745,7 @@ async def delete_document(
                         logger.warning(f"Orphaned file does not exist: {file_path_obj}")
             else:
                 # Fallback: try to find file with matching ID in name (old behavior)
-                upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
                 if upload_dir.exists():
                     # Look for file with matching ID in name
                     clean_id_short = clean_id[:8] if len(clean_id) > 8 else clean_id
@@ -770,9 +770,9 @@ async def delete_document(
         )
 
 
-@router.get("/{judgment_id}/documents/{doc_id}/download")
+@router.get("/{case_id}/documents/{doc_id}/download")
 async def download_document(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     inline: bool = False,
     user_id: Optional[str] = Depends(get_current_user_id)
@@ -861,9 +861,9 @@ class ExtractionResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{judgment_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
+@router.post("/{case_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
 async def extract_document_text(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -878,8 +878,8 @@ async def extract_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -966,9 +966,9 @@ async def extract_document_text(
         )
 
 
-@router.delete("/{judgment_id}/documents/{doc_id}/text")
+@router.delete("/{case_id}/documents/{doc_id}/text")
 async def clear_document_text(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -983,8 +983,8 @@ async def clear_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1031,9 +1031,9 @@ class TranscriptionResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{judgment_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
+@router.post("/{case_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
 async def transcribe_document(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     language: str = "fr",
     user_id: str = Depends(require_auth)
@@ -1050,8 +1050,8 @@ async def transcribe_document(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1177,9 +1177,9 @@ class YouTubeDownloadRequest(BaseModel):
     auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
 
 
-@router.post("/{judgment_id}/documents/{doc_id}/transcribe-workflow")
+@router.post("/{case_id}/documents/{doc_id}/transcribe-workflow")
 async def transcribe_document_workflow(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     request: TranscribeWorkflowRequest = TranscribeWorkflowRequest(),
     user_id: str = Depends(require_auth)
@@ -1200,8 +1200,8 @@ async def transcribe_document_workflow(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1285,7 +1285,7 @@ async def transcribe_document_workflow(
                 try:
                     result = await workflow.run(
                         audio_path=file_path,
-                        judgment_id=judgment_id,
+                        case_id=case_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
                         raw_mode=request.raw_mode,
@@ -1350,9 +1350,9 @@ async def transcribe_document_workflow(
 # PDF Extraction to Markdown
 # ============================================================================
 
-@router.post("/{judgment_id}/documents/{doc_id}/extract-to-markdown")
+@router.post("/{case_id}/documents/{doc_id}/extract-to-markdown")
 async def extract_pdf_to_markdown(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -1372,8 +1372,8 @@ async def extract_pdf_to_markdown(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1434,7 +1434,7 @@ async def extract_pdf_to_markdown(
                     markdown_filename = Path(original_filename).stem + ".md"
 
                     # Get judgment directory
-                    judgment_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                    judgment_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
                     markdown_path = judgment_dir / markdown_filename
 
                     # Check if markdown file exists on disk
@@ -1447,8 +1447,8 @@ async def extract_pdf_to_markdown(
 
                     # Check existing documents in database
                     docs_result = await service.query(
-                        "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
-                        {"judgment_id": judgment_id, "filename": markdown_filename}
+                        "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $filename",
+                        {"case_id": case_id, "filename": markdown_filename}
                     )
 
                     if docs_result and len(docs_result) > 0:
@@ -1518,7 +1518,7 @@ async def extract_pdf_to_markdown(
                     new_doc_id = str(uuid.uuid4())
                     doc_record = {
                         # ❌ NE PAS inclure "id" dans doc_record car CREATE va l'ajouter automatiquement
-                        "judgment_id": judgment_id,
+                        "case_id": case_id,
                         "nom_fichier": markdown_filename,
                         "type_fichier": "md",
                         "type_mime": "text/markdown",
@@ -1548,7 +1548,7 @@ async def extract_pdf_to_markdown(
                         indexing_service = get_document_indexing_service()
                         index_result = await indexing_service.index_document(
                             document_id=f"document:{new_doc_id}",
-                            judgment_id=judgment_id,
+                            case_id=case_id,
                             text_content=extraction_result.text,
                             force_reindex=False
                         )
@@ -1639,9 +1639,9 @@ class YouTubeDownloadResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{judgment_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
+@router.post("/{case_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
 async def get_youtube_info(
-    judgment_id: str,
+    case_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -1685,9 +1685,9 @@ async def get_youtube_info(
         )
 
 
-@router.post("/{judgment_id}/documents/youtube", response_model=YouTubeDownloadResponse)
+@router.post("/{case_id}/documents/youtube", response_model=YouTubeDownloadResponse)
 async def download_youtube_audio(
-    judgment_id: str,
+    case_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -1718,11 +1718,11 @@ async def download_youtube_audio(
             await service.connect()
 
         # Normalize judgment ID
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Create upload directory for this judgment
-        upload_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Download audio
@@ -1741,7 +1741,7 @@ async def download_youtube_audio(
 
         file_path = Path(result.file_path)
         document_data = {
-            "judgment_id": judgment_id,
+            "case_id": case_id,
             "nom_fichier": result.filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -1842,9 +1842,9 @@ class TTSResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{judgment_id}/documents/{doc_id}/tts", response_model=TTSResponse)
+@router.post("/{case_id}/documents/{doc_id}/tts", response_model=TTSResponse)
 async def generate_tts(
-    judgment_id: str,
+    case_id: str,
     doc_id: str,
     request: TTSRequest = TTSRequest(),
     user_id: str = Depends(require_auth)
@@ -1869,8 +1869,8 @@ async def generate_tts(
             await service.connect()
 
         # Normalize IDs
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1909,7 +1909,7 @@ async def generate_tts(
         tts_service = get_tts_service()
 
         # Create output path
-        judgment_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+        judgment_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
         judgment_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate filename based on document name
@@ -1944,7 +1944,7 @@ async def generate_tts(
         now = datetime.utcnow().isoformat()
 
         tts_doc_data = {
-            "judgment_id": judgment_id,
+            "case_id": case_id,
             "nom_fichier": audio_filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -1969,8 +1969,8 @@ async def generate_tts(
         logger.info(f"TTS audio saved as document: {tts_doc_id}")
 
         # Return URL for downloading/streaming
-        clean_judgment_id = judgment_id.replace("judgment:", "")
-        audio_url = f"/api/judgments/{clean_judgment_id}/documents/document:{tts_doc_id}/download?inline=true"
+        clean_case_id = case_id.replace("case:", "")
+        audio_url = f"/api/cases/{clean_case_id}/documents/document:{tts_doc_id}/download?inline=true"
 
         return TTSResponse(
             success=True,
@@ -2001,9 +2001,9 @@ class DiagnosticResult(BaseModel):
     ok_count: int
 
 
-@router.get("/{judgment_id}/documents/diagnostic", response_model=DiagnosticResult)
+@router.get("/{case_id}/documents/diagnostic", response_model=DiagnosticResult)
 async def diagnose_documents(
-    judgment_id: str,
+    case_id: str,
     user_id: str = Depends(get_current_user_id)
 ):
     """
@@ -2017,14 +2017,14 @@ async def diagnose_documents(
     if not service.db:
         await service.connect()
 
-    # Normaliser judgment_id
-    if not judgment_id.startswith("judgment:"):
-        judgment_id = f"judgment:{judgment_id}"
+    # Normaliser case_id
+    if not case_id.startswith("case:"):
+        case_id = f"judgment:{case_id}"
 
     # Récupérer tous les documents de la base de données
     docs_result = await service.query(
-        "SELECT * FROM document WHERE judgment_id = $judgment_id",
-        {"judgment_id": judgment_id}
+        "SELECT * FROM document WHERE case_id = $case_id",
+        {"case_id": case_id}
     )
 
     documents = []

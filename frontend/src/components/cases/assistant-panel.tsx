@@ -10,14 +10,19 @@ import {
   Loader2,
   AlertCircle,
   Brain,
-  Database,
-  Cpu,
-  Cloud,
-  Zap,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
+import Image from "next/image";
+
+// Import SVG logos as React components
+import ClaudeLogo from "@/svg/claude-anthropic.svg";
+import OllamaLogo from "@/svg/ollama.svg";
+import AppleLogo from "@/svg/apple-logo.svg";
+
+// Import PNG logo
+import HuggingFaceLogoPng from "@/svg/hf-logo.png";
 
 export interface Message {
   role: "user" | "assistant";
@@ -75,42 +80,91 @@ function saveLLMConfig(config: LLMConfig): void {
   }
 }
 
-// Available LLM models (kept for reference, actual list is in LLMSettingsModal)
+// Available LLM models (synced with ModelSelector)
 const LLM_MODELS = [
+  // Ollama models
   {
     value: "ollama:qwen2.5:7b",
-    label: "Qwen 2.5 7B (Ollama) - Recommandé",
+    label: "Ollama Qwen 2.5 7B",
     provider: "ollama",
   },
   {
     value: "ollama:llama3.2",
-    label: "Llama 3.2 3B (Ollama) - Rapide",
+    label: "Ollama Llama 3.2 3B",
     provider: "ollama",
   },
   {
     value: "ollama:mistral",
-    label: "Mistral 7B (Ollama)",
+    label: "Ollama Mistral 7B",
     provider: "ollama",
   },
   {
     value: "ollama:llama3.1:8b",
-    label: "Llama 3.1 8B (Ollama)",
+    label: "Ollama Llama 3.1 8B",
     provider: "ollama",
   },
+  // Anthropic models
   {
     value: "anthropic:claude-sonnet-4-5-20250929",
-    label: "Claude Sonnet 4.5 (Anthropic) - Production",
+    label: "Claude Sonnet 4.5",
     provider: "anthropic",
   },
   {
     value: "anthropic:claude-sonnet-4-20250514",
-    label: "Claude Sonnet 4 (Anthropic)",
+    label: "Claude Sonnet 4",
     provider: "anthropic",
   },
   {
     value: "anthropic:claude-haiku-3-5-20241022",
-    label: "Claude Haiku 3.5 (Anthropic) - Rapide",
+    label: "Claude Haiku 3.5",
     provider: "anthropic",
+  },
+  // MLX models
+  {
+    value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
+    label: "MLX Qwen2.5-3B-Instruct-4bit",
+    provider: "mlx",
+  },
+  {
+    value: "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
+    label: "MLX Llama-3.2-3B-Instruct-4bit",
+    provider: "mlx",
+  },
+  {
+    value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+    label: "MLX Mistral-7B-Instruct-v0.3-4bit",
+    provider: "mlx",
+  },
+  // Hugging Face models (MPS-compatible for M1 Pro 16GB)
+  {
+    value: "huggingface:Qwen/Qwen2.5-3B-Instruct",
+    label: "HF Qwen2.5-3B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:Qwen/Qwen2.5-7B-Instruct",
+    label: "HF Qwen2.5-7B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:meta-llama/Llama-3.2-3B-Instruct",
+    label: "HF Llama-3.2-3B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:mistralai/Mistral-7B-Instruct-v0.3",
+    label: "HF Mistral-7B-Instruct-v0.3",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:microsoft/Phi-3-mini-4k-instruct",
+    label: "HF Phi-3-mini-4k-instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:google/gemma-2-2b-it",
+    label: "HF Gemma-2-2b-it",
+    provider: "huggingface",
   },
 ];
 
@@ -189,11 +243,29 @@ export function AssistantPanel({
   // Get provider info from model ID
   const getProviderInfo = (modelId: string): { provider: string; icon: React.ReactNode; label: string } => {
     if (modelId.startsWith("anthropic:")) {
-      return { provider: "anthropic", icon: <Cloud className="h-3.5 w-3.5" />, label: "Claude" };
+      return {
+        provider: "anthropic",
+        icon: <ClaudeLogo className="h-4 w-4 flex-shrink-0" />,
+        label: "Claude"
+      };
     } else if (modelId.startsWith("mlx:")) {
-      return { provider: "mlx", icon: <Zap className="h-3.5 w-3.5" />, label: "MLX" };
+      return {
+        provider: "mlx",
+        icon: <AppleLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
+        label: "MLX"
+      };
+    } else if (modelId.startsWith("huggingface:")) {
+      return {
+        provider: "huggingface",
+        icon: <Image src={HuggingFaceLogoPng} alt="Hugging Face" width={16} height={16} className="object-contain flex-shrink-0" />,
+        label: "Hugging Face"
+      };
     } else {
-      return { provider: "ollama", icon: <Cpu className="h-3.5 w-3.5" />, label: "Ollama" };
+      return {
+        provider: "ollama",
+        icon: <OllamaLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
+        label: "Ollama"
+      };
     }
   };
 
@@ -366,10 +438,10 @@ export function AssistantPanel({
       <div className="p-4 border-b bg-background flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">Assistant IA</h2>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
             {getProviderInfo(config.model).icon}
             <span>
-              {getProviderInfo(config.model).label} · {getModelDisplayName(config.model)}
+              {getModelDisplayName(config.model)}
             </span>
           </div>
         </div>

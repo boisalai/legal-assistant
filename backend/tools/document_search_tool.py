@@ -16,12 +16,12 @@ from services.surreal_service import get_surreal_service
 logger = logging.getLogger(__name__)
 
 
-async def _get_case_documents(judgment_id: str) -> List[dict]:
+async def _get_case_documents(case_id: str) -> List[dict]:
     """
     Get all documents for a case with their content.
 
     Args:
-        judgment_id: ID of the case
+        case_id: ID of the case
 
     Returns:
         List of document dicts with texte_extrait
@@ -30,14 +30,14 @@ async def _get_case_documents(judgment_id: str) -> List[dict]:
     if not service.db:
         await service.connect()
 
-    # Normalize judgment_id
-    if not judgment_id.startswith("judgment:"):
-        judgment_id = f"judgment:{judgment_id}"
+    # Normalize case_id
+    if not case_id.startswith("case:"):
+        case_id = f"judgment:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
-        "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-        {"judgment_id": judgment_id}
+        "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
+        {"case_id": case_id}
     )
 
     documents = []
@@ -241,15 +241,15 @@ async def list_documents(case_id: str) -> str:
         if not service.db:
             await service.connect()
 
-        # Normalize judgment_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        # Normalize case_id
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Get documents for this case
         docs_result = await service.query(
-            "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-            {"judgment_id": judgment_id}
+            "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
+            {"case_id": case_id}
         )
 
         documents = []

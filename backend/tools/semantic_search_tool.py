@@ -60,15 +60,15 @@ async def semantic_search(
         logger.info(f"[semantic_search] Got indexing service: {indexing_service}")
 
         # Normaliser case_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
-        logger.info(f"[semantic_search] Normalized judgment_id: {judgment_id}")
+        logger.info(f"[semantic_search] Normalized case_id: {case_id}")
 
         # Vérifier si des documents sont indexés
-        logger.info(f"[semantic_search] Getting index stats for {judgment_id}...")
-        stats = await indexing_service.get_index_stats(judgment_id=judgment_id)
+        logger.info(f"[semantic_search] Getting index stats for {case_id}...")
+        stats = await indexing_service.get_index_stats(case_id=case_id)
         logger.info(f"[semantic_search] Stats: {stats}")
 
         if stats.get("total_chunks", 0) == 0:
@@ -84,7 +84,7 @@ En attendant, je ne peux pas répondre à votre question car je n'ai pas accès 
         logger.info(f"[semantic_search] Searching with query='{query}', top_k={top_k}...")
         results = await indexing_service.search_similar(
             query_text=query,
-            judgment_id=judgment_id,
+            case_id=case_id,
             top_k=top_k,
             min_similarity=0.5  # Score minimum de similarité
         )
@@ -179,9 +179,9 @@ async def index_document_tool(
     """
     try:
         # Normaliser case_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         # Récupérer le document
         surreal_service = get_surreal_service()
@@ -189,8 +189,8 @@ async def index_document_tool(
             await surreal_service.connect()
 
         doc_result = await surreal_service.query(
-            "SELECT * FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $nom_fichier",
-            {"judgment_id": judgment_id, "nom_fichier": document_name}
+            "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $nom_fichier",
+            {"case_id": case_id, "nom_fichier": document_name}
         )
 
         documents = []
@@ -217,7 +217,7 @@ async def index_document_tool(
         indexing_service = get_document_indexing_service()
         result = await indexing_service.index_document(
             document_id=doc_id,
-            judgment_id=judgment_id,
+            case_id=case_id,
             text_content=texte_extrait,
             force_reindex=True  # Forcer la réindexation
         )
@@ -248,12 +248,12 @@ async def get_index_stats(case_id: str) -> str:
     """
     try:
         # Normaliser case_id
-        judgment_id = case_id
-        if not judgment_id.startswith("judgment:"):
-            judgment_id = f"judgment:{judgment_id}"
+        case_id = case_id
+        if not case_id.startswith("case:"):
+            case_id = f"judgment:{case_id}"
 
         indexing_service = get_document_indexing_service()
-        stats = await indexing_service.get_index_stats(judgment_id=judgment_id)
+        stats = await indexing_service.get_index_stats(case_id=case_id)
 
         if "error" in stats:
             return f"Erreur lors de la récupération des statistiques: {stats['error']}"

@@ -110,12 +110,12 @@ async def require_auth(token: Optional[str] = Depends(oauth2_scheme)) -> str:
 async def get_case_documents(service, case_id: str) -> list[dict]:
     """Recupere tous les documents d'un dossier."""
     # Normalize ID
-    if not case_id.startswith("judgment:"):
+    if not case_id.startswith("case:"):
         case_id = f"judgment:{case_id}"
 
     result = await service.query(
-        "SELECT * FROM document WHERE judgment_id = $judgment_id",
-        {"judgment_id": case_id}
+        "SELECT * FROM document WHERE case_id = $case_id",
+        {"case_id": case_id}
     )
 
     if not result or len(result) == 0:
@@ -153,7 +153,7 @@ async def run_analysis_pipeline(
 
     try:
         # Normaliser l'ID
-        if not case_id.startswith("judgment:"):
+        if not case_id.startswith("case:"):
             case_id = f"judgment:{case_id}"
 
         # Mettre a jour le statut: en cours
@@ -233,7 +233,7 @@ async def run_analysis_pipeline(
                 chunk_id = str(uuid.uuid4())[:8]
                 await service.create("document_chunk", {
                     "document_id": chunk_data["document_id"],
-                    "judgment_id": case_id,
+                    "case_id": case_id,
                     "chunk_index": chunk_data["chunk_index"],
                     "text": chunk_data["text"],
                     "embedding": embedding_result.embedding,
@@ -309,7 +309,7 @@ Repondez en francais avec un format structure."""
             now = datetime.utcnow().isoformat()
 
             analysis_data = {
-                "judgment_id": case_id,
+                "case_id": case_id,
                 "summary": summary_text,
                 "key_points": key_points or ["Voir le resume pour les details"],
                 "checklist": checklist_items or [{"titre": "Analyser le dossier en detail", "complete": False}],
@@ -375,7 +375,7 @@ async def start_analysis(
             await service.connect()
 
         # Normaliser l'ID
-        if not case_id.startswith("judgment:"):
+        if not case_id.startswith("case:"):
             case_id = f"judgment:{case_id}"
 
         # Verifier que le dossier existe - importer le helper depuis judgments
@@ -437,7 +437,7 @@ async def get_analysis_status(
         if not service.db:
             await service.connect()
 
-        if not case_id.startswith("judgment:"):
+        if not case_id.startswith("case:"):
             case_id = f"judgment:{case_id}"
 
         # Use helper from judgments route
@@ -503,12 +503,12 @@ async def get_analysis_checklist(
         if not service.db:
             await service.connect()
 
-        if not case_id.startswith("judgment:"):
+        if not case_id.startswith("case:"):
             case_id = f"judgment:{case_id}"
 
         # Chercher le resultat d'analyse le plus recent
         result = await service.query(
-            "SELECT * FROM analysis_result WHERE judgment_id = $case_id ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM analysis_result WHERE case_id = $case_id ORDER BY created_at DESC LIMIT 1",
             {"case_id": case_id}
         )
 

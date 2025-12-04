@@ -53,7 +53,7 @@ export function DocumentPreviewPanel({
       try {
         if (isPdf || isAudio) {
           // Build the download URL with inline=true for browser display
-          const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/${cleanCaseId}/documents/${cleanDocId}/download`;
+          const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
           const url = `${baseUrl}?inline=true`;
           if (isPdf) {
             setPdfUrl(url);
@@ -62,7 +62,7 @@ export function DocumentPreviewPanel({
           }
         } else if (isMarkdown) {
           // For markdown files: always fetch the file content first, fallback to texte_extrait
-          const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/${cleanCaseId}/documents/${cleanDocId}/download`;
+          const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
           try {
             const response = await fetch(downloadUrl);
             if (response.ok) {
@@ -97,7 +97,7 @@ export function DocumentPreviewPanel({
     if (document.file_path) {
       // For linked files, we can't directly open them in browser
       // But we can provide a download link
-      const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/${cleanCaseId}/documents/${cleanDocId}/download`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
       window.open(url, "_blank");
     }
   };
@@ -118,7 +118,7 @@ export function DocumentPreviewPanel({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/judgments/${cleanCaseId}/documents/${cleanDocId}/tts`,
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/tts`,
         {
           method: "POST",
           headers: {
