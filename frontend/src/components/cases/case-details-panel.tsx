@@ -265,7 +265,7 @@ export function CaseDetailsPanel({
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
           {caseData.description && (
-            <div className="flex items-center gap-1.5 text-xs text-foreground">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <span>{caseData.description}</span>
             </div>
           )}
@@ -315,7 +315,7 @@ export function CaseDetailsPanel({
         )}
 
         {/* Boutons d'action */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center py-2 gap-2 flex-wrap">
           <Button
             size="sm"
             onClick={() => setIsEditing(true)}
@@ -352,7 +352,7 @@ export function CaseDetailsPanel({
         </div>
 
       {/* Liste des documents */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold text-sm">Documents ({documents.length})</h3>
           <Button
