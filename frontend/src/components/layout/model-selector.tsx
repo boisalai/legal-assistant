@@ -8,8 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Cpu, Cloud, Zap } from "lucide-react";
+import Image from "next/image";
+
+// Import SVG logos as React components
+import ClaudeLogo from "@/svg/claude-anthropic.svg";
+import OllamaLogo from "@/svg/ollama.svg";
+import AppleLogo from "@/svg/apple-logo.svg";
+
+// Import PNG logo
+import HuggingFaceLogoPng from "@/svg/hf-logo.png";
 
 export interface LLMConfig {
   model: string;
@@ -21,29 +28,29 @@ export interface LLMConfig {
 interface ModelInfo {
   value: string;
   label: string;
-  provider: "ollama" | "anthropic" | "mlx";
+  provider: "ollama" | "anthropic" | "mlx" | "huggingface";
 }
 
 const LLM_MODELS: ModelInfo[] = [
   // Ollama models
   {
     value: "ollama:qwen2.5:7b",
-    label: "Qwen 2.5 7B",
+    label: "Ollama Qwen 2.5 7B",
     provider: "ollama",
   },
   {
     value: "ollama:llama3.2",
-    label: "Llama 3.2 3B",
+    label: "Ollama Llama 3.2 3B",
     provider: "ollama",
   },
   {
     value: "ollama:mistral",
-    label: "Mistral 7B",
+    label: "Ollama Mistral 7B",
     provider: "ollama",
   },
   {
     value: "ollama:llama3.1:8b",
-    label: "Llama 3.1 8B",
+    label: "Ollama Llama 3.1 8B",
     provider: "ollama",
   },
   // Anthropic models
@@ -65,18 +72,49 @@ const LLM_MODELS: ModelInfo[] = [
   // MLX models
   {
     value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
-    label: "MLX Qwen 2.5 3B",
+    label: "MLX Qwen2.5-3B-Instruct-4bit",
     provider: "mlx",
   },
   {
     value: "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
-    label: "MLX Llama 3.2 3B",
+    label: "MLX Llama-3.2-3B-Instruct-4bit",
     provider: "mlx",
   },
   {
     value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-    label: "MLX Mistral 7B",
+    label: "MLX Mistral-7B-Instruct-v0.3-4bit",
     provider: "mlx",
+  },
+  // Hugging Face models (MPS-compatible for M1 Pro 16GB)
+  {
+    value: "huggingface:Qwen/Qwen2.5-3B-Instruct",
+    label: "HF Qwen2.5-3B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:Qwen/Qwen2.5-7B-Instruct",
+    label: "HF Qwen2.5-7B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:meta-llama/Llama-3.2-3B-Instruct",
+    label: "HF Llama-3.2-3B-Instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:mistralai/Mistral-7B-Instruct-v0.3",
+    label: "HF Mistral-7B-Instruct-v0.3",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:microsoft/Phi-3-mini-4k-instruct",
+    label: "HF Phi-3-mini-4k-instruct",
+    provider: "huggingface",
+  },
+  {
+    value: "huggingface:google/gemma-2-2b-it",
+    label: "HF Gemma-2-2b-it",
+    provider: "huggingface",
   },
 ];
 
@@ -114,15 +152,17 @@ function saveLLMConfig(config: LLMConfig): void {
   }
 }
 
-function getProviderIcon(provider: string) {
+function getProviderIcon(provider: string, inDropdown: boolean = false) {
   switch (provider) {
     case "anthropic":
-      return <Cloud className="h-3.5 w-3.5" />;
+      return <ClaudeLogo className="h-4 w-4 flex-shrink-0" />;
     case "mlx":
-      return <Zap className="h-3.5 w-3.5" />;
+      return <AppleLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
+    case "huggingface":
+      return <Image src={HuggingFaceLogoPng} alt="Hugging Face" width={16} height={16} className="object-contain flex-shrink-0" />;
     case "ollama":
     default:
-      return <Cpu className="h-3.5 w-3.5" />;
+      return <OllamaLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
   }
 }
 
@@ -132,6 +172,8 @@ function getProviderLabel(provider: string) {
       return "Claude";
     case "mlx":
       return "MLX";
+    case "huggingface":
+      return "Hugging Face";
     case "ollama":
     default:
       return "Ollama";
@@ -171,12 +213,12 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
   return (
     <div className="px-2 pb-2">
       <Select value={config.model} onValueChange={handleModelChange}>
-        <SelectTrigger className="h-9 bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
+        <SelectTrigger className="h-auto min-h-[36px] bg-sidebar border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
           <SelectValue>
             {currentModel && (
-              <div className="flex items-center gap-2">
-                {getProviderIcon(currentModel.provider)}
-                <span className="text-xs font-medium truncate">
+              <div className="flex items-center gap-2 py-1">
+                {getProviderIcon(currentModel.provider, false)}
+                <span className="text-xs font-medium">
                   {currentModel.label}
                 </span>
               </div>
@@ -193,11 +235,8 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
             {LLM_MODELS.filter((m) => m.provider === "anthropic").map((model) => (
               <SelectItem key={model.value} value={model.value}>
                 <div className="flex items-center gap-2">
-                  {getProviderIcon(model.provider)}
+                  {getProviderIcon(model.provider, true)}
                   <span>{model.label}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {getProviderLabel(model.provider)}
-                  </Badge>
                 </div>
               </SelectItem>
             ))}
@@ -209,11 +248,21 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
             {LLM_MODELS.filter((m) => m.provider === "mlx").map((model) => (
               <SelectItem key={model.value} value={model.value}>
                 <div className="flex items-center gap-2">
-                  {getProviderIcon(model.provider)}
+                  {getProviderIcon(model.provider, true)}
                   <span>{model.label}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {getProviderLabel(model.provider)}
-                  </Badge>
+                </div>
+              </SelectItem>
+            ))}
+
+            {/* Hugging Face models */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+              Hugging Face (MPS)
+            </div>
+            {LLM_MODELS.filter((m) => m.provider === "huggingface").map((model) => (
+              <SelectItem key={model.value} value={model.value}>
+                <div className="flex items-center gap-2">
+                  {getProviderIcon(model.provider, true)}
+                  <span>{model.label}</span>
                 </div>
               </SelectItem>
             ))}
@@ -225,11 +274,8 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
             {LLM_MODELS.filter((m) => m.provider === "ollama").map((model) => (
               <SelectItem key={model.value} value={model.value}>
                 <div className="flex items-center gap-2">
-                  {getProviderIcon(model.provider)}
+                  {getProviderIcon(model.provider, true)}
                   <span>{model.label}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {getProviderLabel(model.provider)}
-                  </Badge>
                 </div>
               </SelectItem>
             ))}

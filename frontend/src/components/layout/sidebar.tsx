@@ -180,7 +180,7 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom Section - Model Selector + User Profile with Menu */}
-      <div className="border-t border-sidebar-border">
+      <div>
         {/* Model Selector */}
         <ModelSelector collapsed={collapsed} />
 
