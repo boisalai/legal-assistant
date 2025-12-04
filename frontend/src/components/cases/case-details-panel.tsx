@@ -1,53 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   FileUp,
   Mic,
   Trash2,
-  Eye,
   CheckCircle2,
   AlertTriangle,
   Edit2,
   Check,
   X,
-  FileText,
-  Music,
   Loader2,
   Link2,
-  Brain,
-  Database,
-  MoreVertical,
-  DatabaseBackup,
   RefreshCw,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,51 +34,6 @@ import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
-
-// Status configuration
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  nouveau: { label: "Nouveau", variant: "default" },
-  pending: { label: "Nouveau", variant: "default" },
-  en_analyse: { label: "En analyse", variant: "secondary" },
-  analyzing: { label: "En analyse", variant: "secondary" },
-  termine: { label: "Terminé", variant: "outline" },
-  summarized: { label: "Terminé", variant: "outline" },
-  en_erreur: { label: "En erreur", variant: "destructive" },
-  error: { label: "En erreur", variant: "destructive" },
-  archive: { label: "Archivé", variant: "secondary" },
-  archived: { label: "Archivé", variant: "secondary" },
-};
-
-// Transaction type labels
-const typeLabels: Record<string, string> = {
-  vente: "Vente",
-  achat: "Achat",
-  hypotheque: "Hypothèque",
-  testament: "Testament",
-  succession: "Succession",
-  autre: "Autre",
-  civil: "Civil",
-  criminal: "Pénal",
-  administrative: "Administratif",
-  family: "Familial",
-  commercial: "Commercial",
-  labor: "Travail",
-  constitutional: "Constitutionnel",
-  juridique: "Juridique",
-  other: "Autre",
-};
-
-// Type options for the select
-const typeOptions = [
-  { value: "civil", label: "Civil" },
-  { value: "criminal", label: "Pénal" },
-  { value: "administrative", label: "Administratif" },
-  { value: "family", label: "Familial" },
-  { value: "commercial", label: "Commercial" },
-  { value: "labor", label: "Travail" },
-  { value: "constitutional", label: "Constitutionnel" },
-  { value: "other", label: "Autre" },
-];
 
 interface CaseDetailsPanelProps {
   caseData: Case;
@@ -147,7 +72,6 @@ export function CaseDetailsPanel({
 }: CaseDetailsPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState(caseData.description || "");
-  const [editType, setEditType] = useState(caseData.type_transaction || "civil");
   const [isSaving, setIsSaving] = useState(false);
   const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
   const [transcribingDocId, setTranscribingDocId] = useState<string | null>(null);
@@ -322,7 +246,6 @@ export function CaseDetailsPanel({
     try {
       await onUpdateCase({
         description: editDescription,
-        type_transaction: editType,
       });
       setIsEditing(false);
     } finally {
@@ -332,42 +255,30 @@ export function CaseDetailsPanel({
 
   const handleCancelEdit = () => {
     setEditDescription(caseData.description || "");
-    setEditType(caseData.type_transaction || "civil");
     setIsEditing(false);
   };
-
-  const getFileIcon = (type: string) => {
-    if (type.includes("audio")) return <Music className="h-5 w-5 text-purple-500" />;
-    return <FileText className="h-5 w-5 text-blue-500" />;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const statusInfo = statusConfig[caseData.status] || statusConfig.nouveau;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Case Header */}
-      <div className="px-6 py-4 border-b bg-background">
-        <div className="flex flex-col">
-          <h2 className="text-xl font-bold">{caseData.nom_dossier}</h2>
-          <span className="text-xs text-muted-foreground/60">
-            Statut : {statusInfo.label}. Date de création : {new Date(caseData.created_at).toLocaleDateString("fr-CA")}
-          </span>
+      <div className="p-4 border-b bg-background">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
+          {caseData.description && (
+            <div className="flex items-center gap-1.5 text-xs text-foreground">
+              <span>{caseData.description}</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Contenu principal avec padding */}
-      <div className="px-6 py-4 space-y-4 flex-1">
-        {/* Mode édition ou affichage */}
-        {isEditing ? (
+      <div className="px-6 py-2 space-y-4 flex-1">
+        {/* Mode édition */}
+        {isEditing && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
+              <Label htmlFor="edit-description">Description</Label> 
               <Textarea
                 id="edit-description"
                 value={editDescription}
@@ -376,21 +287,6 @@ export function CaseDetailsPanel({
                 disabled={isSaving}
                 className="text-sm min-h-[80px]"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-type">Type de dossier</Label>
-              <Select value={editType} onValueChange={setEditType} disabled={isSaving}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -415,15 +311,6 @@ export function CaseDetailsPanel({
                 Annuler
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {caseData.description && (
-              <p className="text-sm text-foreground">{caseData.description}</p>
-            )}
-            <p className="text-sm text-foreground">
-              <span className="font-medium">Type :</span> {typeLabels[caseData.type_transaction] || caseData.type_transaction}
-            </p>
           </div>
         )}
 
@@ -513,23 +400,6 @@ export function CaseDetailsPanel({
           onComplete={onAnalysisComplete}
         />
       </div>
-
-      {/* Score de confiance */}
-      {caseData.score_confiance !== null && caseData.score_confiance !== undefined && (
-        <div className="space-y-2">
-          <h3 className="font-semibold text-sm">Score de confiance</h3>
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Niveau de confiance</span>
-              <span className="font-semibold">{caseData.score_confiance}%</span>
-            </div>
-            <Progress
-              value={caseData.score_confiance}
-              className="h-2"
-            />
-          </div>
-        </div>
-      )}
 
       {/* Points de vérification et d'attention */}
       {checklist && (

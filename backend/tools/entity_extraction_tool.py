@@ -18,12 +18,12 @@ from services.model_factory import create_model
 logger = logging.getLogger(__name__)
 
 
-async def _get_document_content(judgment_id: str, document_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+async def _get_document_content(case_id: str, document_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get document content by name or return all documents.
 
     Args:
-        judgment_id: ID of the case
+        case_id: ID of the case
         document_name: Optional specific document name
 
     Returns:
@@ -33,14 +33,14 @@ async def _get_document_content(judgment_id: str, document_name: Optional[str] =
     if not service.db:
         await service.connect()
 
-    # Normalize judgment_id
-    if not judgment_id.startswith("judgment:"):
-        judgment_id = f"judgment:{judgment_id}"
+    # Normalize case_id
+    if not case_id.startswith("case:"):
+        case_id = f"judgment:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
-        "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-        {"judgment_id": judgment_id}
+        "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
+        {"case_id": case_id}
     )
 
     documents = []

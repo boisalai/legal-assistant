@@ -8,6 +8,16 @@ import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
 import { NewCaseModal } from "@/components/cases/new-case-modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { casesApi } from "@/lib/api";
 import type { Case } from "@/types";
 import { Loader2 } from "lucide-react";
@@ -21,6 +31,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewCaseModal, setShowNewCaseModal] = useState(false);
+  const [caseToDelete, setCaseToDelete] = useState<string | null>(null);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -37,13 +48,20 @@ function DashboardContent() {
     fetchCases();
   }, [fetchCases]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Supprimer ce dossier ?")) return;
+  const handleDelete = (id: string) => {
+    setCaseToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!caseToDelete) return;
+
     try {
-      await casesApi.delete(id);
-      setCases((prev) => prev.filter((c) => c.id !== id));
-    } catch {
-      alert("Erreur lors de la suppression");
+      await casesApi.delete(caseToDelete);
+      setCases((prev) => prev.filter((c) => c.id !== caseToDelete));
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+    } finally {
+      setCaseToDelete(null);
     }
   };
 
@@ -51,8 +69,8 @@ function DashboardContent() {
     try {
       await casesApi.deleteMany(ids);
       setCases((prev) => prev.filter((c) => !ids.includes(c.id)));
-    } catch {
-      alert("Erreur lors de la suppression");
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
     }
   };
 
@@ -62,8 +80,8 @@ function DashboardContent() {
       setCases((prev) =>
         prev.map((c) => (c.id === id ? updatedCase : c))
       );
-    } catch {
-      alert("Erreur lors de l'épinglage");
+    } catch (error) {
+      console.error("Erreur lors de l'épinglage:", error);
     }
   };
 
@@ -96,8 +114,10 @@ function DashboardContent() {
       {/* Cases Table */}
       {cases.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
-          <p>Aucun dossier pour le moment.</p>
-          <p className="text-sm mt-2">Utilisez le bouton "+ Nouveau dossier" pour commencer.</p>
+          <p className="mb-4">Aucun dossier pour le moment.</p>
+          <Button onClick={() => setShowNewCaseModal(true)}>
+            + Nouveau dossier
+          </Button>
         </div>
       ) : (
         <DataTable
@@ -111,6 +131,24 @@ function DashboardContent() {
       )}
 
       <NewCaseModal open={showNewCaseModal} onOpenChange={setShowNewCaseModal} />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!caseToDelete} onOpenChange={(open) => !open && setCaseToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce dossier ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le dossier et tous ses documents seront définitivement supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

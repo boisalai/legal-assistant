@@ -159,14 +159,14 @@ Quand utiliser les outils - RÈGLES IMPORTANTES:
                 logger.info(f"Fetching case context for case_id={request.case_id}")
 
                 # Normalize judgment ID (same pattern as documents.py)
-                judgment_id = request.case_id
-                if not judgment_id.startswith("judgment:"):
-                    judgment_id = f"judgment:{judgment_id}"
+                case_id = request.case_id
+                if not case_id.startswith("case:"):
+                    case_id = f"judgment:{case_id}"
 
-                logger.info(f"Looking for case with judgment_id={judgment_id}")
+                logger.info(f"Looking for case with case_id={case_id}")
 
                 # Get case info - use direct record access
-                case_result = await service.query(f"SELECT * FROM {judgment_id}")
+                case_result = await service.query(f"SELECT * FROM {case_id}")
                 logger.info(f"Case query result: {case_result}")
 
                 if case_result and len(case_result) > 0:
@@ -190,13 +190,11 @@ Quand utiliser les outils - RÈGLES IMPORTANTES:
                         case_name = case_data.get("title") or case_data.get("nom_dossier", "Dossier")
                         case_desc = case_data.get("description", "")
                         case_summary = case_data.get("summary") or case_data.get("resume", "")
-                        case_type = case_data.get("legal_domain") or case_data.get("type_transaction", "")
 
                         system_content += f"""
 
 Contexte du dossier actuel:
 - Nom: {case_name}
-- Type: {case_type}
 - Description: {case_desc}"""
 
                         if case_summary:
@@ -205,8 +203,8 @@ Contexte du dossier actuel:
 
                         # Get documents for this case (same pattern as documents.py)
                         docs_result = await service.query(
-                            "SELECT * FROM document WHERE judgment_id = $judgment_id ORDER BY created_at DESC",
-                            {"judgment_id": judgment_id}
+                            "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
+                            {"case_id": case_id}
                         )
                         logger.info(f"Documents query result type: {type(docs_result)}, len: {len(docs_result) if docs_result else 0}")
 
@@ -416,13 +414,13 @@ Contenu des documents:"""
                 conv_service = get_conversation_service()
                 # Save user message
                 await conv_service.save_message(
-                    judgment_id=request.case_id,
+                    case_id=request.case_id,
                     role="user",
                     content=request.message
                 )
                 # Save assistant response
                 await conv_service.save_message(
-                    judgment_id=request.case_id,
+                    case_id=request.case_id,
                     role="assistant",
                     content=assistant_message,
                     model_id=request.model_id,
@@ -687,7 +685,7 @@ async def get_chat_history(case_id: str, limit: int = 50, offset: int = 0):
     try:
         conv_service = get_conversation_service()
         messages = await conv_service.get_conversation_history(
-            judgment_id=case_id,
+            case_id=case_id,
             limit=limit,
             offset=offset
         )
@@ -719,7 +717,7 @@ async def clear_chat_history(case_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        success = await conv_service.clear_conversation(judgment_id=case_id)
+        success = await conv_service.clear_conversation(case_id=case_id)
 
         if success:
             return {"success": True, "message": "Historique effacé avec succès"}
@@ -752,7 +750,7 @@ async def get_chat_stats(case_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        stats = await conv_service.get_conversation_stats(judgment_id=case_id)
+        stats = await conv_service.get_conversation_stats(case_id=case_id)
 
         return {
             "case_id": case_id,

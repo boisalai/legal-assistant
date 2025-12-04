@@ -50,7 +50,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
+import { Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -61,23 +61,7 @@ interface DataTableProps<TData, TValue> {
   newCaseLabel?: string;
 }
 
-// Filter options
-const statusOptions = [
-  { value: "nouveau", label: "Nouveau" },
-  { value: "en_analyse", label: "En analyse" },
-  { value: "termine", label: "Terminé" },
-  { value: "en_erreur", label: "En erreur" },
-  { value: "archive", label: "Archivé" },
-];
-
-const typeOptions = [
-  { value: "vente", label: "Vente" },
-  { value: "achat", label: "Achat" },
-  { value: "hypotheque", label: "Hypotheque" },
-  { value: "testament", label: "Testament" },
-  { value: "succession", label: "Succession" },
-  { value: "autre", label: "Autre" },
-];
+// No filter options needed for simplified Case model
 
 export function DataTable<TData extends { id: string }, TValue>({
   columns,
@@ -89,7 +73,7 @@ export function DataTable<TData extends { id: string }, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    initialFilter ? [{ id: "nom_dossier", value: initialFilter }] : []
+    initialFilter ? [{ id: "title", value: initialFilter }] : []
   );
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
@@ -97,7 +81,7 @@ export function DataTable<TData extends { id: string }, TValue>({
   // Update filter when initialFilter changes
   React.useEffect(() => {
     if (initialFilter) {
-      setColumnFilters([{ id: "nom_dossier", value: initialFilter }]);
+      setColumnFilters([{ id: "title", value: initialFilter }]);
     }
   }, [initialFilter]);
 
@@ -137,66 +121,12 @@ export function DataTable<TData extends { id: string }, TValue>({
         <div className="flex items-center gap-2">
           <Input
             placeholder="Filtrer par nom..."
-            value={(table.getColumn("nom_dossier")?.getFilterValue() as string) ?? ""}
+            value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
             onChange={(event) =>
-              table.getColumn("nom_dossier")?.setFilterValue(event.target.value)
+              table.getColumn("title")?.setFilterValue(event.target.value)
             }
             className="max-w-sm h-8"
           />
-
-          {/* Status filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                Statut
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Filtrer par statut</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => table.getColumn("statut")?.setFilterValue(undefined)}
-              >
-                Tous
-              </DropdownMenuItem>
-              {statusOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.value}
-                  onClick={() => table.getColumn("statut")?.setFilterValue([option.value])}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Type filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                Type
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Filtrer par type</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => table.getColumn("type_transaction")?.setFilterValue(undefined)}
-              >
-                Tous
-              </DropdownMenuItem>
-              {typeOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.value}
-                  onClick={() => table.getColumn("type_transaction")?.setFilterValue([option.value])}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {/* Delete selected */}
           {selectedIds.length > 0 && (
