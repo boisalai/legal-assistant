@@ -88,14 +88,14 @@ app = FastAPI(
 
     ## Fonctionnalites
 
-    - **Jugements**: Upload et gestion de jugements juridiques
-    - **Resumes**: Generation automatique de case briefs avec 4 agents specialises
+    - **Dossiers**: Gestion de dossiers academiques (cours de droit)
+    - **Documents**: Upload et gestion de documents
     - **Authentification**: Systeme de connexion securise
 
     ## Endpoints principaux
 
     - `/api/auth/*` - Authentification (login, register, logout)
-    - `/api/judgments/*` - Gestion des jugements et resumes
+    - `/api/cases/*` - Gestion des dossiers
     """,
     version="0.1.0",
     lifespan=lifespan,
@@ -131,17 +131,17 @@ except ImportError as e:
 # ROUTES
 # ============================================================
 
-from routes import auth_router, judgments_router, documents_router, analysis_router, chat_router
+from routes import auth_router, cases_router, documents_router, analysis_router, chat_router
 from routes.settings import router as settings_router
 
 app.include_router(auth_router, tags=["Authentication"])
-app.include_router(judgments_router, tags=["Judgments"])
+app.include_router(cases_router, tags=["Cases"])
 app.include_router(documents_router, tags=["Documents"])
 app.include_router(analysis_router, tags=["Analysis"])
 app.include_router(chat_router, tags=["Chat"])
 app.include_router(settings_router, tags=["Settings"])
 
-logger.info("Routes configured: /api/auth, /api/judgments, /api/judgments/{id}/documents, /api/analysis, /api/chat, /api/settings")
+logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/analysis, /api/chat, /api/settings")
 
 
 # ============================================================
@@ -154,12 +154,12 @@ async def root():
     return {
         "name": "Legal Assistant API",
         "version": "0.1.0",
-        "description": "Assistant d'etudes juridiques - Resume de jugements",
+        "description": "Assistant d'etudes juridiques - Gestion de dossiers",
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
             "auth": "/api/auth",
-            "judgments": "/api/judgments"
+            "cases": "/api/cases"
         }
     }
 

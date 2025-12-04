@@ -1,7 +1,6 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,44 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import type { Case } from "@/types";
-import {
-  MoreHorizontal,
-  ArrowUpDown,
-  Circle,
-  Timer,
-  CheckCircle,
-  XCircle,
-  ArrowUp,
-  ArrowRight,
-  ArrowDown,
-  Pin,
-} from "lucide-react";
-
-// Status configuration
-const statusConfig: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
-  nouveau: { label: "Nouveau", icon: <Circle className="h-3.5 w-3.5" />, className: "text-blue-600" },
-  en_analyse: { label: "En analyse", icon: <Timer className="h-3.5 w-3.5" />, className: "text-yellow-600" },
-  termine: { label: "Terminé", icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-600" },
-  en_erreur: { label: "En erreur", icon: <XCircle className="h-3.5 w-3.5" />, className: "text-red-600" },
-  archive: { label: "Archivé", icon: <XCircle className="h-3.5 w-3.5" />, className: "text-gray-500" },
-};
-
-// Priority based on score
-const getPriority = (score: number | null | undefined) => {
-  if (!score || score < 50) return { label: "Urgent", icon: <ArrowUp className="h-3.5 w-3.5" />, className: "text-red-600" };
-  if (score < 75) return { label: "Moyen", icon: <ArrowRight className="h-3.5 w-3.5" />, className: "text-yellow-600" };
-  return { label: "Faible", icon: <ArrowDown className="h-3.5 w-3.5" />, className: "text-green-600" };
-};
-
-// Type labels
-const typeLabels: Record<string, string> = {
-  vente: "Vente",
-  achat: "Achat",
-  hypotheque: "Hypotheque",
-  testament: "Testament",
-  succession: "Succession",
-  autre: "Autre",
-};
+import { MoreHorizontal, ArrowUpDown } from "lucide-react";
 
 export const createColumns = (
   onDelete: (id: string) => void,
@@ -80,40 +42,16 @@ export const createColumns = (
     enableHiding: false,
   },
   {
-    id: "pin",
-    header: () => null,
-    cell: ({ row }) => {
-      const caseItem = row.original;
-      const isPinned = caseItem.pinned || false;
-
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0"
-          onClick={() => onTogglePin(caseItem.id)}
-          aria-label={isPinned ? "Dé-épingler" : "Épingler"}
-        >
-          <Pin
-            className={`h-4 w-4 ${isPinned ? "fill-current text-primary" : "text-muted-foreground"}`}
-          />
-        </Button>
-      );
-    },
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
     accessorKey: "id",
     header: "ID",
     cell: ({ row }) => {
       const id = row.getValue("id") as string;
-      const shortId = id.replace("dossier:", "").substring(0, 8);
+      const shortId = id.replace("case:", "").substring(0, 8);
       return <code className="text-xs font-mono text-muted-foreground">{shortId}</code>;
     },
   },
   {
-    accessorKey: "nom_dossier",
+    accessorKey: "title",
     header: ({ column }) => {
       return (
         <Button
@@ -128,93 +66,27 @@ export const createColumns = (
     },
     cell: ({ row }) => {
       const fullId = row.getValue("id") as string;
-      // Extract clean ID without "dossier:" or "judgment:" prefix for URL
-      const urlId = fullId.replace("dossier:", "").replace("judgment:", "");
+      const urlId = fullId.replace("case:", "");
+      const title = row.getValue("title") as string;
       return (
         <Link
           href={`/cases/${urlId}`}
           className="font-medium hover:underline"
         >
-          {row.getValue("nom_dossier")}
+          {title}
         </Link>
       );
     },
   },
   {
-    accessorKey: "type_transaction",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Type
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    accessorKey: "description",
+    header: "Description",
     cell: ({ row }) => {
-      const type = row.getValue("type_transaction") as string;
-      return <span className="capitalize">{typeLabels[type] || type}</span>;
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id));
-    },
-  },
-  {
-    accessorKey: "statut",
-    header: ({ column }) => {
+      const description = row.getValue("description") as string | undefined;
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Statut
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => {
-      const statut = row.getValue("statut") as string;
-      const config = statusConfig[statut] || statusConfig.nouveau;
-      return (
-        <div className={`flex items-center gap-2 ${config.className}`}>
-          {config.icon}
-          <span>{config.label}</span>
-        </div>
-      );
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id));
-    },
-  },
-  {
-    accessorKey: "score_confiance",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Priorité
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => {
-      const score = row.getValue("score_confiance") as number | null;
-      const priority = getPriority(score);
-      return (
-        <div className={`flex items-center gap-2 ${priority.className}`}>
-          {priority.icon}
-          <span>{priority.label}</span>
-          {score !== null && score !== undefined && (
-            <span className="text-xs text-muted-foreground">({score}%)</span>
-          )}
-        </div>
+        <span className="text-muted-foreground max-w-md truncate block">
+          {description || "-"}
+        </span>
       );
     },
   },
@@ -265,7 +137,7 @@ export const createColumns = (
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => window.location.href = `/cases/${caseItem.id.replace("dossier:", "").replace("judgment:", "")}`}
+              onClick={() => window.location.href = `/cases/${caseItem.id.replace("case:", "")}`}
             >
               Ouvrir
             </DropdownMenuItem>

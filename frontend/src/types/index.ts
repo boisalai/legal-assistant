@@ -1,158 +1,24 @@
 // Types for Legal Assistant application
-// Assistant d'etudes juridiques - Resume de jugements
+// Assistant d'etudes juridiques - Gestion de dossiers
 
 // ============================================
-// Judgment Types
+// Case Types
 // ============================================
 
-// Judgment status enum
-export type JudgmentStatus =
-  | "pending"
-  | "analyzing"
-  | "summarized"
-  | "error"
-  | "archived";
-
-// Legal domain enum
-export type LegalDomain =
-  | "civil"
-  | "criminal"
-  | "administrative"
-  | "family"
-  | "commercial"
-  | "constitutional"
-  | "labor"
-  | "other";
-
-// Court level enum
-export type CourtLevel =
-  | "tribunal_instance"
-  | "cour_superieure"
-  | "cour_appel"
-  | "cour_supreme";
-
-// Main Judgment type (maps to API "judgment")
-export interface Judgment {
+// Main Case type (academic folders/courses)
+export interface Case {
   id: string;
-  title?: string;             // Title or case name
-  description?: string;       // Description of the judgment
-  citation?: string;          // Legal citation (e.g., "2024 QCCS 1234")
-  court?: string;             // Court name
-  decision_date?: string;     // Date of decision
-  legal_domain?: string;      // Area of law
-  text?: string;              // Full text of judgment
-  file_path?: string;         // Path to uploaded PDF
-  status: JudgmentStatus;
-  user_id?: string;
+  title?: string;             // Title (e.g., "DRT-1001 - Introduction au droit")
+  description?: string;       // Description of the case/course
+  keywords: string[];         // Keywords
   created_at: string;
   updated_at?: string;
 }
 
-// Judgment summary (Case Brief)
-export interface JudgmentSummary {
-  id: string;
-  judgment_id: string;
-  case_brief: CaseBrief;
-  confidence_score: number;   // 0-1
-  key_takeaway: string;
-  model_used: string;
-  created_at: string;
-}
-
-// Structured Case Brief
-export interface CaseBrief {
-  case_name?: string;
-  citation?: string;
-  court?: string;
-  decision_date?: string;
-  judge?: string;
-  parties?: Party[];
-  facts?: string[];
-  procedural_history?: string;
-  issues?: LegalIssue[];
-  rules?: LegalRule[];
-  ratio_decidendi?: string;
-  obiter_dicta?: string[];
-  holding?: string;
-  remedy?: string;
-}
-
-// Party in a legal case
-export interface Party {
-  name: string;
-  role: "plaintiff" | "defendant" | "appellant" | "respondent" | "other";
-  lawyer?: string;
-}
-
-// Legal issue
-export interface LegalIssue {
-  question: string;
-  importance: "primary" | "secondary";
-  answer?: string;
-}
-
-// Legal rule
-export interface LegalRule {
-  rule: string;
-  source: string;
-  source_type: "statute" | "case_law" | "doctrine" | "principle";
-}
-
-// ============================================
-// Case Types (for backwards compatibility)
-// ============================================
-
-// Case status enum
-export type CaseStatus =
-  | "nouveau"
-  | "pending"
-  | "en_analyse"
-  | "analyzing"
-  | "termine"
-  | "summarized"
-  | "en_erreur"
-  | "error"
-  | "archive"
-  | "archived";
-
-// Transaction type enum (now maps to legal domain)
-export type TransactionType =
-  | "civil"
-  | "criminal"
-  | "administrative"
-  | "family"
-  | "commercial"
-  | "juridique"
-  | "autre";
-
-// Main Case type (maps to Judgment for compatibility)
-export interface Case {
-  id: string;
-  nom_dossier: string;        // Case name / Title
-  type_transaction: TransactionType | string;
-  status: CaseStatus;
-  statut?: CaseStatus;        // Alias for backwards compatibility
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  score_confiance?: number;   // Confidence score (0-1)
-  pinned?: boolean;           // Whether the case is pinned
-  summary?: string;           // One-line summary
-  description?: string;       // Case description
-  // Judgment-specific fields
-  citation?: string;
-  court?: string;
-  decision_date?: string;
-  text?: string;
-}
-
-// Legacy alias for backward compatibility
-export type Dossier = Case;
-
 // Document attached to a case
 export interface Document {
   id: string;
-  dossier_id: string;         // Case ID in API
+  case_id: string;            // Case ID (formerly case_id)
   nom_fichier: string;        // File name
   type_fichier: string;       // File type (pdf, docx, txt, audio, etc.)
   taille: number;             // Size in bytes
@@ -164,7 +30,7 @@ export interface Document {
 
   // Document metadata
   type_mime?: string;         // MIME type
-  document_type?: string;     // Type of document (certificat, contrat, etc.)
+  document_type?: string;     // Type of document
   language?: string;          // Language (fr, en)
   use_ocr?: boolean;          // OCR was used
   is_recording?: boolean;     // Is an audio recording
@@ -260,7 +126,7 @@ export interface NextStep {
 // Complete checklist
 export interface Checklist {
   id?: string;
-  dossier_id: string;
+  case_id: string;            // Formerly dossier_id
   items: ChecklistItem[];
   points_attention: string[];
   documents_manquants: string[];
@@ -345,3 +211,7 @@ export type DonneesExtraites = ExtractedData;
 export type DocumentExtrait = ExtractedDocument;
 export type ItemChecklist = ChecklistItem;
 export type EtapeSuivante = NextStep;
+
+// Legacy aliases for judgment/case compatibility
+export type Judgment = Case;
+export type Dossier = Case;

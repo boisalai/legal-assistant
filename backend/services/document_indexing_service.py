@@ -54,7 +54,7 @@ class DocumentIndexingService:
     async def index_document(
         self,
         document_id: str,
-        judgment_id: str,
+        case_id: str,
         text_content: str,
         force_reindex: bool = False
     ) -> dict:
@@ -63,7 +63,7 @@ class DocumentIndexingService:
 
         Args:
             document_id: ID du document (ex: "document:abc123")
-            judgment_id: ID du dossier (ex: "judgment:xyz")
+            case_id: ID du dossier (ex: "judgment:xyz")
             text_content: Contenu textuel à indexer
             force_reindex: Si True, supprime les embeddings existants avant de réindexer
 
@@ -74,8 +74,8 @@ class DocumentIndexingService:
             # Normaliser les IDs
             if not document_id.startswith("document:"):
                 document_id = f"document:{document_id}"
-            if not judgment_id.startswith("judgment:"):
-                judgment_id = f"judgment:{judgment_id}"
+            if not case_id.startswith("case:"):
+                case_id = f"judgment:{case_id}"
 
             logger.info(f"Indexing document {document_id} with {len(text_content)} chars")
 
@@ -132,7 +132,7 @@ class DocumentIndexingService:
                         # Stocker l'embedding dans SurrealDB
                         await self._store_embedding(
                             document_id=document_id,
-                            judgment_id=judgment_id,
+                            case_id=case_id,
                             chunk_index=idx,
                             chunk_text=chunk_text,
                             embedding=embedding_result.embedding,
@@ -171,7 +171,7 @@ class DocumentIndexingService:
     async def _store_embedding(
         self,
         document_id: str,
-        judgment_id: str,
+        case_id: str,
         chunk_index: int,
         chunk_text: str,
         embedding: List[float],
@@ -193,7 +193,7 @@ class DocumentIndexingService:
         query = """
         CREATE document_embedding CONTENT {{
             document_id: $document_id,
-            judgment_id: $judgment_id,
+            case_id: $case_id,
             chunk_index: $chunk_index,
             chunk_text: $chunk_text,
             embedding: $embedding,
@@ -206,7 +206,7 @@ class DocumentIndexingService:
 
         params = {
             "document_id": document_id,
-            "judgment_id": judgment_id,
+            "case_id": case_id,
             "chunk_index": chunk_index,
             "chunk_text": chunk_text,
             "embedding": embedding,
@@ -253,7 +253,7 @@ class DocumentIndexingService:
     async def search_similar(
         self,
         query_text: str,
-        judgment_id: Optional[str] = None,
+        case_id: Optional[str] = None,
         top_k: int = 5,
         min_similarity: float = 0.5
     ) -> List[dict]:
@@ -265,7 +265,7 @@ class DocumentIndexingService:
 
         Args:
             query_text: Texte de la requête
-            judgment_id: Optionnel, limiter la recherche à un dossier
+            case_id: Optionnel, limiter la recherche à un dossier
             top_k: Nombre maximum de résultats
             min_similarity: Score de similarité minimum (0-1)
 
@@ -282,9 +282,9 @@ class DocumentIndexingService:
 
             query_embedding = query_embedding_result.embedding
 
-            # Normaliser judgment_id si fourni
-            if judgment_id and not judgment_id.startswith("judgment:"):
-                judgment_id = f"judgment:{judgment_id}"
+            # Normaliser case_id si fourni
+            if case_id and not case_id.startswith("case:"):
+                case_id = f"judgment:{case_id}"
 
             # Utiliser l'opérateur vectoriel natif de SurrealDB
             if not self.surreal_service.db:
@@ -293,15 +293,15 @@ class DocumentIndexingService:
             # Construire la requête avec calcul de similarité manuelle
             # Note: L'opérateur <|k,COSINE|> nécessite un index MTREE qui n'est pas encore configuré
             # Pour l'instant, on utilise vector::similarity::cosine() et on filtre manuellement
-            if judgment_id:
+            if case_id:
                 query = """
                 SELECT *, vector::similarity::cosine(embedding, $query_embedding) AS similarity_score
                 FROM document_embedding
-                WHERE judgment_id = $judgment_id
+                WHERE case_id = $case_id
                 ORDER BY similarity_score DESC
                 """
                 params = {
-                    "judgment_id": judgment_id,
+                    "case_id": case_id,
                     "query_embedding": query_embedding
                 }
             else:
@@ -337,7 +337,7 @@ class DocumentIndexingService:
                 if similarity >= min_similarity:
                     similarities.append({
                         "document_id": emb_record.get("document_id"),
-                        "judgment_id": emb_record.get("judgment_id"),
+                        "case_id": emb_record.get("case_id"),
                         "chunk_index": emb_record.get("chunk_index"),
                         "chunk_text": emb_record.get("chunk_text"),
                         "similarity_score": similarity,
@@ -387,12 +387,12 @@ class DocumentIndexingService:
             logger.error(f"Error deleting document index: {e}", exc_info=True)
             return False
 
-    async def get_index_stats(self, judgment_id: Optional[str] = None) -> dict:
+    async def get_index_stats(self, case_id: Optional[str] = None) -> dict:
         """
         Obtient des statistiques sur l'index.
 
         Args:
-            judgment_id: Optionnel, filtrer par dossier
+            case_id: Optionnel, filtrer par dossier
 
         Returns:
             Dict avec total_chunks, total_documents, embedding_model
@@ -401,11 +401,11 @@ class DocumentIndexingService:
             if not self.surreal_service.db:
                 await self.surreal_service.connect()
 
-            if judgment_id:
-                if not judgment_id.startswith("judgment:"):
-                    judgment_id = f"judgment:{judgment_id}"
-                query = "SELECT count() AS total, math::max(document_id) AS docs FROM document_embedding WHERE judgment_id = $judgment_id GROUP ALL"
-                params = {"judgment_id": judgment_id}
+            if case_id:
+                if not case_id.startswith("case:"):
+                    case_id = f"judgment:{case_id}"
+                query = "SELECT count() AS total, math::max(document_id) AS docs FROM document_embedding WHERE case_id = $case_id GROUP ALL"
+                params = {"case_id": case_id}
             else:
                 query = "SELECT count() AS total, count(DISTINCT document_id) AS docs FROM document_embedding GROUP ALL"
                 params = {}
