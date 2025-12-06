@@ -12,9 +12,10 @@ Endpoints:
 import logging
 import uuid
 import mimetypes
+import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
 from fastapi.responses import FileResponse, StreamingResponse
@@ -22,6 +23,7 @@ from pydantic import BaseModel
 
 from config.settings import settings
 from services.surreal_service import get_surreal_service
+from services.document_indexing_service import DocumentIndexingService
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ ALLOWED_EXTENSIONS = {
     '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     '.txt': 'text/plain',
     '.md': 'text/markdown',
+    '.mdx': 'text/markdown',  # MDX (Markdown + JSX)
     '.mp3': 'audio/mpeg',
     '.wav': 'audio/wav',
     '.m4a': 'audio/mp4',
@@ -44,7 +47,11 @@ ALLOWED_EXTENSIONS = {
     '.webm': 'audio/webm',
 }
 
+# Types de fichiers supportés pour les liens (fichiers/dossiers)
+LINKABLE_EXTENSIONS = {'.md', '.mdx', '.pdf', '.txt', '.docx'}
+
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB - Pour supporter les enregistrements audio de 3h+
+MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un dossier
 
 
 # ============================================================================
@@ -81,9 +88,31 @@ class RegisterDocumentRequest(BaseModel):
     file_path: str  # Absolute path to the file on disk
 
 
+class LinkPathRequest(BaseModel):
+    """Request to link a file or folder."""
+    path: str  # Absolute path to file or folder
+
+
+class LinkPathResponse(BaseModel):
+    """Response for link operation."""
+    success: bool
+    linked_count: int
+    documents: List[DocumentResponse]
+    warnings: Optional[List[str]] = None
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
+def calculate_file_hash(file_path: Path) -> str:
+    """Calculate SHA-256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
 
 def get_file_extension(filename: str) -> str:
     """Get file extension from filename."""
@@ -94,6 +123,39 @@ def is_allowed_file(filename: str) -> bool:
     """Check if file extension is allowed."""
     ext = get_file_extension(filename)
     return ext in ALLOWED_EXTENSIONS
+
+
+def is_linkable_file(filename: str) -> bool:
+    """Check if file can be linked (for folder linking)."""
+    ext = get_file_extension(filename)
+    return ext in LINKABLE_EXTENSIONS
+
+
+def scan_folder_for_files(folder_path: Path, max_files: int = MAX_LINKED_FILES) -> List[Path]:
+    """
+    Scan a folder for linkable files (non-recursive).
+
+    Returns list of file paths, limited to max_files.
+    Filters by LINKABLE_EXTENSIONS.
+    """
+    files = []
+
+    try:
+        for item in folder_path.iterdir():
+            if len(files) >= max_files:
+                break
+
+            # Skip hidden files and directories
+            if item.name.startswith('.'):
+                continue
+
+            # Only process files (not subdirectories)
+            if item.is_file() and is_linkable_file(item.name):
+                files.append(item)
+    except Exception as e:
+        logger.error(f"Error scanning folder {folder_path}: {e}")
+
+    return sorted(files, key=lambda p: p.name)
 
 
 def get_mime_type(filename: str) -> str:
@@ -478,6 +540,192 @@ async def register_document(
         raise
     except Exception as e:
         logger.error(f"Error registering document: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/{case_id}/documents/link", response_model=LinkPathResponse, status_code=status.HTTP_201_CREATED)
+async def link_file_or_folder(
+    case_id: str,
+    request: LinkPathRequest,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Lie un fichier ou un dossier sans copie.
+
+    - Si le chemin est un fichier : lie ce fichier uniquement
+    - Si le chemin est un dossier : lie tous les fichiers supportés du dossier (non-récursif)
+
+    Les fichiers sont référencés à leur emplacement d'origine.
+    Un hash SHA-256 et mtime sont stockés pour détecter les modifications.
+
+    Types supportés : .md, .mdx, .pdf, .txt, .docx
+    Limite : 50 fichiers maximum par dossier
+    """
+    path = Path(request.path)
+    warnings = []
+    linked_documents = []
+
+    # Verify path exists
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Le chemin n'existe pas : {request.path}"
+        )
+
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize case ID
+        if not case_id.startswith("case:"):
+            case_id = f"case:{case_id}"
+
+        # Determine if path is file or folder
+        files_to_link = []
+
+        if path.is_file():
+            # Single file
+            if not is_linkable_file(path.name):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Type de fichier non supporté. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
+                )
+            files_to_link = [path]
+
+        elif path.is_dir():
+            # Folder - scan for files
+            files_to_link = scan_folder_for_files(path, MAX_LINKED_FILES)
+
+            if len(files_to_link) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Aucun fichier supporté trouvé dans ce dossier. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
+                )
+
+            if len(files_to_link) == MAX_LINKED_FILES:
+                warnings.append(f"Limite de {MAX_LINKED_FILES} fichiers atteinte. Certains fichiers ont été ignorés.")
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le chemin n'est ni un fichier ni un dossier"
+            )
+
+        # Link each file
+        now = datetime.utcnow().isoformat()
+
+        for file_path in files_to_link:
+            try:
+                # Get file info
+                file_stat = file_path.stat()
+                file_size = file_stat.st_size
+                ext = get_file_extension(file_path.name)
+
+                # Check file size
+                if file_size > MAX_FILE_SIZE:
+                    warnings.append(f"Fichier ignoré (trop volumineux) : {file_path.name}")
+                    continue
+
+                # Calculate hash and get mtime
+                file_hash = calculate_file_hash(file_path)
+                file_mtime = file_stat.st_mtime
+
+                # Generate document ID
+                doc_id = str(uuid.uuid4())[:8]
+
+                # Create linked source metadata
+                linked_source = {
+                    "absolute_path": str(file_path.absolute()),
+                    "last_sync": now,
+                    "source_hash": file_hash,
+                    "source_mtime": file_mtime,
+                    "needs_reindex": False
+                }
+
+                # Read file content for text files
+                texte_extrait = None
+                if ext in {'.md', '.mdx', '.txt'}:
+                    try:
+                        texte_extrait = file_path.read_text(encoding='utf-8')
+                    except Exception as e:
+                        logger.warning(f"Could not read text from {file_path}: {e}")
+
+                # Create document record
+                document_data = {
+                    "case_id": case_id,
+                    "nom_fichier": file_path.name,
+                    "type_fichier": ext.lstrip('.'),
+                    "type_mime": get_mime_type(file_path.name),
+                    "taille": file_size,
+                    "file_path": str(file_path.absolute()),
+                    "user_id": user_id,
+                    "created_at": now,
+                    "source_type": "linked",
+                    "linked_source": linked_source,
+                    "texte_extrait": texte_extrait,
+                    "indexed": False  # Will be set to True after indexing
+                }
+
+                await service.create("document", document_data, record_id=doc_id)
+                logger.info(f"Linked file: {file_path.name} -> document:{doc_id}")
+
+                # Index text content if available
+                if texte_extrait:
+                    try:
+                        indexing_service = DocumentIndexingService()
+                        result = await indexing_service.index_document(
+                            document_id=f"document:{doc_id}",
+                            case_id=case_id,
+                            text_content=texte_extrait
+                        )
+
+                        if result.get("success"):
+                            await service.update(f"document:{doc_id}", {"indexed": True})
+                            logger.info(f"Indexed document:{doc_id} with {result.get('chunks_created', 0)} chunks")
+                    except Exception as e:
+                        logger.error(f"Error indexing document:{doc_id}: {e}")
+
+                # Add to response
+                linked_documents.append(DocumentResponse(
+                    id=f"document:{doc_id}",
+                    case_id=case_id,
+                    nom_fichier=file_path.name,
+                    type_fichier=ext.lstrip('.'),
+                    type_mime=get_mime_type(file_path.name),
+                    taille=file_size,
+                    file_path=str(file_path.absolute()),
+                    created_at=now,
+                    source_type="linked",
+                    texte_extrait=texte_extrait[:500] + "..." if texte_extrait and len(texte_extrait) > 500 else texte_extrait,
+                    indexed=texte_extrait is not None,
+                    file_exists=True
+                ))
+
+            except Exception as e:
+                logger.error(f"Error linking file {file_path}: {e}")
+                warnings.append(f"Erreur lors de la liaison de {file_path.name} : {str(e)}")
+
+        if len(linked_documents) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Aucun fichier n'a pu être lié. Vérifiez les warnings."
+            )
+
+        return LinkPathResponse(
+            success=True,
+            linked_count=len(linked_documents),
+            documents=linked_documents,
+            warnings=warnings if warnings else None
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error linking path: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
