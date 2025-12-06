@@ -61,13 +61,13 @@ async def lifespan(app: FastAPI):
     # === SHUTDOWN ===
     logger.info("Legal Assistant API - Shutting down...")
 
-    # Shutdown MLX server if running
+    # Shutdown all model servers (MLX, vLLM) if running
     try:
-        from services.mlx_server_service import shutdown_mlx_server
-        await shutdown_mlx_server()
-        logger.info("MLX server stopped")
+        from services.model_server_manager import shutdown_all_model_servers
+        await shutdown_all_model_servers()
+        logger.info("All model servers stopped")
     except Exception as e:
-        logger.warning(f"Error stopping MLX server: {e}")
+        logger.warning(f"Error stopping model servers: {e}")
 
     # Shutdown SurrealDB
     try:
@@ -133,15 +133,21 @@ except ImportError as e:
 
 from routes import auth_router, cases_router, documents_router, analysis_router, chat_router
 from routes.settings import router as settings_router
+from routes.transcription import router as transcription_router
+from routes.extraction import router as extraction_router
+from routes.model_servers import router as model_servers_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(cases_router, tags=["Cases"])
 app.include_router(documents_router, tags=["Documents"])
+app.include_router(transcription_router, tags=["Transcription"])
+app.include_router(extraction_router, tags=["Extraction"])
 app.include_router(analysis_router, tags=["Analysis"])
 app.include_router(chat_router, tags=["Chat"])
 app.include_router(settings_router, tags=["Settings"])
+app.include_router(model_servers_router, tags=["Model Servers"])
 
-logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/analysis, /api/chat, /api/settings")
+logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers")
 
 
 # ============================================================

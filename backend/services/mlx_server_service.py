@@ -30,7 +30,7 @@ class MLXServerService:
         self.host = host
         self.process: Optional[subprocess.Popen] = None
         self.current_model: Optional[str] = None
-        self._startup_timeout = 30  # secondes
+        self._startup_timeout = 120  # secondes (augmenté pour téléchargement initial)
 
     def is_running(self) -> bool:
         """Vérifie si le serveur MLX est en cours d'exécution."""
@@ -57,17 +57,20 @@ class MLXServerService:
             logger.debug(f"Health check failed: {e}")
             return False
 
-    async def start(self, model_id: str, max_wait: int = 30) -> bool:
+    async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
         """
         Démarre le serveur MLX avec le modèle spécifié.
 
         Args:
             model_id: ID du modèle MLX (ex: "mlx-community/Qwen2.5-3B-Instruct-4bit")
-            max_wait: Temps max d'attente pour le démarrage (secondes)
+            max_wait: Temps max d'attente pour le démarrage (secondes). Si None, utilise self._startup_timeout
 
         Returns:
             True si le serveur a démarré avec succès, False sinon
         """
+        # Utiliser le timeout configuré si max_wait n'est pas spécifié
+        if max_wait is None:
+            max_wait = self._startup_timeout
         # Si le modèle demandé est déjà en cours, ne rien faire
         if self.is_running() and self.current_model == model_id:
             logger.info(f"✅ Serveur MLX déjà en cours avec {model_id}")
@@ -80,19 +83,21 @@ class MLXServerService:
 
         logger.info(f"🚀 Démarrage serveur MLX avec {model_id}...")
         logger.info(f"   Port: {self.port}")
-        logger.info(f"   ⚠️  Premier démarrage: téléchargement du modèle (~2-4 GB)")
+        logger.info(f"   ⚠️  Si premier démarrage: téléchargement du modèle (~2-4 GB)")
+        logger.info(f"   ⏱️  Cela peut prendre 1-2 minutes selon votre connexion...")
 
         try:
             # Démarrer le serveur MLX en subprocess
+            # Note: Utiliser "mlx_lm.server" directement (pas "python -m mlx_lm.server" qui est déprécié)
             self.process = subprocess.Popen(
                 [
-                    "python3", "-m", "mlx_lm.server",
+                    "mlx_lm.server",
                     "--model", model_id,
                     "--port", str(self.port),
                     "--host", self.host,
                 ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,  # Ignorer stdout pour éviter buffer overflow
+                stderr=subprocess.PIPE,      # Capturer stderr pour les erreurs
                 text=True,
             )
 
@@ -121,6 +126,8 @@ class MLXServerService:
 
             # Timeout atteint
             logger.error(f"❌ Timeout: Le serveur MLX n'a pas démarré en {max_wait}s")
+            logger.error(f"   Vérifiez votre connexion Internet si c'est le premier démarrage")
+            logger.error(f"   Le modèle doit télécharger ~2-4 GB depuis HuggingFace")
             await self.stop()
             return False
 

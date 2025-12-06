@@ -238,60 +238,11 @@ DEFAULT_MLX_SERVER_URL = "http://localhost:8080/v1"  # URL OpenAI-compatible
 
 
 # ========================================
-# Modèles HuggingFace (Transformers)
+# Modèles vLLM - SUPPRIMÉS
 # ========================================
-
-HuggingFaceModel = Literal[
-    "microsoft/Phi-3-mini-4k-instruct",
-    "mistralai/Mistral-7B-Instruct-v0.3",
-    "Qwen/Qwen2.5-7B-Instruct",
-    "meta-llama/Llama-3.2-3B-Instruct",
-]
-
-HUGGINGFACE_MODELS_INFO = {
-    "microsoft/Phi-3-mini-4k-instruct": {
-        "name": "Phi-3 Mini 4K Instruct",
-        "params": "3.8B",
-        "ram": "~8 GB",
-        "speed": "Medium",
-        "quality": "Very Good",
-        "best_for": "Extraction, raisonnement",
-        "recommended": True,
-        "requires_gpu": False,
-    },
-    "mistralai/Mistral-7B-Instruct-v0.3": {
-        "name": "Mistral 7B Instruct v0.3",
-        "params": "7B",
-        "ram": "~14 GB",
-        "speed": "Slow",
-        "quality": "Excellent",
-        "best_for": "Qualité maximale, documents complexes",
-        "recommended": True,
-        "requires_gpu": True,
-    },
-    "Qwen/Qwen2.5-7B-Instruct": {
-        "name": "Qwen 2.5 7B Instruct",
-        "params": "7B",
-        "ram": "~14 GB",
-        "speed": "Slow",
-        "quality": "Excellent",
-        "best_for": "Multilingual, français excellent",
-        "recommended": True,
-        "requires_gpu": True,
-    },
-    "meta-llama/Llama-3.2-3B-Instruct": {
-        "name": "Llama 3.2 3B Instruct",
-        "params": "3B",
-        "ram": "~6 GB",
-        "speed": "Fast",
-        "quality": "Good",
-        "best_for": "Tests rapides, développement",
-        "recommended": True,
-        "requires_gpu": False,
-    },
-}
-
-DEFAULT_HUGGINGFACE_MODEL: HuggingFaceModel = "microsoft/Phi-3-mini-4k-instruct"
+# vLLM est lent sur Apple Silicon (CPU uniquement, ~5-10 tok/s)
+# Utiliser MLX à la place (GPU Metal, ~50-60 tok/s)
+# Le code vLLM est conservé pour usage manuel si nécessaire
 
 
 # ========================================
@@ -327,10 +278,10 @@ def get_recommended_mlx_models() -> list[str]:
     ]
 
 
-def get_recommended_huggingface_models() -> list[str]:
-    """Retourne la liste des modèles HuggingFace recommandés."""
+def get_recommended_vllm_models() -> list[str]:
+    """Retourne la liste des modèles vLLM recommandés."""
     return [
-        model for model, info in HUGGINGFACE_MODELS_INFO.items()
+        model for model, info in VLLM_MODELS_INFO.items()
         if info.get("recommended", False)
     ]
 
@@ -385,7 +336,7 @@ def get_all_models_for_api() -> dict:
         },
         "mlx": {
             "name": "MLX (Apple Silicon)",
-            "description": "Modèles optimisés pour Mac M1/M2/M3",
+            "description": "Modèles HF convertis pour Mac M1/M2/M3",
             "icon": "cpu",
             "requires_api_key": False,
             "requires_mlx_server": True,
@@ -404,28 +355,6 @@ def get_all_models_for_api() -> dict:
                     "recommended": info.get("recommended", False),
                 }
                 for model, info in MLX_MODELS_INFO.items()
-            ],
-        },
-        "huggingface": {
-            "name": "HuggingFace",
-            "description": "Modèles Transformers (GPU recommandé)",
-            "icon": "box",
-            "requires_api_key": False,
-            "requires_gpu": True,
-            "default": f"huggingface:{DEFAULT_HUGGINGFACE_MODEL}",
-            "models": [
-                {
-                    "id": f"huggingface:{model}",
-                    "name": info["name"],
-                    "params": info.get("params", ""),
-                    "ram": info.get("ram", ""),
-                    "speed": info.get("speed", ""),
-                    "quality": info.get("quality", ""),
-                    "best_for": info.get("best_for", ""),
-                    "recommended": info.get("recommended", False),
-                    "requires_gpu": info.get("requires_gpu", False),
-                }
-                for model, info in HUGGINGFACE_MODELS_INFO.items()
             ],
         },
     }

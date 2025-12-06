@@ -20,6 +20,7 @@ from agno.agent import Agent
 from services.model_factory import create_model
 from services.surreal_service import get_surreal_service
 from services.conversation_service import get_conversation_service
+from services.model_server_manager import ensure_model_server
 from tools.transcription_tool import transcribe_audio, transcribe_audio_streaming, get_tools_description
 from tools.document_search_tool import search_documents, list_documents
 from tools.entity_extraction_tool import extract_entities, find_entity
@@ -69,26 +70,42 @@ async def chat(request: ChatRequest):
     if a case_id is provided.
     """
     logger.info(f"Chat request: model={request.model_id}, case_id={request.case_id}")
+    logger.info(f"DEBUG - model_id type: {type(request.model_id)}, value: '{request.model_id}'")
+    logger.info(f"DEBUG - Checking if model_id starts with mlx/vllm/huggingface...")
 
     sources_list = []  # Track sources used in RAG
 
     try:
-        # Auto-start MLX server if needed
-        if request.model_id.startswith("mlx:"):
-            from services.mlx_server_service import ensure_mlx_server
-            logger.info(f"🍎 Modèle MLX détecté: {request.model_id}")
-            logger.info("⏳ Démarrage automatique du serveur MLX...")
+        # Auto-start model server if needed (MLX or vLLM)
+        # Note: "huggingface:" is deprecated and redirects to "vllm:" in model_factory
+        if request.model_id.startswith(("mlx:", "vllm:", "huggingface:")):
+            logger.info("DEBUG - Auto-startup condition TRUE")
+            if request.model_id.startswith("mlx:"):
+                provider = "MLX"
+            else:
+                # Both "vllm:" and deprecated "huggingface:" use vLLM
+                provider = "vLLM"
+            logger.info(f"🚀 Modèle {provider} détecté: {request.model_id}")
+            logger.info(f"⏳ Démarrage automatique du serveur {provider}...")
 
-            mlx_started = await ensure_mlx_server(request.model_id)
+            server_ready = await ensure_model_server(request.model_id)
 
-            if not mlx_started:
-                error_msg = "❌ Échec du démarrage du serveur MLX. Vérifiez que mlx-lm est installé (uv sync)."
+            if not server_ready:
+                error_msg = f"❌ Échec du démarrage du serveur {provider}. "
+                if provider == "MLX":
+                    error_msg += "Vérifiez que mlx-lm est installé (uv sync)."
+                else:
+                    error_msg += "Vérifiez que vLLM est installé (pip install vllm)."
                 logger.error(error_msg)
                 raise HTTPException(status_code=500, detail=error_msg)
 
-            logger.info("✅ Serveur MLX prêt")
+            logger.info(f"✅ Serveur {provider} prêt")
+        else:
+            logger.info(f"DEBUG - Auto-startup condition FALSE - model_id: '{request.model_id}'")
+            logger.info("DEBUG - This model does not require auto-startup (not MLX/vLLM/huggingface)")
 
         # Create the model
+        logger.info(f"DEBUG - Creating model with model_id: '{request.model_id}'")
         model = create_model(request.model_id)
 
         # Get tools description
@@ -603,25 +620,38 @@ def _generate_transcript_summary(text: str, max_length: int = 500) -> str:
 async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
     """Handle regular chat with streaming response."""
     try:
-        # Auto-start MLX server if needed
-        if request.model_id.startswith("mlx:"):
-            from services.mlx_server_service import ensure_mlx_server
-            logger.info(f"🍎 Modèle MLX détecté: {request.model_id}")
-            logger.info("⏳ Démarrage automatique du serveur MLX...")
+        # Auto-start model server if needed (MLX or vLLM)
+        # Note: "huggingface:" is deprecated and redirects to "vllm:" in model_factory
+        if request.model_id.startswith(("mlx:", "vllm:", "huggingface:")):
+            if request.model_id.startswith("mlx:"):
+                provider = "MLX"
+                emoji = "🍎"
+            else:
+                # Both "vllm:" and deprecated "huggingface:" use vLLM
+                provider = "vLLM"
+                emoji = "🚀"
+
+            logger.info(f"{emoji} Modèle {provider} détecté: {request.model_id}")
+            logger.info(f"⏳ Démarrage automatique du serveur {provider}...")
 
             # Envoyer un message de statut à l'utilisateur
-            yield f"event: message\ndata: {json.dumps({'content': '🍎 Démarrage du serveur MLX...'})}\n\n"
+            yield f"event: message\ndata: {json.dumps({'content': f'{emoji} Démarrage du serveur {provider}...'})}\n\n"
 
-            # Démarrer le serveur MLX (ou vérifier qu'il tourne)
-            mlx_started = await ensure_mlx_server(request.model_id)
+            # Démarrer le serveur approprié
+            from services.model_server_manager import ensure_model_server
+            server_ready = await ensure_model_server(request.model_id)
 
-            if not mlx_started:
-                error_msg = "❌ Échec du démarrage du serveur MLX. Vérifiez que mlx-lm est installé (uv sync)."
+            if not server_ready:
+                error_msg = f"❌ Échec du démarrage du serveur {provider}. "
+                if provider == "MLX":
+                    error_msg += "Vérifiez que mlx-lm est installé (uv sync)."
+                else:
+                    error_msg += "Vérifiez que vLLM est installé (pip install vllm)."
                 logger.error(error_msg)
                 yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
                 return
 
-            yield f"event: message\ndata: {json.dumps({'content': '✅ Serveur MLX prêt\\n\\n'})}\n\n"
+            yield f"event: message\ndata: {json.dumps({'content': f'✅ Serveur {provider} prêt\\n\\n'})}\n\n"
 
         # Create the model
         model = create_model(request.model_id)

@@ -28,7 +28,7 @@ export interface LLMConfig {
 interface ModelInfo {
   value: string;
   label: string;
-  provider: "ollama" | "anthropic" | "mlx" | "huggingface";
+  provider: "ollama" | "anthropic" | "mlx";
 }
 
 const LLM_MODELS: ModelInfo[] = [
@@ -85,37 +85,6 @@ const LLM_MODELS: ModelInfo[] = [
     label: "MLX Mistral-7B-Instruct-v0.3-4bit",
     provider: "mlx",
   },
-  // Hugging Face models (MPS-compatible for M1 Pro 16GB)
-  {
-    value: "huggingface:Qwen/Qwen2.5-3B-Instruct",
-    label: "HF Qwen2.5-3B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:Qwen/Qwen2.5-7B-Instruct",
-    label: "HF Qwen2.5-7B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:meta-llama/Llama-3.2-3B-Instruct",
-    label: "HF Llama-3.2-3B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:mistralai/Mistral-7B-Instruct-v0.3",
-    label: "HF Mistral-7B-Instruct-v0.3",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:microsoft/Phi-3-mini-4k-instruct",
-    label: "HF Phi-3-mini-4k-instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:google/gemma-2-2b-it",
-    label: "HF Gemma-2-2b-it",
-    provider: "huggingface",
-  },
 ];
 
 const LLM_CONFIG_STORAGE_KEY = "legal-assistant-llm-config";
@@ -158,8 +127,6 @@ function getProviderIcon(provider: string, inDropdown: boolean = false) {
       return <ClaudeLogo className="h-4 w-4 flex-shrink-0" />;
     case "mlx":
       return <AppleLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
-    case "huggingface":
-      return <Image src={HuggingFaceLogoPng} alt="Hugging Face" width={16} height={16} className="object-contain flex-shrink-0" />;
     case "ollama":
     default:
       return <OllamaLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
@@ -172,8 +139,6 @@ function getProviderLabel(provider: string) {
       return "Claude";
     case "mlx":
       return "MLX";
-    case "huggingface":
-      return "Hugging Face";
     case "ollama":
     default:
       return "Ollama";
@@ -246,19 +211,6 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
               MLX (Apple Silicon)
             </div>
             {LLM_MODELS.filter((m) => m.provider === "mlx").map((model) => (
-              <SelectItem key={model.value} value={model.value}>
-                <div className="flex items-center gap-2">
-                  {getProviderIcon(model.provider, true)}
-                  <span>{model.label}</span>
-                </div>
-              </SelectItem>
-            ))}
-
-            {/* Hugging Face models */}
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
-              Hugging Face (MPS)
-            </div>
-            {LLM_MODELS.filter((m) => m.provider === "huggingface").map((model) => (
               <SelectItem key={model.value} value={model.value}>
                 <div className="flex items-center gap-2">
                   {getProviderIcon(model.provider, true)}

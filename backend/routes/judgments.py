@@ -17,20 +17,15 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Depends
-from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
 from config.settings import settings
 from services.surreal_service import get_surreal_service
+from auth.helpers import get_current_user_id, require_auth
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/judgments", tags=["Judgments"])
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
-
-# In-memory session store (reuse from auth)
-from routes.auth import active_sessions
 
 
 # ============================================================================
@@ -110,39 +105,6 @@ async def get_judgment_by_id(service, judgment_id: str) -> Optional[dict]:
         return None
 
     return items[0] if items else None
-
-
-async def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
-    """Get current user ID from token."""
-    if not token:
-        return None
-    return active_sessions.get(token)
-
-
-async def require_auth(token: Optional[str] = Depends(oauth2_scheme)) -> str:
-    """Require authentication (relaxed in debug mode)."""
-    # In debug mode, allow unauthenticated access with a default user
-    if settings.debug:
-        if not token:
-            return "user:dev_user"
-        user_id = active_sessions.get(token)
-        return user_id or "user:dev_user"
-
-    # Production mode: strict authentication
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Non authentifie",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    user_id = active_sessions.get(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide ou expire",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user_id
 
 
 # ============================================================================
