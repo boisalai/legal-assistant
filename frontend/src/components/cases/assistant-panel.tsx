@@ -14,15 +14,11 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
-import Image from "next/image";
 
 // Import SVG logos as React components
 import ClaudeLogo from "@/svg/claude-anthropic.svg";
 import OllamaLogo from "@/svg/ollama.svg";
 import AppleLogo from "@/svg/apple-logo.svg";
-
-// Import PNG logo
-import HuggingFaceLogoPng from "@/svg/hf-logo.png";
 
 export interface Message {
   role: "user" | "assistant";
@@ -135,37 +131,6 @@ const LLM_MODELS = [
     label: "MLX Mistral-7B-Instruct-v0.3-4bit",
     provider: "mlx",
   },
-  // Hugging Face models (MPS-compatible for M1 Pro 16GB)
-  {
-    value: "huggingface:Qwen/Qwen2.5-3B-Instruct",
-    label: "HF Qwen2.5-3B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:Qwen/Qwen2.5-7B-Instruct",
-    label: "HF Qwen2.5-7B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:meta-llama/Llama-3.2-3B-Instruct",
-    label: "HF Llama-3.2-3B-Instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:mistralai/Mistral-7B-Instruct-v0.3",
-    label: "HF Mistral-7B-Instruct-v0.3",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:microsoft/Phi-3-mini-4k-instruct",
-    label: "HF Phi-3-mini-4k-instruct",
-    provider: "huggingface",
-  },
-  {
-    value: "huggingface:google/gemma-2-2b-it",
-    label: "HF Gemma-2-2b-it",
-    provider: "huggingface",
-  },
 ];
 
 export function AssistantPanel({
@@ -253,12 +218,6 @@ export function AssistantPanel({
         provider: "mlx",
         icon: <AppleLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
         label: "MLX"
-      };
-    } else if (modelId.startsWith("huggingface:")) {
-      return {
-        provider: "huggingface",
-        icon: <Image src={HuggingFaceLogoPng} alt="Hugging Face" width={16} height={16} className="object-contain flex-shrink-0" />,
-        label: "Hugging Face"
       };
     } else {
       return {
