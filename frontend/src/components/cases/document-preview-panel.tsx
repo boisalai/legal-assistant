@@ -61,25 +61,22 @@ export function DocumentPreviewPanel({
             setAudioUrl(url);
           }
         } else if (isMarkdown) {
-          // For markdown files: always fetch the file content first, fallback to texte_extrait
-          const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
-          try {
-            const response = await fetch(downloadUrl);
-            if (response.ok) {
-              const content = await response.text();
-              if (content && content.trim()) {
-                setMarkdownContent(content);
-              } else if (document.texte_extrait) {
-                setMarkdownContent(document.texte_extrait);
+          // For markdown files: use texte_extrait (cleaned content) if available
+          if (document.texte_extrait && document.texte_extrait.trim()) {
+            setMarkdownContent(document.texte_extrait);
+          } else {
+            // Fallback to downloading the file if texte_extrait is not available
+            const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
+            try {
+              const response = await fetch(downloadUrl);
+              if (response.ok) {
+                const content = await response.text();
+                if (content && content.trim()) {
+                  setMarkdownContent(content);
+                }
               }
-            } else if (document.texte_extrait) {
-              // Fallback to texte_extrait if download fails
-              setMarkdownContent(document.texte_extrait);
-            }
-          } catch {
-            // Fallback to texte_extrait on network error
-            if (document.texte_extrait) {
-              setMarkdownContent(document.texte_extrait);
+            } catch (error) {
+              console.error("Error downloading markdown file:", error);
             }
           }
         }
@@ -166,7 +163,9 @@ export function DocumentPreviewPanel({
           )}
           <div className="min-w-0">
             <h3 className="font-semibold text-sm truncate">{document.nom_fichier}</h3>
-            <p className="text-xs text-muted-foreground">Visualisation</p>
+            <p className="text-xs text-muted-foreground truncate" title={document.file_path}>
+              {document.file_path}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">

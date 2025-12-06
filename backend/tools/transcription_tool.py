@@ -41,7 +41,7 @@ async def _find_audio_document(case_id: str, filename: Optional[str] = None) -> 
 
     # Normalize case_id
     if not case_id.startswith("case:"):
-        case_id = f"judgment:{case_id}"
+        case_id = f"case:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
@@ -138,7 +138,7 @@ async def transcribe_audio_streaming(
         # Normalize case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow
@@ -195,7 +195,7 @@ async def transcribe_audio(
     La transcription utilise Whisper (OpenAI) pour la reconnaissance vocale.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
         audio_filename: Nom du fichier audio à transcrire (optionnel - si non spécifié,
                        utilise le premier fichier audio non transcrit du dossier)
         language: Langue de l'audio ("fr" pour français, "en" pour anglais, etc.)
@@ -226,7 +226,7 @@ async def transcribe_audio(
         # Normalize case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow

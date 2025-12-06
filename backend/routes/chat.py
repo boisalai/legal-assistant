@@ -178,7 +178,7 @@ Quand utiliser les outils - RÈGLES IMPORTANTES:
                 # Normalize judgment ID (same pattern as documents.py)
                 case_id = request.case_id
                 if not case_id.startswith("case:"):
-                    case_id = f"judgment:{case_id}"
+                    case_id = f"case:{case_id}"
 
                 logger.info(f"Looking for case with case_id={case_id}")
 

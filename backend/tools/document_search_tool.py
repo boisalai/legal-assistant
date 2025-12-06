@@ -32,7 +32,7 @@ async def _get_case_documents(case_id: str) -> List[dict]:
 
     # Normalize case_id
     if not case_id.startswith("case:"):
-        case_id = f"judgment:{case_id}"
+        case_id = f"case:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
@@ -130,7 +130,7 @@ async def search_documents(
     - "Résume ce document" → utilisez semantic_search
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
         keywords: Mots-clés à rechercher, séparés par des virgules (ex: "contrat, signature, date")
         max_results: Nombre maximum de résultats à retourner par mot-clé (défaut: 10)
 
@@ -231,7 +231,7 @@ async def list_documents(case_id: str) -> str:
     leur type, et s'ils ont du contenu extractible (texte ou transcription).
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
 
     Returns:
         Une liste formatée des documents avec leur statut
@@ -244,7 +244,7 @@ async def list_documents(case_id: str) -> str:
         # Normalize case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Get documents for this case
         docs_result = await service.query(

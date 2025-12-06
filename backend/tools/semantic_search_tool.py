@@ -45,7 +45,7 @@ async def semantic_search(
     - semantic_search: Comprend le sens de la question (ex: "quelles sont les obligations du vendeur ?")
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
         query: La question de l'utilisateur (ex: "qu'est-ce que le notariat ?")
         top_k: Nombre de passages pertinents à retourner (défaut: 5)
 
@@ -62,7 +62,7 @@ async def semantic_search(
         # Normaliser case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         logger.info(f"[semantic_search] Normalized case_id: {case_id}")
 
@@ -181,7 +181,7 @@ async def index_document_tool(
         # Normaliser case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Récupérer le document
         surreal_service = get_surreal_service()
@@ -250,7 +250,7 @@ async def get_index_stats(case_id: str) -> str:
         # Normaliser case_id
         case_id = case_id
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         indexing_service = get_document_indexing_service()
         stats = await indexing_service.get_index_stats(case_id=case_id)
