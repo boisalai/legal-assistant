@@ -43,7 +43,7 @@ class ConversationService:
         try:
             # Normalize case_id
             if not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             message_data = {
                 "case_id": case_id,
@@ -95,7 +95,7 @@ class ConversationService:
         try:
             # Normalize case_id
             if not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             # Query conversation messages
             result = await self.service.query(
@@ -181,7 +181,7 @@ class ConversationService:
         try:
             # Normalize case_id
             if not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             # Delete all messages for this case
             await self.service.query(
@@ -209,7 +209,7 @@ class ConversationService:
         try:
             # Normalize case_id
             if not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             # Query stats
             result = await self.service.query(

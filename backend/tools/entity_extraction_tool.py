@@ -35,7 +35,7 @@ async def _get_document_content(case_id: str, document_name: Optional[str] = Non
 
     # Normalize case_id
     if not case_id.startswith("case:"):
-        case_id = f"judgment:{case_id}"
+        case_id = f"case:{case_id}"
 
     # Get documents for this case
     docs_result = await service.query(
@@ -100,7 +100,7 @@ async def extract_entities(
     les noms de personnes, dates importantes, montants financiers, et références légales.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
         document_name: Nom d'un document spécifique à analyser (optionnel - si non spécifié, analyse tous les documents)
         entity_types: Types d'entités à extraire, séparés par des virgules (défaut: "personnes,dates,montants,références légales")
 
@@ -287,7 +287,7 @@ async def find_entity(
     ou une référence légale spécifique et voir tous les contextes où elle apparaît.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "judgment:1f9fc70e")
+        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
         entity_name: Le nom de l'entité à rechercher (ex: "Jean Dupont", "450000", "Art. 1457")
         entity_type: Type d'entité (défaut: "personne"). Options: personne, date, montant, référence
 

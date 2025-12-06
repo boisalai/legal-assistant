@@ -192,24 +192,49 @@ async def list_documents(
         if not service.db:
             await service.connect()
 
-        # Normalize judgment ID
+        # Normalize case ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
-        # Query documents for this judgment
+        # Query documents for this case
+        # TEMPORARY: Support both "case:" and "judgment:" formats during migration
+        legacy_case_id = case_id.replace("case:", "judgment:")
+
         if include_derived:
             # Include all documents
             result = await service.query(
-                "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
-                {"case_id": case_id}
+                "SELECT * FROM document WHERE case_id IN [$case_id, $legacy_case_id] ORDER BY created_at DESC",
+                {"case_id": case_id, "legacy_case_id": legacy_case_id}
             )
         else:
             # Exclude derived documents (only show source documents)
             # Use "!= true" instead of "= false OR IS NULL" for SurrealDB compatibility
             result = await service.query(
-                "SELECT * FROM document WHERE case_id = $case_id AND is_derived != true ORDER BY created_at DESC",
-                {"case_id": case_id}
+                "SELECT * FROM document WHERE case_id IN [$case_id, $legacy_case_id] AND is_derived != true ORDER BY created_at DESC",
+                {"case_id": case_id, "legacy_case_id": legacy_case_id}
             )
+
+        # Unwrap SurrealDB query result
+        # SurrealDB query() can return results in different formats:
+        # 1. Direct list of documents: [doc1, doc2, doc3]
+        # 2. Wrapped format: [{result: [doc1, doc2, doc3]}]
+        items = []
+        if result and len(result) > 0:
+            first_result = result[0]
+            # Check if it's the wrapped format with "result" key
+            if isinstance(first_result, dict) and "result" in first_result:
+                items = first_result["result"]
+            # Otherwise, assume it's already a direct list of documents
+            elif isinstance(result, list):
+                items = result
+
+        logger.info(f"GET /documents unwrapped result: {len(items)} documents")
+        logger.info(f"Query case_id: {case_id}, legacy_case_id: {legacy_case_id}")
+        logger.info(f"Raw query result: {result}")
+        if items and len(items) > 0:
+            logger.info(f"First 3 documents from unwrapped result:")
+            for doc in items[:3]:
+                logger.info(f"  - {doc.get('nom_fichier')} (case_id: {doc.get('case_id')}, source_type: {doc.get('source_type')})")
 
         documents = []
         missing_files = []
@@ -217,9 +242,7 @@ async def list_documents(
         registered_files = set()  # Track files already in database (by absolute path)
         registered_filenames = set()  # Track filenames already in database (fallback check)
 
-        if result and len(result) > 0:
-            # SurrealDB query() returns a list of results directly
-            items = result
+        if items and len(items) > 0:
             if isinstance(items, list):
                 for item in items:
                     file_path = item.get("file_path", "")
@@ -305,7 +328,7 @@ async def list_documents(
                                     now = datetime.utcnow().isoformat()
 
                                     # Use relative path (consistent with upload endpoint)
-                                    relative_path = f"data/uploads/{case_id.replace('judgment:', '')}/{file_path.name}"
+                                    relative_path = f"data/uploads/{case_id.replace('case:', '')}/{file_path.name}"
 
                                     document_data = {
                                         "case_id": case_id,
@@ -390,9 +413,9 @@ async def upload_document(
         if not service.db:
             await service.connect()
 
-        # Normalize judgment ID
+        # Normalize case ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Generate document ID and save file
         doc_id = str(uuid.uuid4())[:8]
@@ -420,6 +443,7 @@ async def upload_document(
             "file_path": file_path,
             "user_id": user_id,
             "created_at": now,
+            "source_type": "upload",
         }
 
         await service.create("document", document_data, record_id=doc_id)
@@ -487,9 +511,9 @@ async def register_document(
         if not service.db:
             await service.connect()
 
-        # Normalize judgment ID
+        # Normalize case ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Get file info
         file_size = file_path.stat().st_size
@@ -582,7 +606,7 @@ async def link_file_or_folder(
 
         # Normalize case ID (must match GET endpoint normalization)
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Determine if path is file or folder
         files_to_link = []
@@ -670,8 +694,10 @@ async def link_file_or_folder(
                     "indexed": False  # Will be set to True after indexing
                 }
 
-                await service.create("document", document_data, record_id=doc_id)
+                created_doc = await service.create("document", document_data, record_id=doc_id)
                 logger.info(f"Linked file: {file_path.name} -> document:{doc_id}")
+                logger.info(f"Created document in DB: {created_doc}")
+                logger.info(f"Document case_id: {document_data['case_id']}")
 
                 # Index text content if available
                 if texte_extrait:
@@ -684,7 +710,7 @@ async def link_file_or_folder(
                         )
 
                         if result.get("success"):
-                            await service.update(f"document:{doc_id}", {"indexed": True})
+                            await service.merge(f"document:{doc_id}", {"indexed": True})
                             logger.info(f"Indexed document:{doc_id} with {result.get('chunks_created', 0)} chunks")
                     except Exception as e:
                         logger.error(f"Error indexing document:{doc_id}: {e}")
@@ -751,7 +777,7 @@ async def get_derived_documents(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -812,7 +838,7 @@ async def get_document(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -882,7 +908,7 @@ async def delete_document(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -924,7 +950,7 @@ async def delete_document(
                 source_audio_filename = item.get("source_audio")
                 case_id_for_query = item.get("case_id", case_id)
                 if not case_id_for_query.startswith("case:"):
-                    case_id_for_query = f"judgment:{case_id_for_query}"
+                    case_id_for_query = f"case:{case_id_for_query}"
 
                 # Find the source audio document
                 audio_result = await service.query(
@@ -1133,7 +1159,7 @@ async def extract_document_text(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1238,7 +1264,7 @@ async def clear_document_text(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1305,7 +1331,7 @@ async def transcribe_document(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1455,7 +1481,7 @@ async def transcribe_document_workflow(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1627,7 +1653,7 @@ async def extract_pdf_to_markdown(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1971,9 +1997,9 @@ async def download_youtube_audio(
         if not service.db:
             await service.connect()
 
-        # Normalize judgment ID
+        # Normalize case ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Create upload directory for this judgment
         upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
@@ -2003,6 +2029,7 @@ async def download_youtube_audio(
             "file_path": str(file_path.absolute()),
             "user_id": user_id,
             "created_at": now,
+            "source_type": "youtube",
             "source": "youtube",
             "source_url": request.url,
             "metadata": {
@@ -2124,7 +2151,7 @@ async def generate_tts(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -2273,7 +2300,7 @@ async def diagnose_documents(
 
     # Normaliser case_id
     if not case_id.startswith("case:"):
-        case_id = f"judgment:{case_id}"
+        case_id = f"case:{case_id}"
 
     # Récupérer tous les documents de la base de données
     docs_result = await service.query(

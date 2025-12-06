@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
+import { cn } from "@/lib/utils";
 import { UploadModal } from "@/components/cases/upload-modal";
 import {
   AlertDialog,
@@ -37,6 +38,8 @@ import {
   FileDown,
   RefreshCw,
   BookOpen,
+  Link,
+  HardDrive,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -335,6 +338,41 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
+  // Get source type badge info
+  const getSourceBadge = (doc: Document) => {
+    switch (doc.source_type) {
+      case "linked":
+        return {
+          icon: Link,
+          label: "Lié",
+          variant: "secondary" as const,
+          className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+        };
+      case "docusaurus":
+        return {
+          icon: BookOpen,
+          label: "Docusaurus",
+          variant: "secondary" as const,
+          className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+        };
+      case "youtube":
+        return {
+          icon: Youtube,
+          label: "YouTube",
+          variant: "secondary" as const,
+          className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        };
+      case "upload":
+      default:
+        return {
+          icon: HardDrive,
+          label: "Stocké",
+          variant: "outline" as const,
+          className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+        };
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Upload Modal */}
@@ -462,6 +500,8 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
               {documents.map((doc) => {
                 const Icon = getFileIcon(doc.type_fichier, doc.nom_fichier);
                 const typeLabel = getFileTypeLabel(doc.type_fichier, doc.nom_fichier);
+                const sourceBadge = getSourceBadge(doc);
+                const SourceIcon = sourceBadge.icon;
                 return (
                   <div
                     key={doc.id}
@@ -472,8 +512,17 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
                       <Icon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm truncate">{doc.nom_fichier}</p>
+                        {/* Source type badge */}
+                        <div className={cn(
+                          "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors shrink-0",
+                          sourceBadge.className
+                        )}>
+                          <SourceIcon className="h-3 w-3 mr-1" />
+                          {sourceBadge.label}
+                        </div>
+                        {/* Derived files count */}
                         {derivedCounts[doc.id] > 0 && (
                           <Badge variant="secondary" className="text-xs shrink-0">
                             +{derivedCounts[doc.id]}

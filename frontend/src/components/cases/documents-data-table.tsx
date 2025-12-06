@@ -49,6 +49,7 @@ import {
   Mic,
   DatabaseBackup,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Document } from "@/types";
 
 interface DocumentsDataTableProps {
@@ -67,6 +68,18 @@ interface DocumentsDataTableProps {
   isPDFFile: (doc: Document) => boolean;
   isAudioFile: (doc: Document) => boolean;
 }
+
+// Get icon color based on source type
+const getSourceIconColor = (sourceType?: string) => {
+  switch (sourceType) {
+    case "linked":
+      return "text-blue-600 dark:text-blue-400";
+    case "upload":
+      return "text-green-600 dark:text-green-400";
+    default:
+      return "text-muted-foreground";
+  }
+};
 
 export function DocumentsDataTable({
   documents,
@@ -105,10 +118,11 @@ export function DocumentsDataTable({
       cell: ({ row }) => {
         const doc = row.original;
         const Icon = doc.type_fichier?.startsWith("audio/") ? FileAudio : FileText;
+        const iconColor = getSourceIconColor(doc.source_type);
 
         return (
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Icon className={cn("h-4 w-4 shrink-0", iconColor)} />
             <span className="font-medium">{doc.nom_fichier}</span>
             {doc.texte_extrait && (
               <Database className="h-4 w-4 text-muted-foreground shrink-0" title="Indexé" />

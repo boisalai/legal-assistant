@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
   Brain,
+  Database,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";

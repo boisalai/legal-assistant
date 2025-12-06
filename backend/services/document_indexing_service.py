@@ -63,7 +63,7 @@ class DocumentIndexingService:
 
         Args:
             document_id: ID du document (ex: "document:abc123")
-            case_id: ID du dossier (ex: "judgment:xyz")
+            case_id: ID du dossier (ex: "case:xyz")
             text_content: Contenu textuel à indexer
             force_reindex: Si True, supprime les embeddings existants avant de réindexer
 
@@ -75,7 +75,7 @@ class DocumentIndexingService:
             if not document_id.startswith("document:"):
                 document_id = f"document:{document_id}"
             if not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             logger.info(f"Indexing document {document_id} with {len(text_content)} chars")
 
@@ -284,7 +284,7 @@ class DocumentIndexingService:
 
             # Normaliser case_id si fourni
             if case_id and not case_id.startswith("case:"):
-                case_id = f"judgment:{case_id}"
+                case_id = f"case:{case_id}"
 
             # Utiliser l'opérateur vectoriel natif de SurrealDB
             if not self.surreal_service.db:
@@ -403,7 +403,7 @@ class DocumentIndexingService:
 
             if case_id:
                 if not case_id.startswith("case:"):
-                    case_id = f"judgment:{case_id}"
+                    case_id = f"case:{case_id}"
                 query = "SELECT count() AS total, math::max(document_id) AS docs FROM document_embedding WHERE case_id = $case_id GROUP ALL"
                 params = {"case_id": case_id}
             else:

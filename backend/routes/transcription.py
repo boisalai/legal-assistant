@@ -99,7 +99,7 @@ async def transcribe_document(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -226,7 +226,7 @@ async def transcribe_document_workflow(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -454,7 +454,7 @@ async def download_youtube_audio(
 
         # Normalize judgment ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Create upload directory for this judgment
         upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")

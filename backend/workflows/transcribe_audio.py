@@ -11,7 +11,7 @@ Usage:
     workflow = TranscriptionWorkflow(whisper_model="large-v3-turbo")
     result = await workflow.run(
         audio_path="/path/to/audio.mp3",
-        judgment_id="judgment:xxx",
+        judgment_id="case:xxx",
         language="fr"
     )
 """
@@ -326,8 +326,8 @@ Transcription brute:
                 await service.connect()
 
             # Normaliser le judgment_id
-            if not judgment_id.startswith("judgment:"):
-                judgment_id = f"judgment:{judgment_id}"
+            if not judgment_id.startswith("case:"):
+                judgment_id = f"case:{judgment_id}"
 
             # Générer le nom du fichier markdown
             base_name = Path(audio_filename).stem
@@ -339,7 +339,7 @@ Transcription brute:
             else:
                 # Fallback to default upload directory if no audio path
                 from config.settings import settings
-                save_dir = Path(settings.upload_dir) / judgment_id.replace("judgment:", "")
+                save_dir = Path(settings.upload_dir) / judgment_id.replace("case:", "")
                 save_dir.mkdir(parents=True, exist_ok=True)
 
             # Définir le chemin du fichier markdown

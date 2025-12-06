@@ -76,7 +76,7 @@ async def get_case_documents(service, case_id: str) -> list[dict]:
     """Recupere tous les documents d'un dossier."""
     # Normalize ID
     if not case_id.startswith("case:"):
-        case_id = f"judgment:{case_id}"
+        case_id = f"case:{case_id}"
 
     result = await service.query(
         "SELECT * FROM document WHERE case_id = $case_id",
@@ -119,7 +119,7 @@ async def run_analysis_pipeline(
     try:
         # Normaliser l'ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Mettre a jour le statut: en cours
         await service.merge(case_id, {
@@ -341,7 +341,7 @@ async def start_analysis(
 
         # Normaliser l'ID
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Verifier que le dossier existe - importer le helper depuis judgments
         from routes.judgments import get_judgment_by_id
@@ -403,7 +403,7 @@ async def get_analysis_status(
             await service.connect()
 
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Use helper from judgments route
         from routes.judgments import get_judgment_by_id
@@ -469,7 +469,7 @@ async def get_analysis_checklist(
             await service.connect()
 
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
 
         # Chercher le resultat d'analyse le plus recent
         result = await service.query(
