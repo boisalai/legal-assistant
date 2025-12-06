@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cases", tags=["Documents"])
 
-# Reuse auth from judgments
-from routes.judgments import require_auth, get_current_user_id
+# Import auth helpers
+from auth.helpers import require_auth, get_current_user_id
 
 # Allowed file types
 ALLOWED_EXTENSIONS = {

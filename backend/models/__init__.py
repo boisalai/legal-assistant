@@ -1,5 +1,10 @@
 """Models module for Legal Assistant."""
 
+from .document_models import (
+    DocumentResponse,
+    DocumentListResponse,
+    RegisterDocumentRequest,
+)
 from .judgment import (
     CourtLevel,
     Judgment,
@@ -26,6 +31,10 @@ from .summary import (
 )
 
 __all__ = [
+    # Document models
+    "DocumentResponse",
+    "DocumentListResponse",
+    "RegisterDocumentRequest",
     # Judgment models
     "Judgment",
     "JudgmentBase",

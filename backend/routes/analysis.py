@@ -21,21 +21,17 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
-from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
 from config.settings import settings
 from services.surreal_service import get_surreal_service
 from services.document_extraction_service import get_extraction_service
 from services.embedding_service import get_embedding_service
+from auth.helpers import get_current_user_id, require_auth
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
-
-from routes.auth import active_sessions
 
 
 # ============================================================================
@@ -75,37 +71,6 @@ class AnalysisResultResponse(BaseModel):
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-async def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
-    """Get current user ID from token."""
-    if not token:
-        return None
-    return active_sessions.get(token)
-
-
-async def require_auth(token: Optional[str] = Depends(oauth2_scheme)) -> str:
-    """Require authentication (relaxed in debug mode)."""
-    if settings.debug:
-        if not token:
-            return "user:dev_user"
-        user_id = active_sessions.get(token)
-        return user_id or "user:dev_user"
-
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Non authentifie",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    user_id = active_sessions.get(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide ou expire",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user_id
-
 
 async def get_case_documents(service, case_id: str) -> list[dict]:
     """Recupere tous les documents d'un dossier."""
