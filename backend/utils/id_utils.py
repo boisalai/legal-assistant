@@ -8,25 +8,25 @@ pour SurrealDB, que ce soit "case:", "judgment:", ou "document:".
 
 def normalize_case_id(case_id: str) -> str:
     """
-    Normalise un ID de dossier au format SurrealDB "judgment:".
+    Normalise un ID de dossier au format SurrealDB "case:".
 
     Args:
         case_id: ID brut (peut être "case:xxx", "judgment:xxx", ou "xxx")
 
     Returns:
-        ID normalisé au format "judgment:xxx"
+        ID normalisé au format "case:xxx"
 
     Examples:
         >>> normalize_case_id("case:123")
-        'judgment:123'
+        'case:123'
         >>> normalize_case_id("judgment:123")
-        'judgment:123'
+        'case:123'
         >>> normalize_case_id("123")
-        'judgment:123'
+        'case:123'
     """
     # Supprimer les préfixes existants
     clean_id = case_id.replace("case:", "").replace("judgment:", "")
-    return f"judgment:{clean_id}"
+    return f"case:{clean_id}"
 
 
 def normalize_document_id(doc_id: str) -> str:

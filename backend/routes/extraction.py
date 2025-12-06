@@ -62,7 +62,7 @@ async def extract_document_text(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -166,7 +166,7 @@ async def clear_document_text(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -232,7 +232,7 @@ async def extract_pdf_to_markdown(
 
         # Normalize IDs
         if not case_id.startswith("case:"):
-            case_id = f"judgment:{case_id}"
+            case_id = f"case:{case_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 

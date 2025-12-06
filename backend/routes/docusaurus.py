@@ -78,6 +78,40 @@ class ReindexResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
+def remove_frontmatter(content: str) -> str:
+    """
+    Retire le frontmatter YAML (métadonnées Docusaurus) du contenu Markdown.
+
+    Le frontmatter est délimité par --- au début et à la fin.
+    Exemple :
+    ---
+    sidebar_position: 6
+    custom_edit_url: null
+    ---
+
+    Args:
+        content: Contenu du fichier Markdown
+
+    Returns:
+        Contenu sans le frontmatter
+    """
+    lines = content.split('\n')
+
+    # Vérifier si le fichier commence par ---
+    if not lines or not lines[0].strip() == '---':
+        return content
+
+    # Trouver la fin du frontmatter (deuxième ---)
+    for i in range(1, len(lines)):
+        if lines[i].strip() == '---':
+            # Retourner tout après le frontmatter (en sautant la ligne vide éventuelle)
+            remaining = '\n'.join(lines[i+1:])
+            return remaining.lstrip('\n')  # Retirer les lignes vides au début
+
+    # Si pas de deuxième ---, retourner le contenu original
+    return content
+
+
 def calculate_file_hash(file_path: Path) -> str:
     """Calcule le hash SHA-256 d'un fichier."""
     sha256_hash = hashlib.sha256()
@@ -231,7 +265,9 @@ async def import_docusaurus_files(
                     continue
 
                 # Lire le contenu et calculer le hash
-                content = source_file.read_text(encoding='utf-8')
+                raw_content = source_file.read_text(encoding='utf-8')
+                # Retirer le frontmatter YAML (métadonnées Docusaurus)
+                content = remove_frontmatter(raw_content)
                 file_hash = calculate_file_hash(source_file)
                 file_stat = source_file.stat()
 
@@ -289,7 +325,7 @@ async def import_docusaurus_files(
 
                     if result.get("success"):
                         # Marquer comme indexé
-                        await service.update(
+                        await service.merge(
                             f"document:{doc_id}",
                             {"indexed": True}
                         )
@@ -392,7 +428,7 @@ async def check_docusaurus_updates(
 
                     # Mettre à jour needs_reindex
                     docusaurus_source["needs_reindex"] = True
-                    await service.update(doc_id, {
+                    await service.merge(doc_id, {
                         "docusaurus_source": docusaurus_source
                     })
 
@@ -464,7 +500,9 @@ async def reindex_docusaurus_document(
             )
 
         # Lire le nouveau contenu
-        content = source_path.read_text(encoding='utf-8')
+        raw_content = source_path.read_text(encoding='utf-8')
+        # Retirer le frontmatter YAML (métadonnées Docusaurus)
+        content = remove_frontmatter(raw_content)
         new_hash = calculate_file_hash(source_path)
         new_mtime = source_path.stat().st_mtime
         now = datetime.utcnow().isoformat()
@@ -476,7 +514,7 @@ async def reindex_docusaurus_document(
         docusaurus_source["needs_reindex"] = False
 
         # Mettre à jour le document
-        await service.update(doc_id, {
+        await service.merge(doc_id, {
             "texte_extrait": content,
             "docusaurus_source": docusaurus_source,
             "indexed": False  # Sera mis à True après réindexation
@@ -493,7 +531,7 @@ async def reindex_docusaurus_document(
 
         if result.get("success"):
             # Marquer comme indexé
-            await service.update(doc_id, {"indexed": True})
+            await service.merge(doc_id, {"indexed": True})
             logger.info(f"Reindexed {doc_id} with {result.get('chunks_created', 0)} chunks")
 
             return ReindexResponse(

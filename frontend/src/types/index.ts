@@ -47,7 +47,7 @@ export interface Document {
   derivation_type?: "transcription" | "pdf_extraction" | "tts";  // Type of derivation
 
   // Linked and Docusaurus source documents
-  source_type?: "upload" | "linked" | "docusaurus";  // Source type
+  source_type?: "upload" | "linked" | "docusaurus" | "youtube";  // Source type
   linked_source?: {
     absolute_path: string;      // Absolute path to source file
     last_sync: string;          // Last sync timestamp
