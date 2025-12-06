@@ -580,9 +580,9 @@ async def link_file_or_folder(
         if not service.db:
             await service.connect()
 
-        # Normalize case ID
+        # Normalize case ID (must match GET endpoint normalization)
         if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+            case_id = f"judgment:{case_id}"
 
         # Determine if path is file or folder
         files_to_link = []
