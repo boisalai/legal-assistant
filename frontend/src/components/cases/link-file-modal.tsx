@@ -81,7 +81,8 @@ export function LinkFileModal({
         toast.success(`${result.linked_count} fichiers liés avec succès`);
       }
 
-      onLinkComplete();
+      // Wait for the callback to complete before closing
+      await Promise.resolve(onLinkComplete());
       handleClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur lors de la liaison";
