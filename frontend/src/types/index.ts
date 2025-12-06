@@ -46,8 +46,15 @@ export interface Document {
   is_derived?: boolean;         // True if this is a derived file
   derivation_type?: "transcription" | "pdf_extraction" | "tts";  // Type of derivation
 
-  // Docusaurus source documents
-  source_type?: "upload" | "docusaurus";  // Source type
+  // Linked and Docusaurus source documents
+  source_type?: "upload" | "linked" | "docusaurus";  // Source type
+  linked_source?: {
+    absolute_path: string;      // Absolute path to source file
+    last_sync: string;          // Last sync timestamp
+    source_hash: string;        // SHA-256 hash of source
+    source_mtime: number;       // Source file modification time
+    needs_reindex: boolean;     // True if source has changed
+  };
   docusaurus_source?: {
     absolute_path: string;      // Absolute path to source file
     relative_path: string;      // Relative path in Docusaurus

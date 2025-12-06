@@ -32,6 +32,7 @@ export function LinkFileModal({
   const [filePath, setFilePath] = useState("");
   const [isLinking, setIsLinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   // Clean the file path by removing surrounding quotes (single or double)
   const cleanPath = (path: string): string => {
@@ -51,7 +52,7 @@ export function LinkFileModal({
     const cleanedPath = cleanPath(filePath);
 
     if (!cleanedPath) {
-      setError("Veuillez entrer un chemin de fichier");
+      setError("Veuillez entrer un chemin");
       return;
     }
 
@@ -63,14 +64,27 @@ export function LinkFileModal({
 
     setIsLinking(true);
     setError(null);
+    setWarnings([]);
 
     try {
-      await documentsApi.register(caseId, cleanedPath);
-      toast.success("Fichier lié avec succès");
+      const result = await documentsApi.link(caseId, cleanedPath);
+
+      // Display warnings if any
+      if (result.warnings && result.warnings.length > 0) {
+        setWarnings(result.warnings);
+      }
+
+      // Success message
+      if (result.linked_count === 1) {
+        toast.success("Fichier lié avec succès");
+      } else {
+        toast.success(`${result.linked_count} fichiers liés avec succès`);
+      }
+
       onLinkComplete();
       handleClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du lien";
+      const message = err instanceof Error ? err.message : "Erreur lors de la liaison";
       setError(message);
     } finally {
       setIsLinking(false);
@@ -81,6 +95,7 @@ export function LinkFileModal({
     if (!isLinking) {
       setFilePath("");
       setError(null);
+      setWarnings([]);
       onClose();
     }
   };
@@ -97,31 +112,32 @@ export function LinkFileModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Lier un fichier
+            Lier un fichier ou dossier
           </DialogTitle>
           <DialogDescription>
-            Entrez le chemin du fichier. Il ne sera pas copié, seulement référencé.
+            Entrez le chemin d'un fichier ou d'un dossier. Les fichiers ne seront pas copiés, seulement référencés.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="file-path">Chemin du fichier</Label>
+            <Label htmlFor="file-path">Chemin du fichier ou dossier</Label>
             <Input
               id="file-path"
               type="text"
-              placeholder="/Users/nom/Documents/fichier.pdf"
+              placeholder="/Users/nom/Documents/mon-dossier"
               value={filePath}
               onChange={(e) => {
                 setFilePath(e.target.value);
                 setError(null);
+                setWarnings([]);
               }}
               onKeyDown={handleKeyDown}
               disabled={isLinking}
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              Astuce : Dans le Finder, sélectionnez un fichier et faites <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Cmd</kbd>+<kbd className="px-1 py-0.5 bg-muted rounded text-xs">Option</kbd>+<kbd className="px-1 py-0.5 bg-muted rounded text-xs">C</kbd> pour copier son chemin
+              Astuce : Dans le Finder, sélectionnez un fichier/dossier et faites <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Cmd</kbd>+<kbd className="px-1 py-0.5 bg-muted rounded text-xs">Option</kbd>+<kbd className="px-1 py-0.5 bg-muted rounded text-xs">C</kbd> pour copier son chemin
             </p>
           </div>
 
@@ -132,12 +148,31 @@ export function LinkFileModal({
             </div>
           )}
 
-          <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-            <p className="font-medium mb-1">Note importante</p>
-            <p>
-              Le fichier doit rester accessible à son emplacement d'origine.
-              Si vous déplacez ou supprimez le fichier, il ne sera plus disponible dans l'application.
-            </p>
+          {warnings.length > 0 && (
+            <div className="rounded-md bg-orange-50 border border-orange-200 p-3 space-y-1">
+              <p className="text-sm font-medium text-orange-800">Avertissements :</p>
+              {warnings.map((warning, idx) => (
+                <p key={idx} className="text-xs text-orange-700">• {warning}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground space-y-2">
+            <div>
+              <p className="font-medium mb-1">📁 Si vous liez un dossier :</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Seuls les fichiers du dossier direct seront liés (pas les sous-dossiers)</li>
+                <li>Types supportés : .md, .mdx, .pdf, .txt, .docx</li>
+                <li>Limite : 50 fichiers maximum</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1">⚠️ Note importante :</p>
+              <p className="text-xs">
+                Les fichiers doivent rester accessibles à leur emplacement d'origine.
+                Si vous déplacez ou supprimez les fichiers, ils ne seront plus disponibles dans l'application.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -154,7 +189,7 @@ export function LinkFileModal({
             ) : (
               <>
                 <Link2 className="h-4 w-4 mr-2" />
-                Lier le fichier
+                Lier
               </>
             )}
           </Button>
