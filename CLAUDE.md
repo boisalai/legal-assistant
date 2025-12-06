@@ -1,6 +1,6 @@
 # Legal Assistant - Documentation de développement
 
-> **Note:** Historique détaillé des sessions de développement archivé dans `docs/archive/SESSIONS_2025-12.md`
+> **Note:** Historique détaillé des sessions archivé dans `docs/archive/SESSIONS_2025-12.md`
 
 ---
 
@@ -15,15 +15,15 @@
 - 2x plus rapide qu'Ollama sur Apple Silicon (~50-60 tok/s)
 - RAM réduite (~2 GB pour Qwen 2.5 3B)
 - Support complet de function calling
-- Auto-démarrage : Le backend démarre automatiquement le serveur MLX
+- **Auto-démarrage** : Le backend démarre automatiquement le serveur MLX
 - 100% gratuit et local
 
 **Installation :** `uv sync` (installé par défaut)
-**Guides complets :** `backend/MLX_GUIDE.md` et `backend/MLX_AUTO_START.md`
+**Guides :** `backend/MLX_GUIDE.md` et `backend/MLX_AUTO_START.md`
 
 ---
 
-## État actuel du projet
+## État actuel du projet (2025-12-05)
 
 ### Fonctionnalités implémentées
 
@@ -45,9 +45,10 @@
 
 4. **Agent conversationnel**
    - Chat avec streaming SSE
-   - Support multi-providers : Claude (Anthropic), Ollama, MLX
+   - Support multi-providers : **Claude, Ollama, MLX**
    - **Recherche sémantique intégrée** : utilise automatiquement `semantic_search`
    - Mémoire de conversation dans SurrealDB
+   - **Règle de citation des sources** appliquée dans le prompt système
 
 5. **Indexation vectorielle et RAG**
    - Embeddings BGE-M3 via sentence-transformers
@@ -64,22 +65,65 @@
 
 ### Architecture technique
 
-Voir **`ARCHITECTURE.md`** pour la documentation complète :
-- Structure des dossiers
-- Services backend (SurrealDB, Whisper, Model Factory)
-- Patterns Agno (Workflow déclaratif, hybride, avec classe)
-- Routes API
-- Composants frontend
+Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
-### Fichiers clés
+**Nouveaux modules (2025-12-05) :**
+- `backend/auth/helpers.py` - Helpers d'authentification centralisés
+- `backend/utils/id_utils.py` - Normalisation des IDs
+- `backend/utils/file_utils.py` - Utilitaires fichiers
+- `backend/models/document_models.py` - Modèles Pydantic partagés
+- `backend/routes/transcription.py` - Routes transcription (extrait de documents.py)
+- `backend/routes/extraction.py` - Routes extraction (extrait de documents.py)
+- `backend/services/model_server_manager.py` - Orchestration serveurs MLX/vLLM
+- `backend/services/vllm_server_service.py` - Gestion serveur vLLM (conservé pour usage manuel)
 
-| Fichier | Description |
-|---------|-------------|
-| `backend/auth/helpers.py` | **NOUVEAU** - Helpers d'authentification centralisés |
-| `backend/utils/id_utils.py` | **NOUVEAU** - Utilitaires pour normalisation des IDs |
-| `frontend/src/components/cases/documents-data-table.tsx` | DataTable avec filtres et actions |
-| `backend/tools/semantic_search_tool.py` | Outil de recherche sémantique (fix `type::thing()` appliqué) |
-| `backend/routes/chat.py` | Agent conversationnel avec règle de citation des sources |
+---
+
+## Dernière session (2025-12-05) - Fix MLX auto-startup
+
+### Problème identifié
+
+Le serveur MLX ne démarrait pas automatiquement :
+- **Erreur 1** : Commande dépréciée `python -m mlx_lm.server`
+- **Erreur 2** : Timeout de 30s insuffisant pour téléchargement initial du modèle (~2 GB)
+- **Erreur 3** : Paramètre `max_wait` hardcodé à 30s dans `start()` ignorait le `_startup_timeout`
+
+### Corrections appliquées
+
+**1. Commande MLX corrigée** (`mlx_server_service.py:88-94`)
+```python
+# ❌ Avant
+["python3", "-m", "mlx_lm.server", "--model", model_id, ...]
+
+# ✅ Après
+["mlx_lm.server", "--model", model_id, ...]
+```
+
+**2. Timeout augmenté** (`mlx_server_service.py:33`)
+```python
+self._startup_timeout = 120  # 2 minutes (au lieu de 30s)
+```
+
+**3. Paramètre max_wait corrigé** (`mlx_server_service.py:60-73`)
+```python
+async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
+    if max_wait is None:
+        max_wait = self._startup_timeout  # Utilise 120s par défaut
+```
+
+**4. Nettoyage frontend**
+- Suppression de tous les modèles vLLM et HuggingFace de l'interface
+- Ne reste que : **Claude (Anthropic), Ollama, MLX**
+- Raison : vLLM trop lent sur Apple Silicon (CPU only, ~5-10 tok/s)
+
+### État final
+
+✅ **Le serveur MLX démarre maintenant automatiquement** :
+- Au premier lancement : télécharge le modèle (~2 GB, 1-2 minutes)
+- Lancements suivants : quasi-instantané (modèle en cache)
+- Logs informatifs sur la progression du téléchargement
+
+**Commit :** `96b4079` - "refactor: Implement MLX auto-startup and remove vLLM from UI"
 
 ---
 
@@ -88,7 +132,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète :
 ### 🎯 Règle d'or
 
 - **Documents du dossier nécessaires ?** → **Claude Sonnet 4.5**
-- **Conversation simple sans documents (Mac) ?** → **MLX Qwen 2.5 3B** ⭐ (plus rapide)
+- **Conversation simple sans documents (Mac) ?** → **MLX Qwen 2.5 3B** ⭐
 - **Conversation simple sans documents (autre) ?** → **Ollama Qwen 2.5 7B**
 
 ### Claude Sonnet 4.5 - ✅ RECOMMANDÉ POUR RAG
@@ -107,43 +151,42 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète :
 
 **Inconvénients :**
 - Coût par token (API Anthropic)
-- Nécessite une connexion Internet
+- Nécessite connexion Internet
 
-### Ollama Qwen 2.5 7B - ⚠️ CONVERSATIONS SIMPLES UNIQUEMENT
-
-**Utiliser pour :**
-- Conversations générales ("Bonjour", "Merci")
-- Questions sur l'assistant
-- Clarifications
-
-**Avantages :**
-- Gratuit (modèle local)
-- Rapide, fonctionne hors ligne
-
-**Inconvénients :**
-- ❌ **NE SUPPORTE PAS function calling correctement**
-- ❌ **Hallucine du contenu** si on lui demande de résumer des documents
-- ❌ Ne cite pas les sources
-
-### MLX Qwen 2.5 3B - ⭐ NOUVEAU
+### MLX Qwen 2.5 3B - ⭐ RAPIDE SUR MAC
 
 **Utiliser pour :**
 - Conversations générales sur Apple Silicon (M1/M2/M3)
 - Développement et tests rapides
-- Alternative plus rapide qu'Ollama sur Mac
+- Alternative plus rapide qu'Ollama
 
 **Avantages :**
 - Gratuit, très rapide (~50-60 tok/s, 2x plus rapide qu'Ollama)
 - Excellent en français
 - Support complet de function calling
 - RAM réduite (~2 GB)
-- Auto-démarrage par le backend
+- **Auto-démarrage par le backend** ✅
 
 **Inconvénients :**
 - ❌ Apple Silicon uniquement (pas Intel)
 - ⚠️ Qualité légèrement inférieure à Claude pour RAG
 
-**💡 En cas de doute :** Choisissez Claude Sonnet 4.5 pour garantir l'accès aux documents.
+### Ollama Qwen 2.5 7B - ⚠️ CONVERSATIONS SIMPLES
+
+**Utiliser pour :**
+- Conversations générales ("Bonjour", "Merci")
+- Questions sur l'assistant
+- Cross-platform (Mac, Linux, Windows)
+
+**Avantages :**
+- Gratuit, fonctionne hors ligne
+
+**Inconvénients :**
+- ❌ **NE SUPPORTE PAS function calling correctement**
+- ❌ **Hallucine** si on lui demande de résumer des documents
+- ❌ Ne cite pas les sources
+
+💡 **En cas de doute :** Choisissez Claude Sonnet 4.5.
 
 ---
 
@@ -151,11 +194,13 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète :
 
 ### Immédiat
 
-1. **Tester le RAG complet** ✅ PRIORITÉ
-   - Vérifier que l'agent utilise `semantic_search`
-   - Mesurer la qualité des réponses
+1. **Tester MLX auto-startup** ✅ PRIORITÉ
+   - Redémarrer le backend
+   - Sélectionner un modèle MLX dans l'interface
+   - Vérifier que le serveur démarre automatiquement
+   - Observer les logs pour confirmer le téléchargement/démarrage
 
-2. **Ajuster paramètres RAG**
+2. **Ajuster paramètres RAG si nécessaire**
    - `top_k` : Actuellement 5, considérer 7-10
    - `min_similarity` : Actuellement 0.5 (50%)
    - `chunk_size` : Actuellement 400 mots
@@ -163,45 +208,43 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète :
 
 ### Court terme
 
-1. **Améliorer l'agent chat**
+1. **Améliorer l'agent**
    - ✅ FAIT : Recherche sémantique intégrée
    - ✅ FAIT : Mémoire de conversation
-   - ❌ REPORTER : Extraction d'entités juridiques
+   - ✅ FAIT : Citation des sources obligatoire
+   - ❌ À EXPLORER : Extraction d'entités juridiques
 
 2. **UI/UX**
-   - ❌ REPORTER : Progression de transcription en temps réel
+   - ✅ FAIT : DataTable avec filtres
    - ✅ FAIT : Prévisualisation markdown
-   - ✅ FAIT : Historique des conversations (API prête)
+   - ❌ À EXPLORER : Progression de transcription en temps réel
 
 ### Moyen terme
 
-1. **RAG** ✅ FAIT
-   - Indexation avec embeddings BGE-M3
-   - Recherche sémantique fonctionnelle
-
-2. **Multi-agents avec DuckDuckGo** 💡 À EXPLORER
+1. **Multi-agents avec DuckDuckGo** 💡
    - Workflow multi-agents pour documentation automatique
-   - Utiliser `agno.tools.duckduckgo`
+   - Utiliser `agno.tools.duckduckgo` pour recherches Internet
 
-3. **Intégrations externes** 💡 BONNE IDÉE
+2. **Intégrations externes** 💡
    - MCP Server pour CanLII (jurisprudence canadienne)
    - MCP Server pour Légis Québec / LegisInfo
 
-### Refactoring identifié (2025-12-05)
+### Refactoring
 
-**Phase 1 - Quick wins :**
-- ✅ FAIT : Supprimer scripts racine morts (`debug_surreal.py`, `fix_malformed_doc.py`)
-- ✅ FAIT : Extraire auth helpers dans `backend/auth/helpers.py`
-- ✅ FAIT : Créer utilitaire ID normalization dans `backend/utils/id_utils.py`
+**Phase 1 - Quick wins :** ✅ COMPLÉTÉ
+- ✅ Supprimer scripts racine morts
+- ✅ Extraire auth helpers dans `backend/auth/helpers.py`
+- ✅ Créer utilitaires ID dans `backend/utils/id_utils.py`
 
-**Phase 2 - Refactoring majeur :**
-- ❌ À FAIRE : Diviser `documents.py` (2073 lignes) en 3-4 fichiers thématiques
-  - `documents.py` : CRUD de base + TTS
-  - `transcription.py` : Transcription audio + YouTube
-  - `extraction.py` : Extraction PDF/texte
+**Phase 2 - Routes et modèles :** ✅ COMPLÉTÉ
+- ✅ Extraire modèles Pydantic dans `backend/models/document_models.py`
+- ✅ Créer `backend/routes/transcription.py`
+- ✅ Créer `backend/routes/extraction.py`
+- ❌ **À FAIRE** : Simplifier `documents.py` (toujours 2073 lignes)
 
-**Phase 3 - Documentation :**
-- ✅ FAIT : Simplifier CLAUDE.md (archivé sessions dans `docs/archive/SESSIONS_2025-12.md`)
+**Phase 3 - Documentation :** ✅ COMPLÉTÉ
+- ✅ Archiver sessions dans `docs/archive/SESSIONS_2025-12.md`
+- ✅ Nettoyer CLAUDE.md
 
 ---
 
@@ -211,7 +254,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète :
 # Terminal 1: SurrealDB
 surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
 
-# Terminal 2: Backend (démarre auto le serveur MLX si configuré)
+# Terminal 2: Backend (démarre auto MLX si configuré)
 cd backend
 uv run python main.py
 
@@ -226,15 +269,15 @@ npm run dev -- -p 3001
 - SurrealDB : 8002
 - Backend : 8000
 - Frontend : 3001
-- MLX Server : 8080 (OpenAI-compatible API)
+- MLX Server : 8080 (auto-démarré si modèle MLX sélectionné)
 
 **Installation :**
-- `uv sync` installe toutes les dépendances par défaut :
-  - Whisper (mlx-whisper pour transcription audio)
+- `uv sync` installe toutes les dépendances :
+  - Whisper (mlx-whisper)
   - Embeddings (sentence-transformers avec GPU: MPS/CUDA/CPU)
-  - TTS (edge-tts pour synthèse vocale)
-  - Docling (extraction avancée PDF avec OCR)
-  - MLX-LM (modèles HuggingFace via MLX)
+  - TTS (edge-tts)
+  - Docling (extraction PDF avancée avec OCR)
+  - MLX-LM (modèles HuggingFace optimisés Apple Silicon)
 
 **Configuration embeddings :**
 ```python
@@ -252,7 +295,7 @@ DEFAULT_VOICES = {
     "fr": "fr-FR-DeniseNeural",  # Voix féminine française
     "en": "en-CA-ClaraNeural",   # Voix féminine anglaise (Canada)
 }
-# 15 voix disponibles au total
+# 15 voix disponibles
 ```
 
 **Configuration MLX :**
@@ -264,18 +307,13 @@ DEFAULT_VOICES = {
 "mlx-community/Mistral-7B-Instruct-v0.3-4bit" # ~4 GB RAM, ~35 tok/s
 ```
 
-**Logs à surveiller :**
+**Logs MLX à surveiller :**
 ```
-# Embeddings
-MPS (Metal Performance Shaders) detecte - utilisation du GPU Apple Silicon
-Modele BAAI/bge-m3 charge sur mps
-
-# TTS
-Service TTS initialisé avec edge-tts
-Audio généré avec succès: /path/to/file.mp3
-
-# MLX (si configuré)
-MLX server started on http://localhost:8080
+🚀 Démarrage serveur MLX avec mlx-community/Qwen2.5-3B-Instruct-4bit...
+⚠️  Si premier démarrage: téléchargement du modèle (~2-4 GB)
+⏱️  Cela peut prendre 1-2 minutes selon votre connexion...
+⏳ Attente du démarrage du serveur (max 120s)...
+✅ Serveur MLX démarré avec succès en 45.3s
 ```
 
 **Variables d'environnement :**
@@ -285,11 +323,11 @@ MLX server started on http://localhost:8080
 
 ## Conventions
 
-- Backend en Python avec FastAPI et Agno
-- Frontend en TypeScript avec Next.js 14 (App Router) et shadcn/ui
-- Base de données SurrealDB
-- Documentation en français
-- Commits avec message en anglais + footer Claude Code
+- Backend : Python avec FastAPI et Agno
+- Frontend : TypeScript avec Next.js 14 (App Router) et shadcn/ui
+- Base de données : SurrealDB
+- Documentation : Français
+- Commits : Anglais + footer Claude Code
 
 ---
 
@@ -297,4 +335,5 @@ MLX server started on http://localhost:8080
 
 - **Architecture complète** : `ARCHITECTURE.md`
 - **Guide MLX** : `backend/MLX_GUIDE.md` et `backend/MLX_AUTO_START.md`
+- **Guide modèles locaux** : `backend/LOCAL_MODELS_GUIDE.md`
 - **Historique sessions** : `docs/archive/SESSIONS_2025-12.md`
