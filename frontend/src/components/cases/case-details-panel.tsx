@@ -17,6 +17,7 @@ import {
   Loader2,
   Link2,
   RefreshCw,
+  BookOpen,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -32,6 +33,7 @@ import {
 import type { Case, Document, Checklist } from "@/types";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
+import { ImportDocusaurusModal } from "./import-docusaurus-modal";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -83,6 +85,7 @@ export function CaseDetailsPanel({
   const [syncResultDialogOpen, setSyncResultDialogOpen] = useState(false);
   const [syncResultMessage, setSyncResultMessage] = useState("");
   const [syncResultTitle, setSyncResultTitle] = useState("");
+  const [docusaurusModalOpen, setDocusaurusModalOpen] = useState(false);
 
   // Handle synchronize documents
   const handleSyncDocuments = async () => {
@@ -349,6 +352,15 @@ export function CaseDetailsPanel({
             <Mic className="h-4 w-4" />
             <span>Enregistrer un audio</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDocusaurusModalOpen(true)}
+            className="gap-2"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Docusaurus</span>
+          </Button>
         </div>
 
       {/* Liste des documents */}
@@ -513,6 +525,18 @@ export function CaseDetailsPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Docusaurus Modal */}
+      <ImportDocusaurusModal
+        open={docusaurusModalOpen}
+        onOpenChange={setDocusaurusModalOpen}
+        caseId={caseData.id}
+        onImportSuccess={async () => {
+          if (onDocumentsChange) {
+            await onDocumentsChange();
+          }
+        }}
+      />
     </div>
   );
 }
