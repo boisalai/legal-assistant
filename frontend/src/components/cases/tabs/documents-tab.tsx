@@ -36,6 +36,7 @@ import {
   Youtube,
   FileDown,
   RefreshCw,
+  BookOpen,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,7 +51,7 @@ import {
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
-import { DerivedFilesSubmenu } from "@/components/cases/derived-files-submenu";
+import { ImportDocusaurusModal } from "@/components/cases/import-docusaurus-modal";
 
 interface DocumentsTabProps {
   caseId: string;
@@ -69,6 +70,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+  const [docusaurusModalOpen, setDocusaurusModalOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [derivedCounts, setDerivedCounts] = useState<Record<string, number>>({});
 
@@ -351,6 +353,14 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
         onDownloadComplete={onDocumentsChange}
       />
 
+      {/* Import Docusaurus Modal */}
+      <ImportDocusaurusModal
+        open={docusaurusModalOpen}
+        onOpenChange={setDocusaurusModalOpen}
+        caseId={caseId}
+        onImportSuccess={onDocumentsChange}
+      />
+
       {/* Upload Section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -364,6 +374,10 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDocusaurusModalOpen(true)}>
+              <BookOpen className="h-4 w-4 mr-2" />
+              Docusaurus
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setYoutubeModalOpen(true)}>
               <Youtube className="h-4 w-4 mr-2" />
               YouTube
