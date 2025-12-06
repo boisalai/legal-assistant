@@ -131,7 +131,7 @@ except ImportError as e:
 # ROUTES
 # ============================================================
 
-from routes import auth_router, cases_router, documents_router, analysis_router, chat_router
+from routes import auth_router, cases_router, documents_router, analysis_router, chat_router, docusaurus_router
 from routes.settings import router as settings_router
 from routes.transcription import router as transcription_router
 from routes.extraction import router as extraction_router
@@ -146,8 +146,9 @@ app.include_router(analysis_router, tags=["Analysis"])
 app.include_router(chat_router, tags=["Chat"])
 app.include_router(settings_router, tags=["Settings"])
 app.include_router(model_servers_router, tags=["Model Servers"])
+app.include_router(docusaurus_router, tags=["Docusaurus"])
 
-logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers")
+logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
 
 
 # ============================================================

@@ -45,6 +45,28 @@ export interface Document {
   source_document_id?: string;  // ID of the source document if this is derived
   is_derived?: boolean;         // True if this is a derived file
   derivation_type?: "transcription" | "pdf_extraction" | "tts";  // Type of derivation
+
+  // Docusaurus source documents
+  source_type?: "upload" | "docusaurus";  // Source type
+  docusaurus_source?: {
+    absolute_path: string;      // Absolute path to source file
+    relative_path: string;      // Relative path in Docusaurus
+    last_sync: string;          // Last sync timestamp
+    source_hash: string;        // SHA-256 hash of source
+    source_mtime: number;       // Source file modification time
+    needs_reindex: boolean;     // True if source has changed
+  };
+  indexed?: boolean;            // True if indexed for RAG search
+}
+
+// Docusaurus file listing
+export interface DocusaurusFile {
+  absolute_path: string;
+  relative_path: string;
+  filename: string;
+  size: number;
+  modified_time: number;
+  folder: string;
 }
 
 // Extracted data from documents

@@ -63,6 +63,14 @@
    - Génération audio MP3 depuis documents markdown
    - Configuration des voix par défaut dans Settings
 
+7. **Import Docusaurus** ✨ NOUVEAU
+   - Import de fichiers Markdown depuis documentation Docusaurus
+   - Scan automatique du répertoire Docusaurus (`/Users/alain/Workspace/Docusaurus/docs`)
+   - Interface de sélection par dossier avec recherche
+   - Indexation automatique pour RAG
+   - Tracking des mises à jour (hash SHA-256, mtime)
+   - Réindexation à la demande si fichier source modifié
+
 ### Architecture technique
 
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
@@ -71,15 +79,92 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `backend/auth/helpers.py` - Helpers d'authentification centralisés
 - `backend/utils/id_utils.py` - Normalisation des IDs
 - `backend/utils/file_utils.py` - Utilitaires fichiers
-- `backend/models/document_models.py` - Modèles Pydantic partagés
+- `backend/models/document_models.py` - Modèles Pydantic partagés (+ DocusaurusSource)
 - `backend/routes/transcription.py` - Routes transcription (extrait de documents.py)
 - `backend/routes/extraction.py` - Routes extraction (extrait de documents.py)
+- `backend/routes/docusaurus.py` - Routes import Docusaurus ✨ NOUVEAU
 - `backend/services/model_server_manager.py` - Orchestration serveurs MLX/vLLM
 - `backend/services/vllm_server_service.py` - Gestion serveur vLLM (conservé pour usage manuel)
+- `frontend/src/components/cases/import-docusaurus-modal.tsx` - Modal d'import Docusaurus ✨ NOUVEAU
+- `frontend/src/components/ui/scroll-area.tsx` - Composant shadcn/ui ScrollArea ✨ NOUVEAU
 
 ---
 
-## Dernière session (2025-12-05) - Fix MLX auto-startup
+## Dernière session (2025-12-06) - Import Docusaurus 📚
+
+### Fonctionnalité implémentée
+
+Ajout d'une fonctionnalité complète d'import de documentation Docusaurus dans Legal Assistant :
+
+**Backend :**
+- Nouveau router `backend/routes/docusaurus.py` avec 4 endpoints :
+  1. `GET /api/docusaurus/list` - Liste les fichiers `.md` et `.mdx` disponibles
+  2. `POST /api/cases/{case_id}/import-docusaurus` - Importe des fichiers sélectionnés
+  3. `POST /api/cases/{case_id}/check-docusaurus-updates` - Vérifie si les sources ont changé
+  4. `POST /api/documents/{doc_id}/reindex-docusaurus` - Réindexe un document modifié
+- Modèle `DocusaurusSource` ajouté pour tracker les métadonnées (hash, mtime, chemin source)
+- Workflow d'import : Copie → Hash SHA-256 → Stockage → Indexation RAG automatique
+
+**Frontend :**
+- Modal `ImportDocusaurusModal` avec interface de sélection par dossier
+- Recherche en temps réel dans les fichiers
+- Sélection individuelle ou par dossier entier
+- Bouton "Docusaurus" ajouté dans l'onglet Documents
+- Composant `ScrollArea` (shadcn/ui) créé pour le modal
+
+**Détails techniques :**
+- Chemin par défaut : `/Users/alain/Workspace/Docusaurus/docs`
+- Support `.md` et `.mdx`
+- Ignore `node_modules` et dossiers cachés
+- Documents marqués avec `source_type: "docusaurus"`
+- Tracking des mises à jour via `mtime` et hash SHA-256
+
+### État final
+
+✅ **Fonctionnalité complète et prête à tester**
+- Backend : 4 endpoints fonctionnels
+- Frontend : Bouton + Modal intégré dans l'onglet Documents
+- API : `docusaurusApi` dans `lib/api.ts`
+- Types : `DocusaurusFile` et `DocusaurusSource` ajoutés
+
+**Fichiers modifiés :**
+- `backend/main.py` - Ajout du router Docusaurus
+- `backend/routes/__init__.py` - Export du nouveau router
+- `backend/models/document_models.py` - Ajout `DocusaurusSource`
+- `backend/routes/documents.py` - Ajout champs Docusaurus
+- `frontend/src/types/index.ts` - Ajout types Docusaurus
+- `frontend/src/components/cases/tabs/documents-tab.tsx` - Intégration modal
+
+**Nouveaux fichiers :**
+- `backend/routes/docusaurus.py` (519 lignes)
+- `frontend/src/components/cases/import-docusaurus-modal.tsx` (243 lignes)
+- `frontend/src/components/ui/scroll-area.tsx` (49 lignes)
+
+**Package ajouté :**
+- `@radix-ui/react-scroll-area` (dépendance du composant ScrollArea)
+
+### À tester
+
+```bash
+# Terminal 1: SurrealDB
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+
+# Terminal 2: Backend
+cd backend && uv run python main.py
+
+# Terminal 3: Frontend
+cd frontend && npm run dev -- -p 3001
+```
+
+1. Ouvrir un dossier (case)
+2. Cliquer sur "Docusaurus" dans l'onglet Documents
+3. Sélectionner des fichiers à importer
+4. Vérifier qu'ils apparaissent dans la liste des documents
+5. Tester la recherche sémantique avec ces documents
+
+---
+
+## Session précédente (2025-12-05) - Fix MLX auto-startup
 
 ### Problème identifié
 

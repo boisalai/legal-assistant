@@ -1,7 +1,17 @@
 """Modèles Pydantic pour les documents."""
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
+
+
+class DocusaurusSource(BaseModel):
+    """Informations sur la source Docusaurus d'un document."""
+    absolute_path: str  # Chemin absolu vers le fichier source
+    relative_path: str  # Chemin relatif dans la doc Docusaurus
+    last_sync: str  # Timestamp de la dernière synchronisation
+    source_hash: str  # SHA-256 du contenu lors de l'import
+    source_mtime: float  # Timestamp de modification du fichier source
+    needs_reindex: bool = False  # True si le fichier source a changé
 
 
 class DocumentResponse(BaseModel):
@@ -19,6 +29,9 @@ class DocumentResponse(BaseModel):
     source_document_id: Optional[str] = None  # ID of parent document if this is derived
     is_derived: Optional[bool] = None  # True if this is a derived file
     derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
+    source_type: Optional[str] = None  # "upload" or "docusaurus"
+    docusaurus_source: Optional[DocusaurusSource] = None  # Info Docusaurus si applicable
+    indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
 
 
 class DocumentListResponse(BaseModel):

@@ -65,6 +65,9 @@ class DocumentResponse(BaseModel):
     source_document_id: Optional[str] = None  # ID of parent document if this is derived
     is_derived: Optional[bool] = None  # True if this is a derived file
     derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
+    source_type: Optional[str] = None  # "upload" or "docusaurus"
+    docusaurus_source: Optional[dict] = None  # Info Docusaurus si applicable
+    indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
 
 
 class DocumentListResponse(BaseModel):
@@ -197,6 +200,9 @@ async def list_documents(
                         source_document_id=item.get("source_document_id"),
                         is_derived=item.get("is_derived"),
                         derivation_type=item.get("derivation_type"),
+                        source_type=item.get("source_type"),
+                        docusaurus_source=item.get("docusaurus_source"),
+                        indexed=item.get("indexed"),
                     ))
 
         # Auto-remove documents with missing files
