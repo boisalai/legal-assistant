@@ -14,14 +14,14 @@ export function AppShell({ children, noPadding = false }: AppShellProps) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="h-screen max-h-screen overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <div className="flex-1 max-w-sm">
             <ModelSelector variant="header" />
           </div>
         </header>
-        <main className={cn("flex-1 overflow-auto", !noPadding && "p-6")}>
+        <main className={cn("flex-1 min-h-0 overflow-auto", !noPadding && "p-6")}>
           {children}
         </main>
       </SidebarInset>

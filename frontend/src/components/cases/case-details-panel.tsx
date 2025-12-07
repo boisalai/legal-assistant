@@ -259,9 +259,9 @@ export function CaseDetailsPanel({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Case Header */}
-      <div className="p-4 border-b bg-background">
+      <div className="p-4 border-b bg-background shrink-0">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
           {caseData.description && (
@@ -273,7 +273,7 @@ export function CaseDetailsPanel({
       </div>
 
       {/* Contenu principal avec padding */}
-      <div className="px-6 py-2 space-y-4 flex-1">
+      <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
         {/* Mode édition */}
         {isEditing && (
           <div className="space-y-4">
