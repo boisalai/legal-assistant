@@ -279,13 +279,21 @@ async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
 
 ### Immédiat
 
-1. **Tester MLX auto-startup** ✅ PRIORITÉ
+1. **Migration shadcn/ui vers versions officielles** 🎯 PRIORITÉ AVANT FINALISATION
+   - **Objectif** : Migrer tous les composants shadcn/ui vers leurs versions officielles
+   - **Plan détaillé** : Voir `SHADCN_MIGRATION_PLAN.md`
+   - **Composants à migrer** : 24 composants (button, card, dialog, etc.)
+   - **Composants à conserver** : 7 composants personnalisés/utilitaires
+   - **Durée estimée** : 2h20 (avec tests)
+   - **Statut** : ⏳ En attente d'exécution
+
+2. **Tester MLX auto-startup** ✅ COMPLÉTÉ
    - Redémarrer le backend
    - Sélectionner un modèle MLX dans l'interface
    - Vérifier que le serveur démarre automatiquement
    - Observer les logs pour confirmer le téléchargement/démarrage
 
-2. **Ajuster paramètres RAG si nécessaire**
+3. **Ajuster paramètres RAG si nécessaire**
    - `top_k` : Actuellement 5, considérer 7-10
    - `min_similarity` : Actuellement 0.5 (50%)
    - `chunk_size` : Actuellement 400 mots
@@ -413,6 +421,40 @@ DEFAULT_VOICES = {
 - Base de données : SurrealDB
 - Documentation : Français
 - Commits : Anglais + footer Claude Code
+
+### Politique shadcn/ui
+
+**Règle stricte : Utiliser uniquement les versions officielles des composants shadcn/ui sans modification.**
+
+**Composants shadcn/ui officiels (18)** - À maintenir en sync avec les versions officielles :
+- `button`, `card`, `dialog`, `input`, `label`, `select`, `checkbox`, `avatar`, `separator`
+- `collapsible`, `progress`, `slider`, `switch`, `tabs`, `tooltip`, `alert`, `badge`, `table`
+- `textarea`, `skeleton`, `alert-dialog`, `dropdown-menu`, `sheet`, `scroll-area`
+
+**Composants personnalisés autorisés (4)** - Spécifiques au domaine métier :
+- `audio-recorder.tsx` - Enregistrement audio avec visualisation
+- `file-upload.tsx` - Upload drag-and-drop de fichiers
+- `language-selector.tsx` - Sélecteur de locale i18n
+- `markdown.tsx` - Rendu Markdown avec remark-gfm
+
+**Composants utilitaires (3)** - Extensions de shadcn/ui :
+- `sidebar.tsx` - Système de layout complexe (shadcn/ui officiel)
+- `sonner.tsx` - Wrapper Toast avec thème
+- `use-mobile.tsx` - Hook détection mobile
+
+**Procédure de mise à jour** :
+1. Vérifier les nouvelles versions : https://ui.shadcn.com/docs/components
+2. Mettre à jour : `npx shadcn@latest add <component-name>`
+3. Accepter l'écrasement si demandé
+4. Tester l'UI pour détecter les régressions
+5. Commit avec message : `chore(ui): Update <component-name> to latest shadcn/ui version`
+
+**Interdictions** :
+- ❌ Modifier les composants shadcn/ui officiels
+- ❌ Copier/coller du code shadcn/ui sans la CLI
+- ❌ Créer des variantes personnalisées de composants existants
+- ✅ Composer plusieurs composants shadcn/ui pour créer de nouvelles fonctionnalités
+- ✅ Créer des composants métier dans `frontend/src/components/cases/` ou `frontend/src/components/layout/`
 
 ---
 
