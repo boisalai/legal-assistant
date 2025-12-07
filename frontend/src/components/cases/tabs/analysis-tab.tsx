@@ -63,7 +63,7 @@ export function AnalysisTab({ caseId, caseData, documents, onAnalysisComplete }:
   const [showSettings, setShowSettings] = useState(false);
 
   const canAnalyze = documents.length > 0 && (caseData.status === "nouveau" || caseData.status === "pending");
-  const isComplete = ["termine", "summarized", "analyse_complete", "complete", "valide"].includes(caseData.status);
+  const isComplete = caseData.status && ["termine", "summarized", "analyse_complete", "complete", "valide"].includes(caseData.status);
   const isInProgress = caseData.status === "en_analyse" || caseData.status === "analyzing";
 
   const handleStartAnalysis = async () => {
