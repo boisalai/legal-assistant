@@ -73,6 +73,8 @@ function saveLLMConfig(config: LLMConfig): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(LLM_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent("llm-config-changed", { detail: config }));
   } catch (e) {
     console.warn("Failed to save LLM config to localStorage:", e);
   }
