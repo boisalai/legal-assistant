@@ -279,13 +279,14 @@ async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
 
 ### Immédiat
 
-1. **Migration shadcn/ui vers versions officielles** 🎯 PRIORITÉ AVANT FINALISATION
+1. **Migration shadcn/ui vers versions officielles** ✅ COMPLÉTÉ (2025-12-07)
    - **Objectif** : Migrer tous les composants shadcn/ui vers leurs versions officielles
-   - **Plan détaillé** : Voir `SHADCN_MIGRATION_PLAN.md`
-   - **Composants à migrer** : 24 composants (button, card, dialog, etc.)
-   - **Composants à conserver** : 7 composants personnalisés/utilitaires
-   - **Durée estimée** : 2h20 (avec tests)
-   - **Statut** : ⏳ En attente d'exécution
+   - **Résultat** : 24 composants migrés avec succès
+   - **Composants mis à jour** : 9 (alert, badge, card, checkbox, dialog, dropdown-menu, select, skeleton, table)
+   - **Composants déjà à jour** : 15
+   - **Composants personnalisés préservés** : 7 (audio-recorder, file-upload, language-selector, markdown, sidebar, sonner, use-mobile)
+   - **Build production** : ✅ PASSE
+   - **Commit** : `652f409`
 
 2. **Tester MLX auto-startup** ✅ COMPLÉTÉ
    - Redémarrer le backend
