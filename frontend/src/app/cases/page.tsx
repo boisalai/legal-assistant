@@ -119,19 +119,6 @@ export default function CasesListPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <FolderOpen className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dossiers</h1>
-            <p className="text-muted-foreground">
-              {cases.length} dossier{cases.length !== 1 ? "s" : ""} au total
-            </p>
-          </div>
-        </div>
-
         {/* Cases Table */}
         {cases.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
