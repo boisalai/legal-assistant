@@ -1809,6 +1809,7 @@ async def extract_pdf_to_markdown(
                         "source_document_id": doc_id,  # Link to source PDF
                         "is_derived": True,
                         "derivation_type": "pdf_extraction",
+                        "source_type": "upload",
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat(),
                     }
@@ -2238,6 +2239,7 @@ async def generate_tts(
             "source_document_id": doc_id,  # Nouveau champ
             "is_derived": True,
             "derivation_type": "tts",
+            "source_type": "upload",
             "metadata": {
                 "voice": tts_result.voice,
                 "language": tts_result.language,

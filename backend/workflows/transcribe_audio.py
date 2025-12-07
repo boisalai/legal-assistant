@@ -406,6 +406,7 @@ Transcription brute:
                 "source_document_id": source_document_id,  # Nouveau champ
                 "is_derived": True,
                 "derivation_type": "transcription",
+                "source_type": "upload",
                 "extraction_method": f"whisper-{self.whisper_model}",
                 "created_at": now,
                 "metadata": {
