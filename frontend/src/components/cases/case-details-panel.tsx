@@ -265,7 +265,7 @@ export function CaseDetailsPanel({
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
           {caseData.description && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <span>{caseData.description}</span>
             </div>
           )}

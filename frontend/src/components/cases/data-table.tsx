@@ -223,7 +223,7 @@ export function DataTable<TData extends { id: string }, TValue>({
             {selectedIds.length} sur {table.getFilteredRowModel().rows.length} sélectionné(s)
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Lignes par page:</span>
+            <span className="text-sm font-medium text-muted-foreground">Rows per page</span>
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => {
@@ -244,8 +244,8 @@ export function DataTable<TData extends { id: string }, TValue>({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} sur{" "}
+          <div className="text-sm font-medium text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
             {table.getPageCount()}
           </div>
           <div className="flex items-center gap-1">

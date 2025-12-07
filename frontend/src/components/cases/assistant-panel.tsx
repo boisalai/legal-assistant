@@ -9,17 +9,18 @@ import {
   User,
   Loader2,
   AlertCircle,
-  Brain,
+  MoreVertical,
   Database,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
+import { LLMSettingsModal } from "./llm-settings-modal";
 
 // Import SVG logos as React components
 import ClaudeLogo from "@/svg/claude-anthropic.svg";
 import OllamaLogo from "@/svg/ollama.svg";
-import AppleLogo from "@/svg/apple-logo.svg";
+import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
 
 export interface Message {
   role: "user" | "assistant";
@@ -165,6 +166,7 @@ export function AssistantPanel({
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Load config from localStorage on mount (client-side only)
   useEffect(() => {
@@ -217,7 +219,7 @@ export function AssistantPanel({
     } else if (modelId.startsWith("mlx:")) {
       return {
         provider: "mlx",
-        icon: <AppleLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
+        icon: <HuggingFaceLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
         label: "MLX"
       };
     } else {
@@ -398,7 +400,7 @@ export function AssistantPanel({
       <div className="p-4 border-b bg-background flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">Assistant IA</h2>
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             {getProviderInfo(config.model).icon}
             <span>
               {getModelDisplayName(config.model)}
@@ -409,15 +411,10 @@ export function AssistantPanel({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onAnalyze}
-            disabled={isAnalyzing || !hasDocuments}
-            title={hasDocuments ? "Analyser le dossier" : "Ajoutez des documents pour analyser"}
+            onClick={() => setShowSettingsModal(true)}
+            title="Paramètres LLM"
           >
-            {isAnalyzing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Brain className="h-5 w-5" />
-            )}
+            <MoreVertical className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -529,6 +526,17 @@ export function AssistantPanel({
           disabled={isLoading}
         />
       </div>
+
+      {/* LLM Settings Modal */}
+      <LLMSettingsModal
+        open={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        config={config}
+        onConfigChange={(newConfig) => {
+          setConfig(newConfig);
+          saveLLMConfig(newConfig);
+        }}
+      />
     </div>
   );
 }

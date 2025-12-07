@@ -39,15 +39,15 @@ const LLM_MODELS = [
   // === MLX (Apple Silicon) ===
   {
     value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
-    label: "🍎 Qwen 2.5 3B (MLX) - Recommandé Apple Silicon",
+    label: "🤗 Qwen 2.5 3B (MLX) - Recommandé Apple Silicon",
   },
   {
     value: "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
-    label: "🍎 Llama 3.2 3B (MLX) - Ultra-rapide",
+    label: "🤗 Llama 3.2 3B (MLX) - Ultra-rapide",
   },
   {
     value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-    label: "🍎 Mistral 7B (MLX) - Qualité maximale",
+    label: "🤗 Mistral 7B (MLX) - Qualité maximale",
   },
   // === Ollama (Cross-platform) ===
   {
@@ -113,7 +113,7 @@ export function LLMSettingsModal({
         <DialogHeader>
           <DialogTitle>Paramètres LLM</DialogTitle>
           <DialogDescription>
-            Configurez le modèle et les paramètres de génération. 🍎 = MLX (Apple Silicon)
+            Configurez le modèle et les paramètres de génération. 🤗 = MLX (Apple Silicon)
           </DialogDescription>
         </DialogHeader>
 

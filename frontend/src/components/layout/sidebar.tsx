@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { authApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
   FolderOpen,
   MessageSquare,
   FileSearch,
@@ -17,15 +16,20 @@ import {
   Scale,
   HelpCircle,
   MoreVertical,
+  User,
+  CreditCard,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { ModelSelector } from "./model-selector";
 
@@ -37,11 +41,6 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  {
-    titleKey: "nav.dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
   {
     titleKey: "nav.cases",
     href: "/cases",
@@ -131,7 +130,7 @@ export function Sidebar() {
           </button>
         ) : (
           <Link
-            href="/dashboard"
+            href="/cases"
             className="flex items-center gap-2"
           >
             <Scale className="h-6 w-6 text-sidebar-foreground" />
@@ -190,53 +189,44 @@ export function Sidebar() {
         {!collapsed && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent rounded-md transition-colors w-full text-left">
-                {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-sidebar-foreground flex items-center justify-center text-sidebar text-xs font-semibold shrink-0">
-                  {getUserInitials(userName)}
-                </div>
-
-                {/* Name and Email */}
+              <button className="flex items-center gap-3 px-2 py-2 hover:bg-sidebar-accent rounded-md transition-colors w-full text-left">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="" alt={userName} />
+                  <AvatarFallback className="bg-sidebar-foreground text-sidebar text-xs font-medium">
+                    {getUserInitials(userName)}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate text-sidebar-foreground">{userName}</p>
-                  <p className="text-xs text-sidebar-foreground/70 truncate">{userEmail}</p>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">{userEmail}</p>
                 </div>
-
-                {/* More Menu Icon */}
-                <MoreVertical className="h-4 w-4 shrink-0 text-sidebar-foreground/70" />
+                <MoreVertical className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-56">
-              {/* User Info Header */}
-              <div className="flex items-center gap-2 px-2 py-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
-                  {getUserInitials(userName)}
+            <DropdownMenuContent align="end" side="top" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{userName}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{userName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-                </div>
-              </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-
-              {/* Settings */}
               <DropdownMenuItem onClick={() => router.push("/settings")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+                <User className="mr-2 h-4 w-4" />
+                <span>Account</span>
               </DropdownMenuItem>
-
-              {/* Get Help */}
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => window.open("https://docs.example.com", "_blank")}>
-                <HelpCircle className="h-4 w-4 mr-2" />
-                Get Help
+                <HelpCircle className="mr-2 h-4 w-4" />
+                <span>Get Help</span>
               </DropdownMenuItem>
-
               <DropdownMenuSeparator />
-
-              {/* Log out */}
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                <LogOut className="h-4 w-4 mr-2" />
-                Log out
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -247,42 +237,38 @@ export function Sidebar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex justify-center px-2 py-2 hover:bg-sidebar-accent rounded-md transition-colors">
-                <div className="w-8 h-8 rounded-full bg-sidebar-foreground flex items-center justify-center text-sidebar text-xs font-semibold">
-                  {getUserInitials(userName)}
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="" alt={userName} />
+                  <AvatarFallback className="bg-sidebar-foreground text-sidebar text-xs font-medium">
+                    {getUserInitials(userName)}
+                  </AvatarFallback>
+                </Avatar>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="right" className="w-56">
-              {/* User Info Header */}
-              <div className="flex items-center gap-2 px-2 py-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold">
-                  {getUserInitials(userName)}
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{userName}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{userName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-                </div>
-              </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-
-              {/* Settings */}
               <DropdownMenuItem onClick={() => router.push("/settings")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+                <User className="mr-2 h-4 w-4" />
+                <span>Account</span>
               </DropdownMenuItem>
-
-              {/* Get Help */}
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => window.open("https://docs.example.com", "_blank")}>
-                <HelpCircle className="h-4 w-4 mr-2" />
-                Get Help
+                <HelpCircle className="mr-2 h-4 w-4" />
+                <span>Get Help</span>
               </DropdownMenuItem>
-
               <DropdownMenuSeparator />
-
-              {/* Log out */}
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                <LogOut className="h-4 w-4 mr-2" />
-                Log out
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
