@@ -13,10 +13,7 @@ import Image from "next/image";
 // Import SVG logos as React components
 import ClaudeLogo from "@/svg/claude-anthropic.svg";
 import OllamaLogo from "@/svg/ollama.svg";
-import AppleLogo from "@/svg/apple-logo.svg";
-
-// Import PNG logo
-import HuggingFaceLogoPng from "@/svg/hf-logo.png";
+import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
 
 export interface LLMConfig {
   model: string;
@@ -126,7 +123,7 @@ function getProviderIcon(provider: string, inDropdown: boolean = false) {
     case "anthropic":
       return <ClaudeLogo className="h-4 w-4 flex-shrink-0" />;
     case "mlx":
-      return <AppleLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
+      return <HuggingFaceLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
     case "ollama":
     default:
       return <OllamaLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
@@ -147,9 +144,10 @@ function getProviderLabel(provider: string) {
 
 interface ModelSelectorProps {
   collapsed?: boolean;
+  variant?: "sidebar" | "header";
 }
 
-export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
+export function ModelSelector({ collapsed = false, variant = "sidebar" }: ModelSelectorProps) {
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [mounted, setMounted] = useState(false);
 
@@ -175,15 +173,21 @@ export function ModelSelector({ collapsed = false }: ModelSelectorProps) {
     return null; // Don't show when sidebar is collapsed
   }
 
+  const triggerClassName = variant === "header"
+    ? "h-9 w-auto max-w-[280px] bg-background border-input text-foreground hover:bg-accent hover:text-accent-foreground"
+    : "h-auto min-h-[36px] bg-sidebar border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent";
+
+  const containerClassName = variant === "header" ? "" : "px-2 pb-2";
+
   return (
-    <div className="px-2 pb-2">
+    <div className={containerClassName}>
       <Select value={config.model} onValueChange={handleModelChange}>
-        <SelectTrigger className="h-auto min-h-[36px] bg-sidebar border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
+        <SelectTrigger className={triggerClassName}>
           <SelectValue>
             {currentModel && (
               <div className="flex items-center gap-2 py-1">
-                {getProviderIcon(currentModel.provider, false)}
-                <span className="text-xs font-medium">
+                {getProviderIcon(currentModel.provider, variant === "sidebar" ? false : true)}
+                <span className="text-xs font-medium truncate">
                   {currentModel.label}
                 </span>
               </div>
