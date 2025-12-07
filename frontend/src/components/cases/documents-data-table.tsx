@@ -125,7 +125,7 @@ export function DocumentsDataTable({
             <Icon className={cn("h-4 w-4 shrink-0", iconColor)} />
             <span className="font-medium">{doc.nom_fichier}</span>
             {doc.texte_extrait && (
-              <Database className="h-4 w-4 text-muted-foreground shrink-0" title="Indexé" />
+              <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label="Indexé" />
             )}
           </div>
         );
@@ -175,7 +175,7 @@ export function DocumentsDataTable({
       cell: ({ row }) => {
         return (
           <span className="text-sm text-muted-foreground">
-            {new Date(row.original.created_at).toLocaleDateString("fr-CA")}
+            {new Date(row.original.uploaded_at).toLocaleDateString("fr-CA")}
           </span>
         );
       },
