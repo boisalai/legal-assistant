@@ -155,6 +155,17 @@ export function ModelSelector({ collapsed = false, variant = "sidebar" }: ModelS
     setMounted(true);
     const savedConfig = loadLLMConfig();
     setConfig(savedConfig);
+
+    // Listen for config changes from other components
+    const handleConfigChange = (event: CustomEvent<LLMConfig>) => {
+      setConfig(event.detail);
+    };
+
+    window.addEventListener("llm-config-changed", handleConfigChange as EventListener);
+
+    return () => {
+      window.removeEventListener("llm-config-changed", handleConfigChange as EventListener);
+    };
   }, []);
 
   const handleModelChange = (modelId: string) => {

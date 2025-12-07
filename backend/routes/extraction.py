@@ -384,6 +384,7 @@ async def extract_pdf_to_markdown(
                         "source_document_id": doc_id,  # Link to source PDF
                         "is_derived": True,
                         "derivation_type": "pdf_extraction",
+                        "source_type": "upload",
                         "created_at": datetime.utcnow().isoformat(),
                         "updated_at": datetime.utcnow().isoformat(),
                     }
