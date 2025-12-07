@@ -93,7 +93,7 @@ export default function AnalysisPage() {
     if (filter === "all") return true;
     if (filter === "pending") return c.status === "nouveau" || c.status === "pending";
     if (filter === "in_progress") return c.status === "en_analyse" || c.status === "analyzing";
-    if (filter === "completed") return ["termine", "summarized", "archive", "archived"].includes(c.status);
+    if (filter === "completed") return c.status && ["termine", "summarized", "archive", "archived"].includes(c.status);
     return true;
   });
 
@@ -102,7 +102,7 @@ export default function AnalysisPage() {
     total: cases.length,
     pending: cases.filter((c) => c.status === "nouveau" || c.status === "pending").length,
     inProgress: cases.filter((c) => c.status === "en_analyse" || c.status === "analyzing").length,
-    completed: cases.filter((c) => ["termine", "summarized", "archive", "archived"].includes(c.status)).length,
+    completed: cases.filter((c) => c.status && ["termine", "summarized", "archive", "archived"].includes(c.status)).length,
   };
 
   const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
@@ -250,7 +250,7 @@ export default function AnalysisPage() {
             ) : (
               <div className="space-y-2">
                 {filteredCases.map((caseItem) => {
-                  const status = statusConfig[caseItem.status] || statusConfig.nouveau;
+                  const status = (caseItem.status && statusConfig[caseItem.status]) || statusConfig.nouveau;
                   const urlId = caseItem.id.replace("dossier:", "").replace("judgment:", "");
                   const isAnalyzing = analyzing === caseItem.id;
                   const canAnalyze = caseItem.status === "nouveau" || caseItem.status === "pending";
