@@ -13,6 +13,7 @@ import {
   HelpCircle,
   User,
   ChevronUp,
+  Scale,
 } from "lucide-react";
 import {
   Sidebar,
@@ -105,21 +106,7 @@ export function AppSidebar() {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/cases">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="size-4"
-                  >
-                    <path d="M3 3h18v18H3z" />
-                    <path d="M12 3v18" />
-                    <path d="M3 9h18" />
-                    <path d="M3 15h18" />
-                  </svg>
+                  <Scale className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{t("common.appName")}</span>

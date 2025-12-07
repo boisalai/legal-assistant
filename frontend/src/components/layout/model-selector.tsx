@@ -185,7 +185,7 @@ export function ModelSelector({ collapsed = false, variant = "sidebar" }: ModelS
   }
 
   const triggerClassName = variant === "header"
-    ? "h-9 w-auto max-w-[280px] bg-background border-input text-foreground hover:bg-accent hover:text-accent-foreground"
+    ? "h-9 w-auto max-w-[420px] bg-background border-input text-foreground hover:bg-accent hover:text-accent-foreground"
     : "h-auto min-h-[36px] bg-sidebar border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent";
 
   const containerClassName = variant === "header" ? "" : "px-2 pb-2";

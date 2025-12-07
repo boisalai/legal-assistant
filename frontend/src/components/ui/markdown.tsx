@@ -28,14 +28,14 @@ export function Markdown({ content, children, className }: MarkdownProps) {
         ),
         // Style paragraphs
         p: ({ children }) => (
-          <p className="my-2 first:mt-0 last:mb-0 leading-relaxed">{children}</p>
+          <p className="my-1 first:mt-0 last:mb-0 leading-relaxed">{children}</p>
         ),
         // Style lists
         ul: ({ children }) => (
-          <ul className="list-disc list-inside my-3 space-y-1">{children}</ul>
+          <ul className="list-disc my-3 space-y-1 marker:text-current">{children}</ul>
         ),
         ol: ({ children }) => (
-          <ol className="list-decimal list-inside my-3 space-y-1">{children}</ol>
+          <ol className="list-decimal my-3 space-y-1 marker:text-current">{children}</ol>
         ),
         // Style code blocks
         code: ({ className, children, ...props }) => {
