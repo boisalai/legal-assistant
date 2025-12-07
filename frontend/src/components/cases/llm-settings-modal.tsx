@@ -109,7 +109,7 @@ export function LLMSettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-md [&>button]:hidden">
+      <DialogContent className="max-w-2xl [&>button]:hidden">
         <DialogHeader>
           <DialogTitle>Paramètres LLM</DialogTitle>
           <DialogDescription>

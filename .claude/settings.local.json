@@ -30,7 +30,11 @@
       "Bash(wc:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(yes:*)",
+      "Bash(npx shadcn@latest add button:*)",
+      "Bash(npx shadcn@latest add card:*)",
+      "Bash(npx shadcn@latest add:*)"
     ],
     "deny": [],
     "ask": []
