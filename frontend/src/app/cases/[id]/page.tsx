@@ -202,12 +202,12 @@ export default function CaseDetailPage() {
 
   return (
     <AppShell noPadding>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full max-h-full">
         {/* Split View */}
-        <div className="flex-1 overflow-hidden">
-          <PanelGroup direction="horizontal">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PanelGroup direction="horizontal" className="h-full">
             {/* Left Panel: Case Details */}
-            <Panel defaultSize={60} minSize={30}>
+            <Panel defaultSize={60} minSize={30} className="overflow-hidden">
               <CaseDetailsPanel
                 caseData={caseData}
                 documents={documents}
@@ -231,11 +231,11 @@ export default function CaseDetailPage() {
             <PanelResizeHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
 
             {/* Right Panel: Document Preview (top) + AI Assistant (bottom) */}
-            <Panel defaultSize={40} minSize={30}>
+            <Panel defaultSize={40} minSize={30} className="overflow-hidden">
               {previewDocument ? (
-                <PanelGroup direction="vertical">
+                <PanelGroup direction="vertical" className="h-full">
                   {/* Document Preview Panel (top) */}
-                  <Panel defaultSize={50} minSize={20}>
+                  <Panel defaultSize={50} minSize={20} className="overflow-hidden">
                     <DocumentPreviewPanel
                       document={previewDocument}
                       caseId={caseId}
@@ -247,28 +247,32 @@ export default function CaseDetailPage() {
                   <PanelResizeHandle className="h-px bg-border hover:bg-primary/50 transition-colors" />
 
                   {/* AI Assistant Panel (bottom) */}
-                  <Panel defaultSize={50} minSize={20}>
-                    <AssistantPanel
-                      caseId={caseId}
-                      onAnalyze={handleAnalyze}
-                      isAnalyzing={isAnalyzing}
-                      hasDocuments={documents.length > 0}
-                      onDocumentCreated={handleDocumentCreated}
-                      messages={assistantMessages}
-                      setMessages={setAssistantMessages}
-                    />
+                  <Panel defaultSize={50} minSize={20} className="overflow-hidden">
+                    <div className="h-full overflow-hidden">
+                      <AssistantPanel
+                        caseId={caseId}
+                        onAnalyze={handleAnalyze}
+                        isAnalyzing={isAnalyzing}
+                        hasDocuments={documents.length > 0}
+                        onDocumentCreated={handleDocumentCreated}
+                        messages={assistantMessages}
+                        setMessages={setAssistantMessages}
+                      />
+                    </div>
                   </Panel>
                 </PanelGroup>
               ) : (
-                <AssistantPanel
-                  caseId={caseId}
-                  onAnalyze={handleAnalyze}
-                  isAnalyzing={isAnalyzing}
-                  hasDocuments={documents.length > 0}
-                  onDocumentCreated={handleDocumentCreated}
-                  messages={assistantMessages}
-                  setMessages={setAssistantMessages}
-                />
+                <div className="h-full overflow-hidden">
+                  <AssistantPanel
+                    caseId={caseId}
+                    onAnalyze={handleAnalyze}
+                    isAnalyzing={isAnalyzing}
+                    hasDocuments={documents.length > 0}
+                    onDocumentCreated={handleDocumentCreated}
+                    messages={assistantMessages}
+                    setMessages={setAssistantMessages}
+                  />
+                </div>
               )}
             </Panel>
           </PanelGroup>

@@ -384,11 +384,6 @@ export function DocumentsDataTable({
           </TableBody>
         </Table>
       </div>
-
-      {/* Results count */}
-      <div className="text-xs text-muted-foreground">
-        {table.getFilteredRowModel().rows.length} document(s) affiché(s)
-      </div>
     </div>
   );
 }
