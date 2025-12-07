@@ -11,8 +11,14 @@ export interface Case {
   title?: string;             // Title (e.g., "DRT-1001 - Introduction au droit")
   description?: string;       // Description of the case/course
   keywords: string[];         // Keywords
+  status?: string;            // Optional status (legacy field for analysis page)
   created_at: string;
   updated_at?: string;
+  pinned?: boolean;           // Optional pinned flag
+  // Legacy fields for analysis page
+  nom_dossier?: string;       // Deprecated: use title instead
+  type_transaction?: string;  // Deprecated: legacy field
+  score_confiance?: number;   // Deprecated: legacy field
 }
 
 // Document attached to a case

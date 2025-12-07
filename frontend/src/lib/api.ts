@@ -1,7 +1,7 @@
 // API client for Legal Assistant
 // Handles communication with FastAPI backend
 
-import type { Case, CaseSummary, Case, AuthToken, User, Document, AnalysisResult, Checklist } from "@/types";
+import type { Case, AuthToken, User, Document, AnalysisResult, Checklist } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -145,9 +145,9 @@ export const casesApi = {
   },
 
   // Generate summary (case brief) for a judgment
-  async summarize(id: string, modelId?: string): Promise<CaseSummary> {
+  async summarize(id: string, modelId?: string): Promise<any> {
     const cleanId = id.replace("judgment:", "");
-    return fetchApi<CaseSummary>(
+    return fetchApi<any>(
       `/api/cases/${encodeURIComponent(cleanId)}/summarize`,
       {
         method: "POST",
@@ -157,9 +157,9 @@ export const casesApi = {
   },
 
   // Get existing summary for a judgment
-  async getSummary(id: string): Promise<CaseSummary> {
+  async getSummary(id: string): Promise<any> {
     const cleanId = id.replace("judgment:", "");
-    return fetchApi<CaseSummary>(
+    return fetchApi<any>(
       `/api/cases/${encodeURIComponent(cleanId)}/summary`
     );
   },
@@ -962,7 +962,7 @@ export const analysisApi = {
         `/api/analysis/${encodeURIComponent(cleanId)}/checklist`
       );
       return {
-        dossier_id: caseId,
+        case_id: caseId,
         items: response.items.map(item => ({
           titre: item.titre,
           description: item.description || "",
@@ -978,7 +978,7 @@ export const analysisApi = {
     } catch {
       // Fallback si pas d'analyse disponible
       return {
-        dossier_id: caseId,
+        case_id: caseId,
         items: [],
         points_attention: [],
         documents_manquants: [],

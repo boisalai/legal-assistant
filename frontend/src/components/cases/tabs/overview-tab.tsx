@@ -109,7 +109,7 @@ export function OverviewTab({ caseData, documents, checklist }: OverviewTabProps
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <InfoItem icon={User} label="Parties" value="À compléter" />
-              <InfoItem icon={Building} label="Type de propriété" value={caseData.type_transaction} />
+              <InfoItem icon={Building} label="Type de propriété" value={caseData.type_transaction || "À compléter"} />
               <InfoItem icon={MapPin} label="Adresse" value="À extraire" />
               <InfoItem icon={DollarSign} label="Prix de vente" value="À extraire" />
               <InfoItem icon={Calendar} label="Date prévue" value="À déterminer" />

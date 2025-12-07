@@ -114,7 +114,7 @@ export function CaseDetailsPanel({
   const isAudioFile = (doc: Document) => {
     const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
     const audioExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
-    return audioExtensions.includes(ext) || doc.type_mime?.includes("audio");
+    return audioExtensions.includes(ext) || (doc.type_mime?.includes("audio") ?? false);
   };
 
   // Check if document is a PDF file
