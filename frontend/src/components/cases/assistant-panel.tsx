@@ -397,9 +397,9 @@ export function AssistantPanel({
   };
 
   return (
-    <div className="flex flex-col h-full border-l">
+    <div className="flex flex-col h-full border-l overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b bg-background flex items-center justify-between">
+      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">Assistant IA</h2>
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -423,7 +423,7 @@ export function AssistantPanel({
 
       {/* Backend status warning */}
       {checkingBackend && (
-        <div className="p-4 border-b">
+        <div className="p-4 border-b shrink-0">
           <Alert>
             <Loader2 className="h-4 w-4 animate-spin" />
             <AlertDescription>
@@ -433,7 +433,7 @@ export function AssistantPanel({
         </div>
       )}
       {!checkingBackend && !backendConnected && (
-        <div className="p-4 border-b">
+        <div className="p-4 border-b shrink-0">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -444,7 +444,7 @@ export function AssistantPanel({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {messages.map((message, idx) => (
           <div
             key={idx}
@@ -517,16 +517,26 @@ export function AssistantPanel({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t bg-background">
-        <Textarea
-          ref={textareaRef}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Posez une question..."
-          className="min-h-[80px] max-h-[200px] resize-none"
-          disabled={isLoading}
-        />
+      <div className="p-4 border-t bg-background shrink-0">
+        <div className="flex gap-2">
+          <Textarea
+            ref={textareaRef}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Posez une question... (Enter pour envoyer, Shift+Enter pour nouvelle ligne)"
+            className="min-h-[60px] max-h-[120px] resize-none flex-1"
+            disabled={isLoading}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={isLoading || !inputValue.trim()}
+            size="icon"
+            className="h-[60px] w-[60px] shrink-0"
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* LLM Settings Modal */}
