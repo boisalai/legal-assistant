@@ -206,74 +206,51 @@ export default function CaseDetailPage() {
         {/* Split View */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <PanelGroup direction="horizontal" className="h-full">
-            {/* Left Panel: Case Details */}
+            {/* Left Panel: Case Details or Document Preview */}
             <Panel defaultSize={60} minSize={30} className="overflow-hidden">
-              <CaseDetailsPanel
-                caseData={caseData}
-                documents={documents}
-                checklist={checklist}
-                onUploadDocuments={handleUploadDocuments}
-                onRecordAudio={handleRecordAudio}
-                onLinkFile={handleLinkFile}
-                onAnalyze={handleAnalyze}
-                onUpdateCase={handleUpdateCase}
-                onDeleteDocument={handleDeleteDocument}
-                onPreviewDocument={handlePreviewDocument}
-                onDelete={handleDelete}
-                onAnalysisComplete={handleAnalysisComplete}
-                onDocumentsChange={fetchCaseDetails}
-                deleting={deleting}
-                isAnalyzing={isAnalyzing}
-              />
+              {previewDocument ? (
+                <DocumentPreviewPanel
+                  document={previewDocument}
+                  caseId={caseId}
+                  onClose={handleClosePreview}
+                />
+              ) : (
+                <CaseDetailsPanel
+                  caseData={caseData}
+                  documents={documents}
+                  checklist={checklist}
+                  onUploadDocuments={handleUploadDocuments}
+                  onRecordAudio={handleRecordAudio}
+                  onLinkFile={handleLinkFile}
+                  onAnalyze={handleAnalyze}
+                  onUpdateCase={handleUpdateCase}
+                  onDeleteDocument={handleDeleteDocument}
+                  onPreviewDocument={handlePreviewDocument}
+                  onDelete={handleDelete}
+                  onAnalysisComplete={handleAnalysisComplete}
+                  onDocumentsChange={fetchCaseDetails}
+                  deleting={deleting}
+                  isAnalyzing={isAnalyzing}
+                />
+              )}
             </Panel>
 
             {/* Resize Handle */}
             <PanelResizeHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
 
-            {/* Right Panel: Document Preview (top) + AI Assistant (bottom) */}
+            {/* Right Panel: AI Assistant */}
             <Panel defaultSize={40} minSize={30} className="overflow-hidden">
-              {previewDocument ? (
-                <PanelGroup direction="vertical" className="h-full">
-                  {/* Document Preview Panel (top) */}
-                  <Panel defaultSize={50} minSize={20} className="overflow-hidden">
-                    <DocumentPreviewPanel
-                      document={previewDocument}
-                      caseId={caseId}
-                      onClose={handleClosePreview}
-                    />
-                  </Panel>
-
-                  {/* Vertical Resize Handle */}
-                  <PanelResizeHandle className="h-px bg-border hover:bg-primary/50 transition-colors" />
-
-                  {/* AI Assistant Panel (bottom) */}
-                  <Panel defaultSize={50} minSize={20} className="overflow-hidden">
-                    <div className="h-full overflow-hidden">
-                      <AssistantPanel
-                        caseId={caseId}
-                        onAnalyze={handleAnalyze}
-                        isAnalyzing={isAnalyzing}
-                        hasDocuments={documents.length > 0}
-                        onDocumentCreated={handleDocumentCreated}
-                        messages={assistantMessages}
-                        setMessages={setAssistantMessages}
-                      />
-                    </div>
-                  </Panel>
-                </PanelGroup>
-              ) : (
-                <div className="h-full overflow-hidden">
-                  <AssistantPanel
-                    caseId={caseId}
-                    onAnalyze={handleAnalyze}
-                    isAnalyzing={isAnalyzing}
-                    hasDocuments={documents.length > 0}
-                    onDocumentCreated={handleDocumentCreated}
-                    messages={assistantMessages}
-                    setMessages={setAssistantMessages}
-                  />
-                </div>
-              )}
+              <div className="h-full overflow-hidden">
+                <AssistantPanel
+                  caseId={caseId}
+                  onAnalyze={handleAnalyze}
+                  isAnalyzing={isAnalyzing}
+                  hasDocuments={documents.length > 0}
+                  onDocumentCreated={handleDocumentCreated}
+                  messages={assistantMessages}
+                  setMessages={setAssistantMessages}
+                />
+              </div>
             </Panel>
           </PanelGroup>
         </div>

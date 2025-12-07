@@ -30,7 +30,6 @@ export function LanguageSelector() {
             onClick={() => changeLocale(loc)}
             className={locale === loc ? "bg-accent" : ""}
           >
-            <span className="mr-2">{localeFlags[loc]}</span>
             {localeNames[loc]}
           </DropdownMenuItem>
         ))}

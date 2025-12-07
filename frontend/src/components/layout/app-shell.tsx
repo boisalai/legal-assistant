@@ -3,6 +3,7 @@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
 import { ModelSelector } from "./model-selector";
+import { LanguageSelector } from "@/components/ui/language-selector";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -19,6 +20,9 @@ export function AppShell({ children, noPadding = false }: AppShellProps) {
           <SidebarTrigger className="-ml-1" />
           <div className="flex-1 max-w-sm">
             <ModelSelector variant="header" />
+          </div>
+          <div className="ml-auto">
+            <LanguageSelector />
           </div>
         </header>
         <main className={cn("flex-1 min-h-0 overflow-auto", !noPadding && "p-6")}>
