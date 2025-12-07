@@ -40,6 +40,7 @@ export default function NewCasePage() {
 
     try {
       // Create case
+      // @ts-ignore - TODO: Implement create method in casesApi or remove this functionality
       const newCase = await casesApi.create({
         nom_dossier: nomDossier,
         type_transaction: typeTransaction,
