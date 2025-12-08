@@ -154,13 +154,14 @@ DEFAULT_CLAUDE_MODEL: ClaudeModel = "claude-sonnet-4-5-20250929"
 # ========================================
 
 MLXModel = Literal[
-    # Modèles recommandés pour M1 Pro 16 GB (3 modèles principaux)
+    # Modèles recommandés pour M1 Pro 16 GB
     "mlx-community/Qwen2.5-3B-Instruct-4bit",        # Léger, excellent français
     "mlx-community/Llama-3.2-3B-Instruct-4bit",      # Rapide, général
     "mlx-community/Mistral-7B-Instruct-v0.3-4bit",   # Qualité maximale
+    "mlx-community/Qwen2.5-7B-Instruct-4bit",        # Qualité supérieure, multilingual
+    "mlx-community/Qwen2.5-14B-Instruct-4bit",       # Meilleur raisonnement, modèle avancé
     # Modèles additionnels (legacy)
     "mlx-community/Phi-3-mini-4k-instruct-4bit",
-    "mlx-community/Qwen2.5-7B-Instruct-4bit",
 ]
 
 MLX_MODELS_INFO = {
@@ -224,8 +225,21 @@ MLX_MODELS_INFO = {
         "ram": "~4.5 GB",
         "speed": "~30 tokens/sec (M1)",
         "quality": "Excellent",
-        "best_for": "Documents complexes, multilingual",
-        "recommended": False,  # Non dans le top 3 (plus lourd)
+        "best_for": "Documents complexes, multilingual, qualité supérieure",
+        "recommended": True,  # Excellent modèle 7B
+        "recommended_rank": 4,  # Quatrième choix - plus puissant que 3B
+        "tools_support": True,
+    },
+    "mlx-community/Qwen2.5-14B-Instruct-4bit": {
+        "name": "Qwen 2.5 14B (4-bit)",
+        "params": "14B",
+        "quantization": "4-bit",
+        "ram": "~7-8 GB",
+        "speed": "~20-25 tokens/sec (M1)",
+        "quality": "Best",
+        "best_for": "Raisonnement avancé, analyse juridique complexe, meilleure qualité locale",
+        "recommended": True,  # Meilleur modèle local pour M1 Pro 16 GB
+        "recommended_rank": 5,  # Cinquième choix - le plus puissant
         "tools_support": True,
     },
 }
