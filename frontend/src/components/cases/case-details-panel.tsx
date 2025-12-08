@@ -15,7 +15,7 @@ import {
   Check,
   X,
   Loader2,
-  Link2,
+  Folder,
   RefreshCw,
 } from "lucide-react";
 import {
@@ -32,6 +32,7 @@ import {
 import type { Case, Document, Checklist } from "@/types";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
+import { LinkedDirectoriesSection } from "./linked-directories-section";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -338,8 +339,8 @@ export function CaseDetailsPanel({
             onClick={onLinkFile}
             className="gap-2"
           >
-            <Link2 className="h-4 w-4" />
-            <span>Lier un fichier</span>
+            <Folder className="h-4 w-4" />
+            <span>Lier un répertoire</span>
           </Button>
           <Button
             size="sm"
@@ -351,10 +352,49 @@ export function CaseDetailsPanel({
           </Button>
         </div>
 
+      {/* Répertoires liés */}
+      {(() => {
+        const linkedDocs = documents.filter((doc) => doc.source_type === "linked");
+        const docusaurusDocs = documents.filter((doc) => doc.source_type === "docusaurus");
+
+        // Debug: afficher les source_types trouvés
+        console.log("Documents source types:", {
+          linked: linkedDocs.length,
+          docusaurus: docusaurusDocs.length,
+          total: documents.length,
+          allSourceTypes: documents.map(d => d.source_type)
+        });
+
+        console.log("LinkedDirectoriesSection condition check:", {
+          hasLinkedDocs: linkedDocs.length > 0,
+          linkedDocsCount: linkedDocs.length,
+          hasOnDocumentsChange: !!onDocumentsChange,
+          onDocumentsChangeType: typeof onDocumentsChange,
+          willRender: linkedDocs.length > 0 && !!onDocumentsChange
+        });
+
+        if (linkedDocs.length > 0 && onDocumentsChange) {
+          console.log("✅ Rendering LinkedDirectoriesSection with", linkedDocs.length, "documents");
+          return (
+            <div className="mb-4">
+              <LinkedDirectoriesSection
+                caseId={caseData.id}
+                documents={linkedDocs}
+                onDocumentsChange={onDocumentsChange}
+              />
+            </div>
+          );
+        }
+        console.log("❌ NOT rendering LinkedDirectoriesSection");
+        return null;
+      })()}
+
       {/* Liste des documents */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-sm">Documents ({documents.length})</h3>
+          <h3 className="font-semibold text-sm">
+            Documents ({documents.filter((doc) => doc.source_type !== "linked").length})
+          </h3>
           <Button
             variant="outline"
             size="sm"
@@ -374,7 +414,7 @@ export function CaseDetailsPanel({
 
         {/* DataTable with filters */}
         <DocumentsDataTable
-          documents={documents}
+          documents={documents.filter((doc) => doc.source_type !== "linked")}
           onPreview={onPreviewDocument}
           onDelete={(doc) => {
             setDocToDelete(doc);

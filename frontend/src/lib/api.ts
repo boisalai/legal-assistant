@@ -1063,6 +1063,99 @@ export const docusaurusApi = {
 };
 
 // ============================================
+// Linked Directory API
+// ============================================
+
+import type { LinkedDirectoryScanResult, LinkedDirectoryProgressEvent } from "@/types";
+
+export const linkedDirectoryApi = {
+  // Scan a directory and return statistics
+  async scan(directoryPath: string): Promise<LinkedDirectoryScanResult> {
+    return fetchApi<LinkedDirectoryScanResult>("/api/linked-directory/scan", {
+      method: "POST",
+      body: JSON.stringify({ directory_path: directoryPath }),
+    });
+  },
+
+  // Link a directory to a case with SSE progress
+  async link(
+    caseId: string,
+    directoryPath: string,
+    onProgress?: (event: LinkedDirectoryProgressEvent) => void,
+    onComplete?: (result: { success: boolean; total_indexed: number; link_id: string }) => void,
+    onError?: (error: string) => void
+  ): Promise<void> {
+    const cleanId = caseId.replace("case:", "");
+    const url = `${API_BASE_URL}/api/cases/${cleanId}/link-directory`;
+
+    // Build headers
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Add auth token if available
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("auth_token");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ directory_path: directoryPath }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error("Response body is null");
+    }
+
+    let currentEvent = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+            continue;
+          }
+
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+
+            if (currentEvent === "progress" && onProgress) {
+              onProgress(data);
+            } else if (currentEvent === "complete" && onComplete) {
+              onComplete(data);
+            } else if (currentEvent === "error" && onError) {
+              onError(data.error);
+            }
+
+            currentEvent = "";
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+};
+
+// ============================================
 // Export all APIs
 // ============================================
 
@@ -1077,6 +1170,7 @@ export const api = {
   admin: adminApi,
   health: healthApi,
   docusaurus: docusaurusApi,
+  linkedDirectory: linkedDirectoryApi,
 };
 
 export default api;
