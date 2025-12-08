@@ -55,6 +55,7 @@ import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
 import { ImportDocusaurusModal } from "@/components/cases/import-docusaurus-modal";
+import { useActivityTracker } from "@/lib/activity-tracker";
 
 interface DocumentsTabProps {
   caseId: string;
@@ -76,6 +77,9 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const [docusaurusModalOpen, setDocusaurusModalOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [derivedCounts, setDerivedCounts] = useState<Record<string, number>>({});
+
+  // Activity tracking
+  const trackActivity = useActivityTracker(caseId);
 
   // Load derived file counts for all documents
   useEffect(() => {
@@ -106,6 +110,10 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     try {
       for (const file of files) {
         await documentsApi.upload(caseId, file);
+        // Track upload activity
+        trackActivity("upload_document", {
+          document_name: file.name,
+        });
       }
       setFiles([]);
       onDocumentsChange();
@@ -114,7 +122,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     } finally {
       setUploading(false);
     }
-  }, [caseId, files, onDocumentsChange]);
+  }, [caseId, files, onDocumentsChange, trackActivity]);
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
@@ -176,6 +184,13 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const handleTranscribe = async (doc: Document) => {
     setProcessingId(doc.id);
     setProcessingAction("transcribe");
+
+    // Track transcription activity
+    trackActivity("transcribe_audio", {
+      document_id: doc.id,
+      document_name: doc.nom_fichier,
+    });
+
     try {
       await documentsApi.transcribeWithWorkflow(caseId, doc.id, {
         language: "fr",
@@ -213,6 +228,13 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const handleExtractPDF = async (doc: Document) => {
     setProcessingId(doc.id);
     setProcessingAction("extract");
+
+    // Track PDF extraction activity
+    trackActivity("extract_pdf", {
+      document_id: doc.id,
+      document_name: doc.nom_fichier,
+    });
+
     try {
       const result = await documentsApi.extractPDFToMarkdown(caseId, doc.id);
       if (result.success) {
@@ -248,6 +270,13 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const handleConfirmDelete = async () => {
     if (docToDelete) {
       setDeletingId(docToDelete.id);
+
+      // Track deletion activity
+      trackActivity("delete_document", {
+        document_id: docToDelete.id,
+        document_name: docToDelete.nom_fichier,
+      });
+
       try {
         // If document has extracted text, clear it first
         if (docToDelete.texte_extrait) {

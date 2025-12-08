@@ -75,10 +75,6 @@ const LLM_MODELS = [
     value: "anthropic:claude-sonnet-4-20250514",
     label: "Claude Sonnet 4 (Anthropic)",
   },
-  {
-    value: "anthropic:claude-haiku-3-5-20241022",
-    label: "Claude Haiku 3.5 (Anthropic) - Rapide",
-  },
 ];
 
 export function LLMSettingsModal({

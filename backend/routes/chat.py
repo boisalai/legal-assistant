@@ -21,6 +21,7 @@ from services.model_factory import create_model
 from services.surreal_service import get_surreal_service
 from services.conversation_service import get_conversation_service
 from services.model_server_manager import ensure_model_server
+from services.user_activity_service import get_activity_service
 from tools.transcription_tool import transcribe_audio, transcribe_audio_streaming, get_tools_description
 from tools.document_search_tool import search_documents, list_documents
 from tools.entity_extraction_tool import extract_entities, find_entity
@@ -111,6 +112,18 @@ async def chat(request: ChatRequest):
         # Get tools description
         tools_desc = get_tools_description()
 
+        # Get user activity context if we have a case_id
+        activity_context = ""
+        if request.case_id:
+            try:
+                activity_service = get_activity_service()
+                activity_context = await activity_service.get_activity_context(
+                    case_id=request.case_id,
+                    limit=20  # Show last 20 activities for context
+                )
+            except Exception as e:
+                logger.warning(f"Could not get activity context: {e}")
+
         # System prompt
         system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
 
@@ -126,6 +139,8 @@ async def chat(request: ChatRequest):
 - Exemple : "Selon Carter.pdf, l'arrêt Carter c. Canada établit que..."
 - Si plusieurs sources, les citer toutes : "D'après Document1.md et Document2.pdf, ..."
 - NE JAMAIS présenter une information sans citer sa source
+
+{activity_context}
 
 Directives générales:
 - Réponds toujours en français

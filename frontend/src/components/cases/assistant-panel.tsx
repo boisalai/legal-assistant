@@ -10,7 +10,6 @@ import {
   Loader2,
   AlertCircle,
   MoreVertical,
-  Database,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
@@ -114,11 +113,6 @@ const LLM_MODELS = [
     label: "Claude Sonnet 4",
     provider: "anthropic",
   },
-  {
-    value: "anthropic:claude-haiku-3-5-20241022",
-    label: "Claude Haiku 3.5",
-    provider: "anthropic",
-  },
   // MLX models
   {
     value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
@@ -133,6 +127,11 @@ const LLM_MODELS = [
   {
     value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
     label: "MLX Mistral-7B-Instruct-v0.3-4bit",
+    provider: "mlx",
+  },
+  {
+    value: "mlx:mlx-community/Ministral-3-14B-Reasoning-2512-4bit",
+    label: "MLX Ministral-3 14B Reasoning",
     provider: "mlx",
   },
 ];
@@ -471,30 +470,6 @@ export function AssistantPanel({
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 )}
               </div>
-
-              {/* Sources consultées - uniquement pour assistant avec sources */}
-              {message.role === "assistant" && message.sources && message.sources.length > 0 && (
-                <div className="px-3 py-2 bg-muted/50 rounded-md border border-muted text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Database className="h-3.5 w-3.5" />
-                    <span className="font-medium">Sources consultées ({message.sources.length})</span>
-                  </div>
-                  <ul className="space-y-1">
-                    {message.sources.map((source, sidx) => (
-                      <li key={sidx} className="flex items-center gap-2">
-                        <span className="text-muted-foreground/70">•</span>
-                        <span className="flex-1">
-                          {source.name}
-                          {source.is_transcription && " (transcription)"}
-                        </span>
-                        <span className="text-muted-foreground/70">
-                          {source.word_count.toLocaleString()} mots
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
             {message.role === "user" && (
               <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">

@@ -19,6 +19,7 @@ import { chatApi, settingsApi, documentsApi, type ChatMessage as ApiChatMessage,
 import type { Case, Document } from "@/types";
 import { TranscriptionProgress, useTranscriptionProgress } from "../transcription-progress";
 import { useLLMSettings } from "@/hooks/use-llm-settings";
+import { useActivityTracker } from "@/lib/activity-tracker";
 
 interface Message {
   id: string;
@@ -45,6 +46,7 @@ const DEFAULT_MODELS: LLMModel[] = [
   { id: "ollama:qwen2.5:7b", name: "Qwen 2.5 7B (Local)", provider: "Ollama" },
   { id: "ollama:llama3.2", name: "Llama 3.2 (Local)", provider: "Ollama" },
   { id: "anthropic:claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Claude" },
+  { id: "mlx:mlx-community/Ministral-3-14B-Reasoning-2512-4bit", name: "Ministral-3 14B Reasoning (MLX)", provider: "MLX" },
 ];
 
 // Audio file extensions
@@ -99,6 +101,9 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
 
   // Transcription progress hook
   const transcriptionProgress = useTranscriptionProgress();
+
+  // Activity tracking
+  const trackActivity = useActivityTracker(caseData.id);
 
   // Load available models from backend
   const loadModels = useCallback(async () => {
@@ -329,6 +334,11 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       content: input.trim(),
       timestamp: new Date(),
     };
+
+    // Track message activity
+    trackActivity("send_message", {
+      message: userMessage.content.slice(0, 200), // Limit to 200 chars for privacy
+    });
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");

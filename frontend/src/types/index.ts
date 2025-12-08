@@ -241,6 +241,38 @@ export interface AuthToken {
   expires_in: number;
 }
 
+// ============================================
+// User Activity Tracking Types
+// ============================================
+
+export type ActivityType =
+  | "view_case"
+  | "view_document"
+  | "close_document"
+  | "send_message"
+  | "upload_document"
+  | "delete_document"
+  | "link_file"
+  | "transcribe_audio"
+  | "extract_pdf"
+  | "generate_tts"
+  | "search_documents"
+  | "semantic_search";
+
+export interface UserActivity {
+  id: string;
+  case_id: string;
+  action_type: ActivityType;
+  timestamp: string;
+  metadata?: {
+    document_id?: string;
+    document_name?: string;
+    message?: string;
+    query?: string;
+    [key: string]: unknown;
+  };
+}
+
 // Legacy type aliases for backward compatibility
 export type DonneesExtraites = ExtractedData;
 export type DocumentExtrait = ExtractedDocument;

@@ -30,7 +30,8 @@ class MLXServerService:
         self.host = host
         self.process: Optional[subprocess.Popen] = None
         self.current_model: Optional[str] = None
-        self._startup_timeout = 120  # secondes (augmenté pour téléchargement initial)
+        self._startup_timeout = 300  # secondes (5 minutes pour téléchargement initial)
+        self._startup_timeout_14b = 600  # secondes (10 minutes pour modèles 14B+)
 
     def is_running(self) -> bool:
         """Vérifie si le serveur MLX est en cours d'exécution."""
@@ -70,7 +71,12 @@ class MLXServerService:
         """
         # Utiliser le timeout configuré si max_wait n'est pas spécifié
         if max_wait is None:
-            max_wait = self._startup_timeout
+            # Détecter les modèles 14B+ qui nécessitent plus de temps
+            if "14B" in model_id or "14b" in model_id:
+                max_wait = self._startup_timeout_14b
+                logger.info(f"📦 Modèle 14B détecté - Timeout étendu à {max_wait}s (10 minutes)")
+            else:
+                max_wait = self._startup_timeout
         # Si le modèle demandé est déjà en cours, ne rien faire
         if self.is_running() and self.current_model == model_id:
             logger.info(f"✅ Serveur MLX déjà en cours avec {model_id}")
@@ -83,8 +89,14 @@ class MLXServerService:
 
         logger.info(f"🚀 Démarrage serveur MLX avec {model_id}...")
         logger.info(f"   Port: {self.port}")
-        logger.info(f"   ⚠️  Si premier démarrage: téléchargement du modèle (~2-4 GB)")
-        logger.info(f"   ⏱️  Cela peut prendre 1-2 minutes selon votre connexion...")
+
+        # Message adapté selon la taille du modèle
+        if "14B" in model_id or "14b" in model_id:
+            logger.info(f"   ⚠️  Si premier démarrage: téléchargement du modèle (~7-8 GB)")
+            logger.info(f"   ⏱️  Cela peut prendre 5-10 minutes selon votre connexion...")
+        else:
+            logger.info(f"   ⚠️  Si premier démarrage: téléchargement du modèle (~2-4 GB)")
+            logger.info(f"   ⏱️  Cela peut prendre 1-2 minutes selon votre connexion...")
 
         try:
             # Démarrer le serveur MLX en subprocess

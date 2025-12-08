@@ -61,11 +61,6 @@ const LLM_MODELS: ModelInfo[] = [
     label: "Claude Sonnet 4",
     provider: "anthropic",
   },
-  {
-    value: "anthropic:claude-haiku-3-5-20241022",
-    label: "Claude Haiku 3.5",
-    provider: "anthropic",
-  },
   // MLX models
   {
     value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
@@ -80,6 +75,16 @@ const LLM_MODELS: ModelInfo[] = [
   {
     value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
     label: "MLX Mistral-7B-Instruct-v0.3-4bit",
+    provider: "mlx",
+  },
+  {
+    value: "mlx:mlx-community/Qwen2.5-7B-Instruct-4bit",
+    label: "MLX Qwen2.5-7B-Instruct-4bit",
+    provider: "mlx",
+  },
+  {
+    value: "mlx:mlx-community/Qwen2.5-14B-Instruct-4bit",
+    label: "MLX Qwen2.5-14B-Instruct-4bit",
     provider: "mlx",
   },
 ];
