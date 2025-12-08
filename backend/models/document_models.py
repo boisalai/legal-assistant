@@ -29,7 +29,8 @@ class DocumentResponse(BaseModel):
     source_document_id: Optional[str] = None  # ID of parent document if this is derived
     is_derived: Optional[bool] = None  # True if this is a derived file
     derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
-    source_type: Optional[str] = None  # "upload" or "docusaurus"
+    source_type: Optional[str] = None  # "upload", "linked", or "docusaurus"
+    linked_source: Optional[Dict[str, Any]] = None  # Info linked directory si applicable
     docusaurus_source: Optional[DocusaurusSource] = None  # Info Docusaurus si applicable
     indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
 
