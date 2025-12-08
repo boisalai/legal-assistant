@@ -40,6 +40,7 @@ import {
   BookOpen,
   Link,
   HardDrive,
+  Folder,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -55,6 +56,8 @@ import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
 import { ImportDocusaurusModal } from "@/components/cases/import-docusaurus-modal";
+import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
+import { LinkedDirectoriesSection } from "@/components/cases/linked-directories-section";
 import { useActivityTracker } from "@/lib/activity-tracker";
 
 interface DocumentsTabProps {
@@ -75,6 +78,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
   const [docusaurusModalOpen, setDocusaurusModalOpen] = useState(false);
+  const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [derivedCounts, setDerivedCounts] = useState<Record<string, number>>({});
 
@@ -402,6 +406,10 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
     }
   };
 
+  // Filter documents: separate linked documents from others
+  const linkedDocuments = documents.filter((doc) => doc.source_type === "linked");
+  const otherDocuments = documents.filter((doc) => doc.source_type !== "linked");
+
   return (
     <div className="space-y-6">
       {/* Upload Modal */}
@@ -428,6 +436,23 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
         onImportSuccess={onDocumentsChange}
       />
 
+      {/* Link Directory Modal */}
+      <LinkDirectoryModal
+        open={linkDirectoryModalOpen}
+        onOpenChange={setLinkDirectoryModalOpen}
+        caseId={caseId}
+        onLinkSuccess={onDocumentsChange}
+      />
+
+      {/* Linked Directories Section */}
+      {linkedDocuments.length > 0 && (
+        <LinkedDirectoriesSection
+          caseId={caseId}
+          documents={linkedDocuments}
+          onDocumentsChange={onDocumentsChange}
+        />
+      )}
+
       {/* Upload Section */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -441,9 +466,9 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setDocusaurusModalOpen(true)}>
-              <BookOpen className="h-4 w-4 mr-2" />
-              Docusaurus
+            <Button variant="outline" size="sm" onClick={() => setLinkDirectoryModalOpen(true)}>
+              <Folder className="h-4 w-4 mr-2" />
+              Lier un répertoire
             </Button>
             <Button variant="outline" size="sm" onClick={() => setYoutubeModalOpen(true)}>
               <Youtube className="h-4 w-4 mr-2" />
@@ -496,10 +521,10 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
           <div className="space-y-1.5">
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Documents ({documents.length})
+              Documents ({otherDocuments.length})
             </CardTitle>
             <CardDescription>
-              Liste des documents attachés à ce dossier
+              Fichiers uploadés, YouTube et Docusaurus
             </CardDescription>
           </div>
           <Button
@@ -518,7 +543,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
           </Button>
         </CardHeader>
         <CardContent>
-          {documents.length === 0 ? (
+          {otherDocuments.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p>Aucun document pour le moment</p>
@@ -526,7 +551,7 @@ export function DocumentsTab({ caseId, documents, onDocumentsChange, onPreviewDo
             </div>
           ) : (
             <div className="space-y-2">
-              {documents.map((doc) => {
+              {otherDocuments.map((doc) => {
                 const Icon = getFileIcon(doc.type_fichier, doc.nom_fichier);
                 const typeLabel = getFileTypeLabel(doc.type_fichier, doc.nom_fichier);
                 const sourceBadge = getSourceBadge(doc);

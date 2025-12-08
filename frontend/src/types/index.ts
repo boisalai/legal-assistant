@@ -41,6 +41,7 @@ export interface Document {
   use_ocr?: boolean;          // OCR was used
   is_recording?: boolean;     // Is an audio recording
   identify_speakers?: boolean; // Identify speakers in transcription
+  created_at?: string;        // Creation timestamp
 
   // Extraction and transcription
   texte_extrait?: string;     // Extracted text
@@ -56,10 +57,12 @@ export interface Document {
   source_type?: "upload" | "linked" | "docusaurus" | "youtube";  // Source type
   linked_source?: {
     absolute_path: string;      // Absolute path to source file
+    relative_path: string;      // Relative path from base directory
+    parent_folder: string;      // Parent folder path
+    link_id: string;            // Unique ID for this linked directory
     last_sync: string;          // Last sync timestamp
     source_hash: string;        // SHA-256 hash of source
     source_mtime: number;       // Source file modification time
-    needs_reindex: boolean;     // True if source has changed
   };
   docusaurus_source?: {
     absolute_path: string;      // Absolute path to source file
@@ -80,6 +83,33 @@ export interface DocusaurusFile {
   size: number;
   modified_time: number;
   folder: string;
+}
+
+// Linked directory types
+export interface LinkedDirectoryFile {
+  absolute_path: string;
+  relative_path: string;
+  filename: string;
+  size: number;
+  modified_time: number;
+  extension: string;
+  parent_folder: string;
+}
+
+export interface LinkedDirectoryScanResult {
+  base_path: string;
+  total_files: number;
+  total_size: number;
+  files_by_type: Record<string, number>;
+  files: LinkedDirectoryFile[];
+  folder_structure: Record<string, number>;
+}
+
+export interface LinkedDirectoryProgressEvent {
+  indexed: number;
+  total: number;
+  current_file: string;
+  percentage: number;
 }
 
 // Extracted data from documents

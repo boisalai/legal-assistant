@@ -11,7 +11,7 @@ import { AssistantPanel, type Message } from "@/components/cases/assistant-panel
 import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
-import { LinkFileModal } from "@/components/cases/link-file-modal";
+import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { casesApi, documentsApi, analysisApi } from "@/lib/api";
@@ -33,7 +33,7 @@ export default function CaseDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [audioModalOpen, setAudioModalOpen] = useState(false);
-  const [linkFileModalOpen, setLinkFileModalOpen] = useState(false);
+  const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
 
   // Assistant messages - lifted to parent to persist across preview open/close
@@ -104,7 +104,7 @@ export default function CaseDetailPage() {
   };
 
   const handleLinkFile = () => {
-    setLinkFileModalOpen(true);
+    setLinkDirectoryModalOpen(true);
   };
 
   const handleUploadComplete = async () => {
@@ -268,11 +268,11 @@ export default function CaseDetailPage() {
           caseId={caseId}
           onUploadComplete={handleUploadComplete}
         />
-        <LinkFileModal
-          open={linkFileModalOpen}
-          onClose={() => setLinkFileModalOpen(false)}
+        <LinkDirectoryModal
+          open={linkDirectoryModalOpen}
+          onOpenChange={setLinkDirectoryModalOpen}
           caseId={caseId}
-          onLinkComplete={handleUploadComplete}
+          onLinkSuccess={handleUploadComplete}
         />
       </div>
     </AppShell>

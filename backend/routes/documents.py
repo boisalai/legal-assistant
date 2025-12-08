@@ -72,7 +72,8 @@ class DocumentResponse(BaseModel):
     source_document_id: Optional[str] = None  # ID of parent document if this is derived
     is_derived: Optional[bool] = None  # True if this is a derived file
     derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
-    source_type: Optional[str] = None  # "upload" or "docusaurus"
+    source_type: Optional[str] = None  # "upload", "linked", or "docusaurus"
+    linked_source: Optional[dict] = None  # Info linked directory si applicable
     docusaurus_source: Optional[dict] = None  # Info Docusaurus si applicable
     indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
 
@@ -271,7 +272,11 @@ async def list_documents(
                         # Also track by filename as a fallback
                         registered_filenames.add(item.get("nom_fichier", ""))
 
-                    documents.append(DocumentResponse(
+                    linked_source_data = item.get("linked_source")
+                    if linked_source_data:
+                        logger.info(f"🔍 Document {item.get('id')} HAS linked_source: {linked_source_data}")
+
+                    doc_response = DocumentResponse(
                         id=str(item.get("id", "")),
                         case_id=item.get("case_id", case_id),
                         nom_fichier=item.get("nom_fichier", ""),
@@ -286,9 +291,12 @@ async def list_documents(
                         is_derived=item.get("is_derived"),
                         derivation_type=item.get("derivation_type"),
                         source_type=item.get("source_type"),
+                        linked_source=linked_source_data,
                         docusaurus_source=item.get("docusaurus_source"),
                         indexed=item.get("indexed"),
-                    ))
+                    )
+                    logger.info(f"🔍 DocumentResponse created with linked_source={doc_response.linked_source}")
+                    documents.append(doc_response)
 
         # Auto-remove documents with missing files
         if docs_to_remove:
