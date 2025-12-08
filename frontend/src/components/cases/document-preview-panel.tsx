@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Document } from "@/types";
+import { useActivityTracker } from "@/lib/activity-tracker";
 
 interface DocumentPreviewPanelProps {
   document: Document;
@@ -41,6 +42,9 @@ export function DocumentPreviewPanel({
   // Clean IDs for API calls
   const cleanCaseId = caseId.replace("judgment:", "");
   const cleanDocId = document.id.replace("document:", "");
+
+  // Activity tracking
+  const trackActivity = useActivityTracker(caseId);
 
   useEffect(() => {
     const loadDocument = async () => {
@@ -88,7 +92,13 @@ export function DocumentPreviewPanel({
     };
 
     loadDocument();
-  }, [document.id, isPdf, isAudio, isMarkdown, cleanCaseId, cleanDocId, document.texte_extrait]);
+
+    // Track document view
+    trackActivity("view_document", {
+      document_id: document.id,
+      document_name: document.nom_fichier,
+    });
+  }, [document.id, isPdf, isAudio, isMarkdown, cleanCaseId, cleanDocId, document.texte_extrait, trackActivity, document.nom_fichier]);
 
   const handleOpenExternal = () => {
     if (document.file_path) {
@@ -103,6 +113,13 @@ export function DocumentPreviewPanel({
     setGeneratingTTS(true);
     setTtsError(null);
     setTtsAudioUrl(null);
+
+    // Track TTS generation
+    trackActivity("generate_tts", {
+      document_id: document.id,
+      document_name: document.nom_fichier,
+      language,
+    });
 
     try {
       // Get voice from localStorage if not specified
@@ -149,6 +166,15 @@ export function DocumentPreviewPanel({
     } finally {
       setGeneratingTTS(false);
     }
+  };
+
+  const handleClose = () => {
+    // Track document close
+    trackActivity("close_document", {
+      document_id: document.id,
+      document_name: document.nom_fichier,
+    });
+    onClose();
   };
 
   return (
@@ -206,7 +232,7 @@ export function DocumentPreviewPanel({
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={onClose}
+            onClick={handleClose}
             title="Fermer"
           >
             <X className="h-4 w-4" />
