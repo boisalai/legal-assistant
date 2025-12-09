@@ -25,6 +25,7 @@ from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
 from models.document_models import DocumentResponse, DocusaurusSource
 from auth.helpers import require_auth, get_current_user_id
+from utils.text_utils import remove_yaml_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -77,40 +78,6 @@ class ReindexResponse(BaseModel):
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-def remove_frontmatter(content: str) -> str:
-    """
-    Retire le frontmatter YAML (métadonnées Docusaurus) du contenu Markdown.
-
-    Le frontmatter est délimité par --- au début et à la fin.
-    Exemple :
-    ---
-    sidebar_position: 6
-    custom_edit_url: null
-    ---
-
-    Args:
-        content: Contenu du fichier Markdown
-
-    Returns:
-        Contenu sans le frontmatter
-    """
-    lines = content.split('\n')
-
-    # Vérifier si le fichier commence par ---
-    if not lines or not lines[0].strip() == '---':
-        return content
-
-    # Trouver la fin du frontmatter (deuxième ---)
-    for i in range(1, len(lines)):
-        if lines[i].strip() == '---':
-            # Retourner tout après le frontmatter (en sautant la ligne vide éventuelle)
-            remaining = '\n'.join(lines[i+1:])
-            return remaining.lstrip('\n')  # Retirer les lignes vides au début
-
-    # Si pas de deuxième ---, retourner le contenu original
-    return content
-
 
 def calculate_file_hash(file_path: Path) -> str:
     """Calcule le hash SHA-256 d'un fichier."""
@@ -267,7 +234,7 @@ async def import_docusaurus_files(
                 # Lire le contenu et calculer le hash
                 raw_content = source_file.read_text(encoding='utf-8')
                 # Retirer le frontmatter YAML (métadonnées Docusaurus)
-                content = remove_frontmatter(raw_content)
+                content = remove_yaml_frontmatter(raw_content)
                 file_hash = calculate_file_hash(source_file)
                 file_stat = source_file.stat()
 

@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from config.settings import settings
 from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
+from utils.text_utils import remove_yaml_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -683,6 +684,9 @@ async def link_file_or_folder(
                 if ext in {'.md', '.mdx', '.txt'}:
                     try:
                         texte_extrait = file_path.read_text(encoding='utf-8')
+                        # Remove YAML frontmatter from markdown files
+                        if ext in {'.md', '.mdx'}:
+                            texte_extrait = remove_yaml_frontmatter(texte_extrait)
                     except Exception as e:
                         logger.warning(f"Could not read text from {file_path}: {e}")
 

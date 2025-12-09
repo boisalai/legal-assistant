@@ -137,8 +137,7 @@ export default function CaseDetailPage() {
 
   const handleUpdateCase = async (data: { description?: string; type_transaction?: string }) => {
     try {
-      // @ts-ignore - TODO: Implement update method in casesApi or remove this functionality
-      const updated = await casesApi.update(caseId, data as any);
+      const updated = await casesApi.update(caseId, data);
       setCaseData(updated);
       toast.success("Dossier mis à jour avec succès");
     } catch (err) {
@@ -259,7 +258,39 @@ export default function CaseDetailPage() {
                     <DirectoryTreeView
                       documents={previewDirectory.documents}
                       basePath={previewDirectory.basePath}
+                      caseId={caseId}
                       onPreviewDocument={handlePreviewDocument}
+                      onExtractPDF={async (doc) => {
+                        try {
+                          toast.info("Extraction en cours...");
+                          const result = await documentsApi.extractPDFToMarkdown(caseId, doc.id);
+                          if (result.success) {
+                            toast.success("Markdown créé avec succès");
+                            await fetchCaseDetails();
+                          } else {
+                            toast.error(result.error || "Erreur lors de l'extraction");
+                          }
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Erreur lors de l'extraction");
+                        }
+                      }}
+                      onTranscribe={async (doc) => {
+                        try {
+                          toast.info("Transcription en cours...");
+                          const result = await documentsApi.transcribeWithWorkflow(caseId, doc.id, {
+                            language: "fr",
+                            createMarkdown: true,
+                          });
+                          if (result.success) {
+                            toast.success("Transcription terminée");
+                            await fetchCaseDetails();
+                          } else {
+                            toast.error(result.error || "Erreur lors de la transcription");
+                          }
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Erreur lors de la transcription");
+                        }
+                      }}
                     />
                   </div>
                 </div>

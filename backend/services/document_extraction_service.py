@@ -15,6 +15,8 @@ from typing import Optional
 from dataclasses import dataclass, field
 import mimetypes
 
+from utils.text_utils import remove_yaml_frontmatter
+
 logger = logging.getLogger(__name__)
 
 
@@ -479,7 +481,9 @@ class DocumentExtractionService:
     async def _extract_markdown(self, file_path: Path) -> ExtractionResult:
         """Extrait le texte d'un fichier Markdown."""
         result = await self._extract_text(file_path)
-        if result.success:
+        if result.success and result.text:
+            # Remove YAML frontmatter (Docusaurus metadata, etc.)
+            result.text = remove_yaml_frontmatter(result.text)
             result.extraction_method = "markdown"
         return result
 

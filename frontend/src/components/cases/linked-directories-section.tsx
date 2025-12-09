@@ -23,7 +23,7 @@ interface LinkedDirectoriesSectionProps {
   caseId: string;
   documents: Document[];
   onDocumentsChange: () => void;
-  onPreviewDirectory: (directory: LinkedDirectory) => void;
+  onPreviewDirectory?: (directory: LinkedDirectory) => void;
 }
 
 export function LinkedDirectoriesSection({
@@ -94,7 +94,7 @@ export function LinkedDirectoriesSection({
 
   // View directory tree
   const handleViewTree = (directory: LinkedDirectory) => {
-    onPreviewDirectory(directory);
+    onPreviewDirectory?.(directory);
   };
 
   // Handle unlink click (opens confirmation dialog)

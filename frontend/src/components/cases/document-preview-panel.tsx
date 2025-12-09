@@ -46,6 +46,32 @@ export function DocumentPreviewPanel({
   // Activity tracking
   const trackActivity = useActivityTracker(caseId);
 
+  // Remove YAML frontmatter from markdown content
+  const removeFrontmatter = (content: string): string => {
+    // Check if content starts with ---
+    if (!content.startsWith("---")) {
+      return content;
+    }
+
+    // Find the closing ---
+    const lines = content.split("\n");
+    let endIndex = -1;
+
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === "---") {
+        endIndex = i;
+        break;
+      }
+    }
+
+    // If we found the closing ---, remove everything up to and including that line
+    if (endIndex > 0) {
+      return lines.slice(endIndex + 1).join("\n").trim();
+    }
+
+    return content;
+  };
+
   useEffect(() => {
     const loadDocument = async () => {
       setLoading(true);
@@ -67,7 +93,8 @@ export function DocumentPreviewPanel({
         } else if (isMarkdown) {
           // For markdown files: use texte_extrait (cleaned content) if available
           if (document.texte_extrait && document.texte_extrait.trim()) {
-            setMarkdownContent(document.texte_extrait);
+            const cleanedContent = removeFrontmatter(document.texte_extrait);
+            setMarkdownContent(cleanedContent);
           } else {
             // Fallback to downloading the file if texte_extrait is not available
             const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
@@ -76,7 +103,8 @@ export function DocumentPreviewPanel({
               if (response.ok) {
                 const content = await response.text();
                 if (content && content.trim()) {
-                  setMarkdownContent(content);
+                  const cleanedContent = removeFrontmatter(content);
+                  setMarkdownContent(cleanedContent);
                 }
               }
             } catch (error) {
@@ -180,21 +208,21 @@ export function DocumentPreviewPanel({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-        <div className="flex items-center gap-2 min-w-0">
-          {isAudio ? (
-            <Music className="h-5 w-5 text-purple-500 flex-shrink-0" />
-          ) : (
-            <FileText className="h-5 w-5 text-blue-500 flex-shrink-0" />
-          )}
-          <div className="min-w-0">
-            <h3 className="font-semibold text-sm truncate">{document.nom_fichier}</h3>
-            <p className="text-xs text-muted-foreground truncate" title={document.file_path}>
+      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <h2 className="text-xl font-bold truncate">{document.nom_fichier}</h2>
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            {isAudio ? (
+              <Music className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <FileText className="h-4 w-4 flex-shrink-0" />
+            )}
+            <span className="truncate" title={document.file_path}>
               {document.file_path}
-            </p>
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0 ml-4">
           {/* TTS Button - Only show if document has extracted text */}
           {document.texte_extrait && !isAudio && (
             <DropdownMenu>
