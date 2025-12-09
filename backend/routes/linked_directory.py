@@ -11,6 +11,7 @@ import logging
 import hashlib
 import os
 import uuid
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -82,6 +83,29 @@ class LinkedDirectoryMetadata(BaseModel):
 # ============================================================================
 
 SUPPORTED_EXTENSIONS = {".md", ".mdx", ".pdf", ".txt", ".docx", ".doc"}
+
+
+def normalize_linked_source(linked_source) -> dict:
+    """
+    Normalise linked_source qui peut être une chaîne JSON ou un dict.
+
+    Args:
+        linked_source: Peut être un dict, une chaîne JSON, ou None
+
+    Returns:
+        Un dictionnaire Python
+    """
+    if linked_source is None:
+        return {}
+    if isinstance(linked_source, str):
+        try:
+            return json.loads(linked_source)
+        except json.JSONDecodeError:
+            logger.warning(f"Impossible de parser linked_source: {linked_source}")
+            return {}
+    if isinstance(linked_source, dict):
+        return linked_source
+    return {}
 
 
 def calculate_file_hash(file_path: Path) -> str:
@@ -439,7 +463,8 @@ async def sync_linked_directories_endpoint(
             AND linked_source IS NOT NONE
         """
         result = await service.db.query(query, {"case_id": case_id})
-        linked_docs = result[0] if result else []
+        # Note: result est directement la liste de documents, pas result[0]
+        linked_docs = result if result else []
 
         if not linked_docs:
             return {
@@ -453,7 +478,8 @@ async def sync_linked_directories_endpoint(
         # Grouper par link_id
         by_link_id = defaultdict(list)
         for doc in linked_docs:
-            link_id = doc.get("linked_source", {}).get("link_id")
+            linked_source = normalize_linked_source(doc.get("linked_source"))
+            link_id = linked_source.get("link_id")
             if link_id:
                 by_link_id[link_id].append(doc)
 
@@ -469,7 +495,8 @@ async def sync_linked_directories_endpoint(
         # Pour chaque répertoire lié
         for link_id, docs in by_link_id.items():
             # Obtenir le chemin de base depuis le premier document
-            base_path = docs[0].get("linked_source", {}).get("absolute_path", "")
+            first_doc_linked_source = normalize_linked_source(docs[0].get("linked_source"))
+            base_path = first_doc_linked_source.get("absolute_path", "")
             if not base_path:
                 logger.warning(f"Chemin de base introuvable pour link_id {link_id}")
                 continue
@@ -571,8 +598,9 @@ async def sync_linked_directories_endpoint(
                 else:
                     # Fichier existant - vérifier s'il a été modifié
                     existing_doc = existing_files[file_path]
-                    old_hash = existing_doc.get("linked_source", {}).get("source_hash", "")
-                    old_mtime = existing_doc.get("linked_source", {}).get("source_mtime", 0)
+                    existing_linked_source = normalize_linked_source(existing_doc.get("linked_source"))
+                    old_hash = existing_linked_source.get("source_hash", "")
+                    old_mtime = existing_linked_source.get("source_mtime", 0)
 
                     # Calculer le nouveau hash
                     new_hash = calculate_file_hash(source_file)
@@ -633,6 +661,7 @@ async def sync_linked_directories_endpoint(
 
     except Exception as e:
         logger.error(f"Erreur lors de la synchronisation des répertoires liés: {e}")
+        logger.error(f"Traceback complet:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
