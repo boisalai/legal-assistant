@@ -288,11 +288,11 @@ export function CaseDetailsPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Case Header */}
-      <div className="p-4 border-b bg-background shrink-0">
+      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
           {caseData.description && (
-            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <span>{caseData.description}</span>
             </div>
           )}

@@ -133,7 +133,7 @@ export function LinkedDirectoriesDataTable({
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
                 return (
-                  <TableHead key={header.id} className="font-bold text-foreground">
+                  <TableHead key={header.id} className="bg-blue-50 font-bold text-black">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
