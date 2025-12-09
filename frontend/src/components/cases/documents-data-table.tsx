@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/select";
 import {
   FileText,
-  FileAudio,
   Eye,
   Trash2,
   MoreVertical,
@@ -49,7 +48,6 @@ import {
   Mic,
   DatabaseBackup,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { Document } from "@/types";
 
 interface DocumentsDataTableProps {
@@ -68,18 +66,6 @@ interface DocumentsDataTableProps {
   isPDFFile: (doc: Document) => boolean;
   isAudioFile: (doc: Document) => boolean;
 }
-
-// Get icon color based on source type
-const getSourceIconColor = (sourceType?: string) => {
-  switch (sourceType) {
-    case "linked":
-      return "text-blue-600 dark:text-blue-400";
-    case "upload":
-      return "text-green-600 dark:text-green-400";
-    default:
-      return "text-muted-foreground";
-  }
-};
 
 export function DocumentsDataTable({
   documents,
@@ -117,12 +103,9 @@ export function DocumentsDataTable({
       },
       cell: ({ row }) => {
         const doc = row.original;
-        const Icon = doc.type_fichier?.startsWith("audio/") ? FileAudio : FileText;
-        const iconColor = getSourceIconColor(doc.source_type);
 
         return (
           <div className="flex items-center gap-2">
-            <Icon className={cn("h-4 w-4 shrink-0", iconColor)} />
             <span className="font-medium">{doc.nom_fichier}</span>
             {doc.texte_extrait && (
               <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label="Indexé" />
@@ -133,7 +116,17 @@ export function DocumentsDataTable({
     },
     {
       accessorKey: "is_derived",
-      header: "Type",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Type
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
       cell: ({ row }) => {
         const doc = row.original;
 
@@ -182,17 +175,18 @@ export function DocumentsDataTable({
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "",
       cell: ({ row }) => {
         const doc = row.original;
 
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={() => onPreview(doc.id)}>
                 <Eye className="h-4 w-4 mr-2" />
@@ -286,6 +280,7 @@ export function DocumentsDataTable({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         );
       },
     },
@@ -347,7 +342,7 @@ export function DocumentsDataTable({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="font-bold text-foreground">
                       {header.isPlaceholder
                         ? null
                         : flexRender(

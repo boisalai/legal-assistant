@@ -399,3 +399,241 @@ async def link_directory_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/cases/{case_id}/sync-linked-directories")
+async def sync_linked_directories_endpoint(
+    case_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Synchronise tous les répertoires liés d'un dossier.
+
+    Pour chaque répertoire lié:
+    - Détecte les nouveaux fichiers (ajoute et indexe)
+    - Détecte les fichiers modifiés (réindexe)
+    - Détecte les fichiers supprimés (retire de la BD)
+
+    Returns:
+        {
+            "added": 3,
+            "updated": 2,
+            "removed": 1,
+            "unchanged": 20
+        }
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normaliser l'ID du dossier
+        if not case_id.startswith("case:"):
+            case_id = f"case:{case_id}"
+
+        # Récupérer tous les documents liés pour ce dossier
+        query = """
+            SELECT * FROM document
+            WHERE case_id = $case_id
+            AND source_type = 'linked'
+            AND linked_source IS NOT NONE
+        """
+        result = await service.db.query(query, {"case_id": case_id})
+        linked_docs = result[0] if result else []
+
+        if not linked_docs:
+            return {
+                "added": 0,
+                "updated": 0,
+                "removed": 0,
+                "unchanged": 0,
+                "message": "Aucun répertoire lié trouvé"
+            }
+
+        # Grouper par link_id
+        by_link_id = defaultdict(list)
+        for doc in linked_docs:
+            link_id = doc.get("linked_source", {}).get("link_id")
+            if link_id:
+                by_link_id[link_id].append(doc)
+
+        # Compteurs
+        total_added = 0
+        total_updated = 0
+        total_removed = 0
+        total_unchanged = 0
+
+        indexing_service = DocumentIndexingService()
+        now = datetime.utcnow().isoformat()
+
+        # Pour chaque répertoire lié
+        for link_id, docs in by_link_id.items():
+            # Obtenir le chemin de base depuis le premier document
+            base_path = docs[0].get("linked_source", {}).get("absolute_path", "")
+            if not base_path:
+                logger.warning(f"Chemin de base introuvable pour link_id {link_id}")
+                continue
+
+            # Extraire le chemin du répertoire parent
+            directory_path = str(Path(base_path).parent)
+
+            # Re-scanner le répertoire
+            try:
+                scan_result = scan_directory(directory_path)
+            except Exception as e:
+                logger.error(f"Impossible de scanner {directory_path}: {e}")
+                continue
+
+            # Créer un index des fichiers existants par chemin absolu
+            existing_files = {doc["file_path"]: doc for doc in docs}
+            scanned_files = {str(f.absolute_path): f for f in scan_result.files}
+
+            # 1. Détecter les fichiers supprimés (dans BD mais pas sur disque)
+            for file_path, doc in existing_files.items():
+                if file_path not in scanned_files:
+                    # Fichier supprimé - retirer de la BD
+                    doc_id = doc["id"]
+                    await service.delete(doc_id)
+                    total_removed += 1
+                    logger.info(f"Document {doc_id} supprimé (fichier absent)")
+
+            # 2. Détecter les nouveaux fichiers et fichiers modifiés
+            for file_path, file_info in scanned_files.items():
+                source_file = Path(file_path)
+
+                if file_path not in existing_files:
+                    # Nouveau fichier - ajouter et indexer
+                    try:
+                        doc_id = str(uuid.uuid4())[:8]
+                        content = extract_text_from_file(source_file)
+                        file_hash = calculate_file_hash(source_file)
+
+                        linked_source = {
+                            "absolute_path": str(source_file),
+                            "relative_path": file_info.relative_path,
+                            "parent_folder": file_info.parent_folder,
+                            "link_id": link_id,
+                            "last_sync": now,
+                            "source_hash": file_hash,
+                            "source_mtime": file_info.modified_time,
+                        }
+
+                        mime_types = {
+                            "md": "text/markdown",
+                            "mdx": "text/markdown",
+                            "txt": "text/plain",
+                            "pdf": "application/pdf",
+                            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "doc": "application/msword"
+                        }
+                        type_mime = mime_types.get(file_info.extension, "application/octet-stream")
+
+                        document_data = {
+                            "case_id": case_id,
+                            "nom_fichier": source_file.name,
+                            "type_fichier": file_info.extension,
+                            "type_mime": type_mime,
+                            "taille": file_info.size,
+                            "file_path": str(source_file),
+                            "user_id": user_id,
+                            "created_at": now,
+                            "source_type": "linked",
+                            "linked_source": linked_source,
+                            "texte_extrait": content if content and not content.startswith("[Contenu") else None,
+                            "indexed": False
+                        }
+
+                        await service.create("document", document_data, record_id=doc_id)
+
+                        # Indexer si contenu disponible
+                        if content and not content.startswith("[Contenu"):
+                            try:
+                                result = await indexing_service.index_document(
+                                    document_id=f"document:{doc_id}",
+                                    case_id=case_id,
+                                    text_content=content
+                                )
+
+                                if result.get("success"):
+                                    await service.merge(
+                                        f"document:{doc_id}",
+                                        {"indexed": True}
+                                    )
+                            except Exception as e:
+                                logger.error(f"Erreur lors de l'indexation du document:{doc_id}: {e}")
+
+                        total_added += 1
+                        logger.info(f"Nouveau fichier ajouté: {file_path}")
+
+                    except Exception as e:
+                        logger.error(f"Erreur lors de l'ajout de {file_path}: {e}")
+
+                else:
+                    # Fichier existant - vérifier s'il a été modifié
+                    existing_doc = existing_files[file_path]
+                    old_hash = existing_doc.get("linked_source", {}).get("source_hash", "")
+                    old_mtime = existing_doc.get("linked_source", {}).get("source_mtime", 0)
+
+                    # Calculer le nouveau hash
+                    new_hash = calculate_file_hash(source_file)
+
+                    # Vérifier si le fichier a changé (hash ou mtime différent)
+                    if new_hash != old_hash or file_info.modified_time != old_mtime:
+                        # Fichier modifié - réindexer
+                        try:
+                            content = extract_text_from_file(source_file)
+                            doc_id = existing_doc["id"]
+
+                            # Mettre à jour les métadonnées
+                            update_data = {
+                                "linked_source.source_hash": new_hash,
+                                "linked_source.source_mtime": file_info.modified_time,
+                                "linked_source.last_sync": now,
+                                "texte_extrait": content if content and not content.startswith("[Contenu") else None,
+                                "taille": file_info.size,
+                                "indexed": False
+                            }
+
+                            await service.merge(doc_id, update_data)
+
+                            # Réindexer si contenu disponible
+                            if content and not content.startswith("[Contenu"):
+                                try:
+                                    result = await indexing_service.index_document(
+                                        document_id=doc_id,
+                                        case_id=case_id,
+                                        text_content=content
+                                    )
+
+                                    if result.get("success"):
+                                        await service.merge(
+                                            doc_id,
+                                            {"indexed": True}
+                                        )
+                                except Exception as e:
+                                    logger.error(f"Erreur lors de la réindexation de {doc_id}: {e}")
+
+                            total_updated += 1
+                            logger.info(f"Fichier mis à jour: {file_path}")
+
+                        except Exception as e:
+                            logger.error(f"Erreur lors de la mise à jour de {file_path}: {e}")
+
+                    else:
+                        # Fichier inchangé
+                        total_unchanged += 1
+
+        return {
+            "added": total_added,
+            "updated": total_updated,
+            "removed": total_removed,
+            "unchanged": total_unchanged,
+            "message": f"Synchronisation terminée: {total_added} ajouté(s), {total_updated} mis à jour, {total_removed} supprimé(s)"
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la synchronisation des répertoires liés: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

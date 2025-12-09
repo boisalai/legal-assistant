@@ -23,7 +23,7 @@
 
 ---
 
-## État actuel du projet (2025-12-05)
+## État actuel du projet
 
 ### Fonctionnalités implémentées
 
@@ -34,181 +34,119 @@
 
 2. **Gestion des documents**
    - Upload de fichiers (PDF, Word, images, audio)
+   - **Liaison de répertoires locaux** : Indexation automatique de dossiers entiers
    - DataTable avec filtres (nom, type) et tri
    - Fichiers dérivés automatiquement liés (transcription, extraction PDF, TTS)
    - Actions contextuelles selon le type de fichier
 
-3. **Transcription audio**
+3. **Répertoires liés** ✨
+   - Liaison de dossiers locaux avec indexation automatique
+   - Tracking des fichiers avec hash SHA-256 et mtime
+   - Interface arborescente pour visualiser la structure
+   - Groupement par link_id dans l'interface
+   - Support des mises à jour et réindexation
+
+4. **Import Docusaurus**
+   - Import de fichiers Markdown depuis documentation Docusaurus
+   - Scan automatique du répertoire avec sélection par dossier
+   - Indexation automatique pour RAG
+   - Tracking des mises à jour (hash SHA-256, mtime)
+
+5. **Transcription audio**
    - Whisper MLX (modèle large-v3-turbo recommandé)
    - Workflow hybride : Whisper → Agent LLM (formatage) → Sauvegarde
    - Création automatique de fichiers markdown
 
-4. **Agent conversationnel**
+6. **Agent conversationnel**
    - Chat avec streaming SSE
    - Support multi-providers : **Claude, Ollama, MLX**
    - **Recherche sémantique intégrée** : utilise automatiquement `semantic_search`
    - Mémoire de conversation dans SurrealDB
    - **Règle de citation des sources** appliquée dans le prompt système
 
-5. **Indexation vectorielle et RAG**
+7. **Indexation vectorielle et RAG**
    - Embeddings BGE-M3 via sentence-transformers
    - Accélération GPU : MPS (Apple Silicon) / CUDA / CPU
    - Chunking intelligent (400 mots, 50 mots overlap)
    - Recherche sémantique dans les documents
-   - **Fix critique appliqué** : Utilisation de `type::thing()` pour gérer les UUIDs SurrealDB
 
-6. **Synthèse vocale (TTS)**
+8. **Synthèse vocale (TTS)**
    - Service edge-tts (Microsoft Edge TTS)
    - 15 voix : 13 françaises + 2 anglaises
    - Génération audio MP3 depuis documents markdown
    - Configuration des voix par défaut dans Settings
 
-7. **Import Docusaurus** ✨ NOUVEAU
-   - Import de fichiers Markdown depuis documentation Docusaurus
-   - Scan automatique du répertoire Docusaurus (`/Users/alain/Workspace/Docusaurus/docs`)
-   - Interface de sélection par dossier avec recherche
-   - Indexation automatique pour RAG
-   - Tracking des mises à jour (hash SHA-256, mtime)
-   - Réindexation à la demande si fichier source modifié
-
 ### Architecture technique
 
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
-**Nouveaux modules (2025-12-05) :**
-- `backend/auth/helpers.py` - Helpers d'authentification centralisés
-- `backend/utils/id_utils.py` - Normalisation des IDs
-- `backend/utils/file_utils.py` - Utilitaires fichiers
-- `backend/models/document_models.py` - Modèles Pydantic partagés (+ DocusaurusSource)
-- `backend/routes/transcription.py` - Routes transcription (extrait de documents.py)
-- `backend/routes/extraction.py` - Routes extraction (extrait de documents.py)
-- `backend/routes/docusaurus.py` - Routes import Docusaurus ✨ NOUVEAU
-- `backend/services/model_server_manager.py` - Orchestration serveurs MLX/vLLM
-- `backend/services/vllm_server_service.py` - Gestion serveur vLLM (conservé pour usage manuel)
-- `frontend/src/components/cases/import-docusaurus-modal.tsx` - Modal d'import Docusaurus ✨ NOUVEAU
-- `frontend/src/components/ui/scroll-area.tsx` - Composant shadcn/ui ScrollArea ✨ NOUVEAU
+**Modules clés :**
+- `backend/routes/linked_directory.py` - API de liaison de répertoires
+- `backend/routes/docusaurus.py` - API d'import Docusaurus
+- `backend/models/document_models.py` - Modèles Pydantic partagés
+- `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
+- `frontend/src/components/cases/directory-tree-view.tsx` - Vue arborescente
 
 ---
 
-## Dernière session (2025-12-06) - Import Docusaurus 📚
+## Dernière session (2025-12-08) - Fix affichage répertoires liés 🔧
 
-### Fonctionnalité implémentée
+### Problème
 
-Ajout d'une fonctionnalité complète d'import de documentation Docusaurus dans Legal Assistant :
+La section "Répertoires liés" n'apparaissait pas dans l'interface malgré la création réussie de 26 documents avec `source_type: "linked"` et métadonnées `linked_source` complètes dans la base de données.
 
-**Backend :**
-- Nouveau router `backend/routes/docusaurus.py` avec 4 endpoints :
-  1. `GET /api/docusaurus/list` - Liste les fichiers `.md` et `.mdx` disponibles
-  2. `POST /api/cases/{case_id}/import-docusaurus` - Importe des fichiers sélectionnés
-  3. `POST /api/cases/{case_id}/check-docusaurus-updates` - Vérifie si les sources ont changé
-  4. `POST /api/documents/{doc_id}/reindex-docusaurus` - Réindexe un document modifié
-- Modèle `DocusaurusSource` ajouté pour tracker les métadonnées (hash, mtime, chemin source)
-- Workflow d'import : Copie → Hash SHA-256 → Stockage → Indexation RAG automatique
+### Diagnostic
 
-**Frontend :**
-- Modal `ImportDocusaurusModal` avec interface de sélection par dossier
-- Recherche en temps réel dans les fichiers
-- Sélection individuelle ou par dossier entier
-- Bouton "Docusaurus" ajouté dans l'onglet Documents
-- Composant `ScrollArea` (shadcn/ui) créé pour le modal
+**Méthodologie incorrecte initiale** : Commencé par le frontend au lieu de suivre le flux de données.
 
-**Détails techniques :**
-- Chemin par défaut : `/Users/alain/Workspace/Docusaurus/docs`
-- Support `.md` et `.mdx`
-- Ignore `node_modules` et dossiers cachés
-- Documents marqués avec `source_type: "docusaurus"`
-- Tracking des mises à jour via `mtime` et hash SHA-256
+**Approche correcte appliquée** :
+1. ✅ **SurrealDB** - Données `linked_source` présentes
+2. ✅ **Backend Query** - Requête récupère bien les données (logs confirmés)
+3. ❌ **Backend Serialization** - **PROBLÈME IDENTIFIÉ ICI**
+4. ❌ **API Response** - `curl` montrait `linked_source` absent du JSON
+5. ❌ **Frontend** - Composant retournait `null` car pas de données
 
-### État final
+### Cause racine
 
-✅ **Fonctionnalité complète et prête à tester**
-- Backend : 4 endpoints fonctionnels
-- Frontend : Bouton + Modal intégré dans l'onglet Documents
-- API : `docusaurusApi` dans `lib/api.ts`
-- Types : `DocusaurusFile` et `DocusaurusSource` ajoutés
+**Deux définitions de `DocumentResponse`** :
+- `models/document_models.py` ligne 17-35 (mise à jour mais NON utilisée)
+- `routes/documents.py` ligne 61-78 (**utilisée, mais SANS le champ `linked_source`**)
+
+Le code utilisait la définition locale dans `routes/documents.py` qui ne définissait pas `linked_source`, causant Pydantic à silencieusement omettre ce champ lors de la sérialisation.
+
+### Solution
+
+Ajout du champ `linked_source: Optional[dict] = None` à la classe `DocumentResponse` dans `/backend/routes/documents.py` ligne 76.
 
 **Fichiers modifiés :**
-- `backend/main.py` - Ajout du router Docusaurus
-- `backend/routes/__init__.py` - Export du nouveau router
-- `backend/models/document_models.py` - Ajout `DocusaurusSource`
-- `backend/routes/documents.py` - Ajout champs Docusaurus
-- `frontend/src/types/index.ts` - Ajout types Docusaurus
-- `frontend/src/components/cases/tabs/documents-tab.tsx` - Intégration modal
+- `backend/routes/documents.py` - Ajout champ `linked_source` au modèle et au constructeur
 
-**Nouveaux fichiers :**
-- `backend/routes/docusaurus.py` (519 lignes)
-- `frontend/src/components/cases/import-docusaurus-modal.tsx` (243 lignes)
-- `frontend/src/components/ui/scroll-area.tsx` (49 lignes)
+**Commit :** `b380c83` - "fix: Add linked_source field to DocumentResponse model"
 
-**Package ajouté :**
-- `@radix-ui/react-scroll-area` (dépendance du composant ScrollArea)
+### Leçon apprise
 
-### À tester
+**Toujours suivre le flux des données de la source à la destination :**
+1. Base de données → 2. Requête backend → 3. Sérialisation → 4. API → 5. Frontend
 
-```bash
-# Terminal 1: SurrealDB
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
-
-# Terminal 2: Backend
-cd backend && uv run python main.py
-
-# Terminal 3: Frontend
-cd frontend && npm run dev -- -p 3001
-```
-
-1. Ouvrir un dossier (case)
-2. Cliquer sur "Docusaurus" dans l'onglet Documents
-3. Sélectionner des fichiers à importer
-4. Vérifier qu'ils apparaissent dans la liste des documents
-5. Tester la recherche sémantique avec ces documents
+Au lieu de déboguer de manière désorganisée, identifier méthodiquement où les données sont perdues à chaque étape.
 
 ---
 
-## Session précédente (2025-12-05) - Fix MLX auto-startup
+## Session précédente (2025-12-06) - Import Docusaurus 📚
 
-### Problème identifié
+Ajout d'une fonctionnalité complète d'import de documentation Docusaurus :
 
-Le serveur MLX ne démarrait pas automatiquement :
-- **Erreur 1** : Commande dépréciée `python -m mlx_lm.server`
-- **Erreur 2** : Timeout de 30s insuffisant pour téléchargement initial du modèle (~2 GB)
-- **Erreur 3** : Paramètre `max_wait` hardcodé à 30s dans `start()` ignorait le `_startup_timeout`
+**Backend :**
+- Router `backend/routes/docusaurus.py` avec 4 endpoints
+- Modèle `DocusaurusSource` pour tracking métadonnées
+- Workflow : Copie → Hash SHA-256 → Stockage → Indexation RAG
 
-### Corrections appliquées
+**Frontend :**
+- Modal `ImportDocusaurusModal` avec sélection par dossier
+- Recherche en temps réel et sélection multiple
+- Composant `ScrollArea` (shadcn/ui)
 
-**1. Commande MLX corrigée** (`mlx_server_service.py:88-94`)
-```python
-# ❌ Avant
-["python3", "-m", "mlx_lm.server", "--model", model_id, ...]
-
-# ✅ Après
-["mlx_lm.server", "--model", model_id, ...]
-```
-
-**2. Timeout augmenté** (`mlx_server_service.py:33`)
-```python
-self._startup_timeout = 120  # 2 minutes (au lieu de 30s)
-```
-
-**3. Paramètre max_wait corrigé** (`mlx_server_service.py:60-73`)
-```python
-async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
-    if max_wait is None:
-        max_wait = self._startup_timeout  # Utilise 120s par défaut
-```
-
-**4. Nettoyage frontend**
-- Suppression de tous les modèles vLLM et HuggingFace de l'interface
-- Ne reste que : **Claude (Anthropic), Ollama, MLX**
-- Raison : vLLM trop lent sur Apple Silicon (CPU only, ~5-10 tok/s)
-
-### État final
-
-✅ **Le serveur MLX démarre maintenant automatiquement** :
-- Au premier lancement : télécharge le modèle (~2 GB, 1-2 minutes)
-- Lancements suivants : quasi-instantané (modèle en cache)
-- Logs informatifs sur la progression du téléchargement
-
-**Commit :** `96b4079` - "refactor: Implement MLX auto-startup and remove vLLM from UI"
+**Commit :** Sessions archivées dans `docs/archive/SESSIONS_2025-12.md`
 
 ---
 
@@ -279,20 +217,15 @@ async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
 
 ### Immédiat
 
-1. **Migration shadcn/ui vers versions officielles** ✅ COMPLÉTÉ (2025-12-07)
-   - **Objectif** : Migrer tous les composants shadcn/ui vers leurs versions officielles
-   - **Résultat** : 24 composants migrés avec succès
-   - **Composants mis à jour** : 9 (alert, badge, card, checkbox, dialog, dropdown-menu, select, skeleton, table)
-   - **Composants déjà à jour** : 15
-   - **Composants personnalisés préservés** : 7 (audio-recorder, file-upload, language-selector, markdown, sidebar, sonner, use-mobile)
-   - **Build production** : ✅ PASSE
-   - **Commit** : `652f409`
+1. **Tester la fonctionnalité répertoires liés**
+   - Lier un répertoire local
+   - Vérifier l'affichage de la section "Répertoires liés"
+   - Tester la vue arborescente
+   - Vérifier la recherche sémantique sur les fichiers liés
 
-2. **Tester MLX auto-startup** ✅ COMPLÉTÉ
-   - Redémarrer le backend
-   - Sélectionner un modèle MLX dans l'interface
-   - Vérifier que le serveur démarre automatiquement
-   - Observer les logs pour confirmer le téléchargement/démarrage
+2. **Nettoyer les logs de debug**
+   - Retirer les `logger.info("🔍 ...")` ajoutés dans `routes/documents.py`
+   - Garder uniquement les logs essentiels
 
 3. **Ajuster paramètres RAG si nécessaire**
    - `top_k` : Actuellement 5, considérer 7-10
@@ -311,6 +244,7 @@ async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
 2. **UI/UX**
    - ✅ FAIT : DataTable avec filtres
    - ✅ FAIT : Prévisualisation markdown
+   - ✅ FAIT : Vue arborescente pour répertoires liés
    - ❌ À EXPLORER : Progression de transcription en temps réel
 
 ### Moyen terme
@@ -325,20 +259,14 @@ async def start(self, model_id: str, max_wait: Optional[int] = None) -> bool:
 
 ### Refactoring
 
-**Phase 1 - Quick wins :** ✅ COMPLÉTÉ
-- ✅ Supprimer scripts racine morts
-- ✅ Extraire auth helpers dans `backend/auth/helpers.py`
-- ✅ Créer utilitaires ID dans `backend/utils/id_utils.py`
+1. **Consolidation modèles Pydantic**
+   - ❌ **À FAIRE** : Supprimer la duplication `DocumentResponse`
+   - Utiliser uniquement `models/document_models.py`
+   - Importer dans `routes/documents.py` au lieu de redéfinir
 
-**Phase 2 - Routes et modèles :** ✅ COMPLÉTÉ
-- ✅ Extraire modèles Pydantic dans `backend/models/document_models.py`
-- ✅ Créer `backend/routes/transcription.py`
-- ✅ Créer `backend/routes/extraction.py`
-- ❌ **À FAIRE** : Simplifier `documents.py` (toujours 2073 lignes)
-
-**Phase 3 - Documentation :** ✅ COMPLÉTÉ
-- ✅ Archiver sessions dans `docs/archive/SESSIONS_2025-12.md`
-- ✅ Nettoyer CLAUDE.md
+2. **Simplification routes**
+   - ❌ **À FAIRE** : `documents.py` toujours trop long (~2100 lignes)
+   - Extraire logique métier dans services dédiés
 
 ---
 
@@ -401,18 +329,6 @@ DEFAULT_VOICES = {
 "mlx-community/Mistral-7B-Instruct-v0.3-4bit" # ~4 GB RAM, ~35 tok/s
 ```
 
-**Logs MLX à surveiller :**
-```
-🚀 Démarrage serveur MLX avec mlx-community/Qwen2.5-3B-Instruct-4bit...
-⚠️  Si premier démarrage: téléchargement du modèle (~2-4 GB)
-⏱️  Cela peut prendre 1-2 minutes selon votre connexion...
-⏳ Attente du démarrage du serveur (max 120s)...
-✅ Serveur MLX démarré avec succès en 45.3s
-```
-
-**Variables d'environnement :**
-- Voir `.env.example` ou `ARCHITECTURE.md` pour la configuration complète
-
 ---
 
 ## Conventions
@@ -427,35 +343,28 @@ DEFAULT_VOICES = {
 
 **Règle stricte : Utiliser uniquement les versions officielles des composants shadcn/ui sans modification.**
 
-**Composants shadcn/ui officiels (18)** - À maintenir en sync avec les versions officielles :
+**Composants shadcn/ui officiels (24)** - À maintenir en sync :
 - `button`, `card`, `dialog`, `input`, `label`, `select`, `checkbox`, `avatar`, `separator`
 - `collapsible`, `progress`, `slider`, `switch`, `tabs`, `tooltip`, `alert`, `badge`, `table`
 - `textarea`, `skeleton`, `alert-dialog`, `dropdown-menu`, `sheet`, `scroll-area`
 
-**Composants personnalisés autorisés (4)** - Spécifiques au domaine métier :
+**Composants personnalisés autorisés (4)** :
 - `audio-recorder.tsx` - Enregistrement audio avec visualisation
 - `file-upload.tsx` - Upload drag-and-drop de fichiers
 - `language-selector.tsx` - Sélecteur de locale i18n
 - `markdown.tsx` - Rendu Markdown avec remark-gfm
-
-**Composants utilitaires (3)** - Extensions de shadcn/ui :
-- `sidebar.tsx` - Système de layout complexe (shadcn/ui officiel)
-- `sonner.tsx` - Wrapper Toast avec thème
-- `use-mobile.tsx` - Hook détection mobile
 
 **Procédure de mise à jour** :
 1. Vérifier les nouvelles versions : https://ui.shadcn.com/docs/components
 2. Mettre à jour : `npx shadcn@latest add <component-name>`
 3. Accepter l'écrasement si demandé
 4. Tester l'UI pour détecter les régressions
-5. Commit avec message : `chore(ui): Update <component-name> to latest shadcn/ui version`
 
 **Interdictions** :
 - ❌ Modifier les composants shadcn/ui officiels
 - ❌ Copier/coller du code shadcn/ui sans la CLI
 - ❌ Créer des variantes personnalisées de composants existants
 - ✅ Composer plusieurs composants shadcn/ui pour créer de nouvelles fonctionnalités
-- ✅ Créer des composants métier dans `frontend/src/components/cases/` ou `frontend/src/components/layout/`
 
 ---
 
