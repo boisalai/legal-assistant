@@ -130,6 +130,23 @@ export const casesApi = {
     return response.json();
   },
 
+  // Update case
+  async update(
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      keywords?: string[];
+    }
+  ): Promise<Case> {
+    // Remove "judgment:" or "case:" prefix if present
+    const cleanId = id.replace("judgment:", "").replace("case:", "");
+    return fetchApi<Case>(`/api/cases/${encodeURIComponent(cleanId)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
   // Delete judgment
   async delete(id: string): Promise<void> {
     // Remove "judgment:" prefix if present
@@ -1003,7 +1020,7 @@ export const analysisApi = {
   },
 
   // Pour compatibilite arriere
-  async startStream(caseId: string): Promise<Response> {
+  async startStream(_caseId: string): Promise<Response> {
     throw new Error("Streaming analysis not implemented");
   },
 

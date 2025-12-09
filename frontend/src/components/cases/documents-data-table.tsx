@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -143,7 +142,7 @@ export function DocumentsDataTable({
 
         return <span className="text-sm">Source</span>;
       },
-      filterFn: (row, id, value) => {
+      filterFn: (row, _id, value) => {
         if (value === "all") return true;
         if (value === "source") return !row.original.is_derived;
         if (value === "transcription") return row.original.derivation_type === "transcription";
@@ -342,7 +341,7 @@ export function DocumentsDataTable({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} className="font-bold text-foreground">
+                    <TableHead key={header.id} className="bg-blue-50 font-bold text-black">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
