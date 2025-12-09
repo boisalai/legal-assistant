@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   FileText,
   Folder,
   FolderOpen,
@@ -14,6 +20,8 @@ import {
   ChevronDown,
   List,
   Network,
+  MoreVertical,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Document } from "@/types";
@@ -21,6 +29,7 @@ import type { Document } from "@/types";
 interface DirectoryTreeViewProps {
   documents: Document[];
   basePath: string;
+  onPreviewDocument?: (docId: string) => void;
 }
 
 type ViewMode = "tree" | "list";
@@ -33,10 +42,30 @@ interface FolderNode {
   isExpanded: boolean;
 }
 
-export function DirectoryTreeView({ documents, basePath }: DirectoryTreeViewProps) {
+export function DirectoryTreeView({ documents, basePath, onPreviewDocument }: DirectoryTreeViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  // File actions menu component
+  const FileActionsMenu = ({ doc }: { doc: Document }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={(e) => {
+          e.stopPropagation();
+          onPreviewDocument?.(doc.id);
+        }}>
+          <Eye className="h-4 w-4 mr-2" />
+          Visualiser
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   // Build folder tree structure
   const folderTree = useMemo(() => {
@@ -159,6 +188,7 @@ export function DirectoryTreeView({ documents, basePath }: DirectoryTreeViewProp
               <span className="text-xs text-muted-foreground shrink-0">
                 {formatFileSize(doc.taille)}
               </span>
+              <FileActionsMenu doc={doc} />
             </div>
           ))}
 
@@ -217,6 +247,7 @@ export function DirectoryTreeView({ documents, basePath }: DirectoryTreeViewProp
                 <span className="text-xs text-muted-foreground shrink-0">
                   {formatFileSize(doc.taille)}
                 </span>
+                <FileActionsMenu doc={doc} />
               </div>
             ))}
 
@@ -273,6 +304,7 @@ export function DirectoryTreeView({ documents, basePath }: DirectoryTreeViewProp
                   <span className="text-xs text-muted-foreground shrink-0">
                     {formatFileSize(doc.taille)}
                   </span>
+                  <FileActionsMenu doc={doc} />
                 </div>
               ))}
             </div>

@@ -9,7 +9,7 @@ import { AppShell } from "@/components/layout";
 import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
 import { AssistantPanel, type Message } from "@/components/cases/assistant-panel";
 import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
-import { DirectoryFilesDataTable } from "@/components/cases/directory-files-data-table";
+import { DirectoryTreeView } from "@/components/cases/directory-tree-view";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
@@ -176,8 +176,15 @@ export default function CaseDetailPage() {
   };
 
   const handleClosePreview = () => {
-    setPreviewDocument(null);
-    setPreviewDirectory(null);
+    // If we're viewing a document, just close it and return to previous view
+    // (either directory tree or case details panel)
+    if (previewDocument) {
+      setPreviewDocument(null);
+      // Keep previewDirectory as is - if it was set, we return to tree view
+    } else {
+      // If we're viewing directory tree, close it and return to case details
+      setPreviewDirectory(null);
+    }
   };
 
   if (loading) {
@@ -249,7 +256,11 @@ export default function CaseDetailPage() {
 
                   {/* Content */}
                   <div className="flex-1 overflow-auto p-6">
-                    <DirectoryFilesDataTable documents={previewDirectory.documents} />
+                    <DirectoryTreeView
+                      documents={previewDirectory.documents}
+                      basePath={previewDirectory.basePath}
+                      onPreviewDocument={handlePreviewDocument}
+                    />
                   </div>
                 </div>
               ) : (
