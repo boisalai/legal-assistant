@@ -17,6 +17,7 @@ import {
   Loader2,
   Folder,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Case, Document, Checklist } from "@/types";
+import type { LinkedDirectory } from "./linked-directories-data-table";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
@@ -47,6 +49,7 @@ interface CaseDetailsPanelProps {
   onUpdateCase: (data: { description?: string; type_transaction?: string }) => Promise<void>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onPreviewDocument: (docId: string) => void;
+  onPreviewDirectory: (directory: LinkedDirectory) => void;
   onDelete: () => void;
   onAnalysisComplete?: () => void;
   onDocumentsChange?: () => Promise<void>;
@@ -65,6 +68,7 @@ export function CaseDetailsPanel({
   onUpdateCase,
   onDeleteDocument,
   onPreviewDocument,
+  onPreviewDirectory,
   onDelete,
   onAnalysisComplete,
   onDocumentsChange,
@@ -89,18 +93,40 @@ export function CaseDetailsPanel({
   const handleSyncDocuments = async () => {
     setSyncingDocuments(true);
     try {
-      const result = await documentsApi.sync(caseData.id);
+      // Sync uploaded documents
+      const uploadResult = await documentsApi.sync(caseData.id);
+
+      // Sync linked directories
+      const linkedResult = await documentsApi.syncLinkedDirectories(caseData.id);
+
+      // Refresh documents list
       if (onDocumentsChange) {
         await onDocumentsChange();
       }
 
-      if (result.discovered > 0) {
+      // Build summary message
+      const messages = [];
+
+      if (uploadResult.discovered > 0) {
+        messages.push(`${uploadResult.discovered} fichier(s) uploadé(s) découvert(s)`);
+      }
+
+      if (linkedResult.added > 0 || linkedResult.updated > 0 || linkedResult.removed > 0) {
+        const parts = [];
+        if (linkedResult.added > 0) parts.push(`${linkedResult.added} ajouté(s)`);
+        if (linkedResult.updated > 0) parts.push(`${linkedResult.updated} mis à jour`);
+        if (linkedResult.removed > 0) parts.push(`${linkedResult.removed} supprimé(s)`);
+        messages.push(`Répertoires liés : ${parts.join(", ")}`);
+      }
+
+      if (messages.length > 0) {
         setSyncResultTitle("Synchronisation réussie");
-        setSyncResultMessage(`${result.discovered} fichier(s) découvert(s) et ajouté(s).`);
+        setSyncResultMessage(messages.join("\n"));
       } else {
         setSyncResultTitle("Synchronisation réussie");
-        setSyncResultMessage("Aucun nouveau fichier découvert.");
+        setSyncResultMessage("Aucun changement détecté.");
       }
+
       setSyncResultDialogOpen(true);
     } catch (err) {
       setSyncResultTitle("Erreur de synchronisation");
@@ -328,14 +354,6 @@ export function CaseDetailsPanel({
           </Button>
           <Button
             size="sm"
-            onClick={onUploadDocuments}
-            className="gap-2"
-          >
-            <FileUp className="h-4 w-4" />
-            <span>Ajouter des documents</span>
-          </Button>
-          <Button
-            size="sm"
             onClick={onLinkFile}
             className="gap-2"
           >
@@ -344,11 +362,32 @@ export function CaseDetailsPanel({
           </Button>
           <Button
             size="sm"
+            onClick={onUploadDocuments}
+            className="gap-2"
+          >
+            <FileUp className="h-4 w-4" />
+            <span>Ajouter des documents</span>
+          </Button>
+          <Button
+            size="sm"
             onClick={onRecordAudio}
             className="gap-2"
           >
             <Mic className="h-4 w-4" />
             <span>Enregistrer un audio</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSyncDocuments}
+            disabled={syncingDocuments}
+            className="gap-2"
+          >
+            {syncingDocuments ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            <span>Synchroniser</span>
           </Button>
         </div>
 
@@ -381,6 +420,7 @@ export function CaseDetailsPanel({
                 caseId={caseData.id}
                 documents={linkedDocs}
                 onDocumentsChange={onDocumentsChange}
+                onPreviewDirectory={onPreviewDirectory}
               />
             </div>
           );
@@ -391,26 +431,10 @@ export function CaseDetailsPanel({
 
       {/* Liste des documents */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-sm">
-            Documents ({documents.filter((doc) => doc.source_type !== "linked").length})
-          </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncDocuments}
-            disabled={syncingDocuments}
-            title="Synchroniser - Découvre les fichiers dans le répertoire du dossier"
-            className="h-7 text-xs"
-          >
-            {syncingDocuments ? (
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-            ) : (
-              <RefreshCw className="h-3 w-3 mr-1" />
-            )}
-            Sync
-          </Button>
-        </div>
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          <FileText className="h-4 w-4" />
+          Documents ({documents.filter((doc) => doc.source_type !== "linked").length})
+        </h3>
 
         {/* DataTable with filters */}
         <DocumentsDataTable
