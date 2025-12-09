@@ -9,10 +9,12 @@ import { AppShell } from "@/components/layout";
 import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
 import { AssistantPanel, type Message } from "@/components/cases/assistant-panel";
 import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
+import { DirectoryFilesDataTable } from "@/components/cases/directory-files-data-table";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
+import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { casesApi, documentsApi, analysisApi } from "@/lib/api";
 import type { Case, Checklist, Document } from "@/types";
@@ -35,6 +37,7 @@ export default function CaseDetailPage() {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+  const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
 
   // Assistant messages - lifted to parent to persist across preview open/close
   const [assistantMessages, setAssistantMessages] = useState<Message[]>([
@@ -163,11 +166,18 @@ export default function CaseDetailPage() {
     const doc = documents.find((d) => d.id === docId);
     if (doc) {
       setPreviewDocument(doc);
+      setPreviewDirectory(null); // Close directory preview if open
     }
+  };
+
+  const handlePreviewDirectory = (directory: LinkedDirectory) => {
+    setPreviewDirectory(directory);
+    setPreviewDocument(null); // Close document preview if open
   };
 
   const handleClosePreview = () => {
     setPreviewDocument(null);
+    setPreviewDirectory(null);
   };
 
   if (loading) {
@@ -206,7 +216,7 @@ export default function CaseDetailPage() {
         {/* Split View */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <PanelGroup direction="horizontal" className="h-full">
-            {/* Left Panel: Case Details or Document Preview */}
+            {/* Left Panel: Case Details, Document Preview, or Directory Tree */}
             <Panel defaultSize={60} minSize={30} className="overflow-hidden">
               {previewDocument ? (
                 <DocumentPreviewPanel
@@ -214,6 +224,34 @@ export default function CaseDetailPage() {
                   caseId={caseId}
                   onClose={handleClosePreview}
                 />
+              ) : previewDirectory ? (
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* Header - matching AssistantPanel style */}
+                  <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <h2 className="text-xl font-bold">Arborescence du répertoire</h2>
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Folder className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {previewDirectory.basePath}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleClosePreview}
+                      className="shrink-0 ml-4"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-auto p-6">
+                    <DirectoryFilesDataTable documents={previewDirectory.documents} />
+                  </div>
+                </div>
               ) : (
                 <CaseDetailsPanel
                   caseData={caseData}
@@ -226,6 +264,7 @@ export default function CaseDetailPage() {
                   onUpdateCase={handleUpdateCase}
                   onDeleteDocument={handleDeleteDocument}
                   onPreviewDocument={handlePreviewDocument}
+                  onPreviewDirectory={handlePreviewDirectory}
                   onDelete={handleDelete}
                   onAnalysisComplete={handleAnalysisComplete}
                   onDocumentsChange={fetchCaseDetails}

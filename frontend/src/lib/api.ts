@@ -363,6 +363,21 @@ export const documentsApi = {
     return { documents: response.documents, discovered };
   },
 
+  // Sync linked directories - reindex, add new files, remove deleted files
+  async syncLinkedDirectories(caseId: string): Promise<{
+    added: number;
+    updated: number;
+    removed: number;
+    unchanged: number;
+    message: string;
+  }> {
+    const cleanId = caseId.replace("judgment:", "").replace("case:", "");
+    return fetchApi(
+      `/api/cases/${encodeURIComponent(cleanId)}/sync-linked-directories`,
+      { method: "POST" }
+    );
+  },
+
   // Get derived documents (transcriptions, extractions, TTS) for a source document
   async getDerived(caseId: string, documentId: string): Promise<{ derived: Document[]; total: number }> {
     const cleanCaseId = caseId.replace("judgment:", "");
