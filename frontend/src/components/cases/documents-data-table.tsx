@@ -165,9 +165,10 @@ export function DocumentsDataTable({
         );
       },
       cell: ({ row }) => {
+        const dateStr = row.original.created_at || row.original.uploaded_at;
         return (
           <span className="text-sm text-muted-foreground">
-            {new Date(row.original.uploaded_at).toLocaleDateString("fr-CA")}
+            {dateStr ? new Date(dateStr).toLocaleDateString("fr-CA") : "—"}
           </span>
         );
       },

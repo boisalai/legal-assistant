@@ -65,13 +65,26 @@ export function DirectoryTreeView({
     return fullPath;
   };
 
-  // Format file size
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 B";
+  // Format file size (French by default, ready for i18n)
+  const formatFileSize = (bytes: number, locale: string = "fr") => {
+    if (bytes === 0) {
+      return locale === "fr" ? "0 octet" : "0 byte";
+    }
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
+    const sizesFr = ["octets", "Ko", "Mo", "Go"];
+    const sizesEn = ["bytes", "KB", "MB", "GB"];
+    const sizes = locale === "fr" ? sizesFr : sizesEn;
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    const value = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+
+    // Special case for bytes/octets: no space before unit, and handle plural
+    if (i === 0) {
+      return locale === "fr"
+        ? `${value} ${value <= 1 ? "octet" : "octets"}`
+        : `${value} ${value === 1 ? "byte" : "bytes"}`;
+    }
+
+    return `${value} ${sizes[i]}`;
   };
 
   // Check if document is a PDF file
@@ -102,7 +115,7 @@ export function DirectoryTreeView({
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Chemin du fichier
+            Nom du fichier
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
@@ -139,6 +152,46 @@ export function DirectoryTreeView({
         }
       },
       accessorFn: (row) => getRelativePath(row.file_path || ""),
+    },
+    {
+      accessorKey: "linked_source.source_mtime",
+      header: ({ column }) => {
+        return (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Date de modification
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+      cell: ({ row }) => {
+        const doc = row.original;
+        const mtime = doc.linked_source?.source_mtime;
+
+        if (!mtime) {
+          return (
+            <div className="text-right">
+              <span className="text-sm text-muted-foreground">—</span>
+            </div>
+          );
+        }
+
+        // Convert Unix timestamp (seconds) to Date object
+        const date = new Date(mtime * 1000);
+
+        return (
+          <div className="text-right">
+            <span className="text-sm text-muted-foreground">
+              {date.toLocaleDateString("fr-CA")}
+            </span>
+          </div>
+        );
+      },
+      accessorFn: (row) => row.linked_source?.source_mtime || 0,
     },
     {
       accessorKey: "taille",
