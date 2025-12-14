@@ -1577,7 +1577,7 @@ async def transcribe_document_workflow(
                 try:
                     result = await workflow.run(
                         audio_path=file_path,
-                        case_id=case_id,
+                        judgment_id=case_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
                         raw_mode=request.raw_mode,
