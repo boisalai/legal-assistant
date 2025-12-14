@@ -127,14 +127,14 @@ export function DataTable<TData extends { id: string }, TValue>({
             onChange={(event) =>
               table.getColumn("title")?.setFilterValue(event.target.value)
             }
-            className="max-w-sm h-8"
+            className="max-w-sm h-9"
           />
 
           {/* Delete selected */}
           {selectedIds.length > 0 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button className="bg-black text-white hover:bg-black/90">
                   <Trash2 className="h-4 w-4" />
                   {t("deleteSelected", { count: selectedIds.length })}
                 </Button>
@@ -151,7 +151,10 @@ export function DataTable<TData extends { id: string }, TValue>({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteSelected}>
+                  <AlertDialogAction
+                    onClick={handleDeleteSelected}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
                     {t("delete")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -197,7 +200,7 @@ export function DataTable<TData extends { id: string }, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="font-normal text-black">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -210,7 +213,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-24 text-center font-normal text-black"
                 >
                   {t("noCases")}
                 </TableCell>

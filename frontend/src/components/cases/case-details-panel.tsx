@@ -37,6 +37,7 @@ import type { LinkedDirectory } from "./linked-directories-data-table";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
+import { SyncProgressModal, SyncTask, SyncResult } from "./sync-progress-modal";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -103,56 +104,131 @@ export function CaseDetailsPanel({
   const [extractingPDFDocId, setExtractingPDFDocId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
-  const [syncingDocuments, setSyncingDocuments] = useState(false);
-  const [syncResultDialogOpen, setSyncResultDialogOpen] = useState(false);
-  const [syncResultMessage, setSyncResultMessage] = useState("");
-  const [syncResultTitle, setSyncResultTitle] = useState("");
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncTasks, setSyncTasks] = useState<SyncTask[]>([]);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncComplete, setSyncComplete] = useState(false);
+  const [syncHasError, setSyncHasError] = useState(false);
 
   // Handle synchronize documents
   const handleSyncDocuments = async () => {
-    setSyncingDocuments(true);
+    // Initialize sync state
+    setSyncModalOpen(true);
+    setSyncComplete(false);
+    setSyncHasError(false);
+    setSyncResult(null);
+
+    const initialTasks: SyncTask[] = [
+      {
+        id: "scan-uploaded",
+        label: "Analyse des documents uploadés",
+        status: "pending",
+      },
+      {
+        id: "scan-linked",
+        label: "Analyse des répertoires liés",
+        status: "pending",
+      },
+      {
+        id: "refresh",
+        label: "Actualisation de la liste",
+        status: "pending",
+      },
+    ];
+    setSyncTasks(initialTasks);
+
     try {
-      // Sync uploaded documents
+      // Step 1: Sync uploaded documents
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "scan-uploaded" ? { ...t, status: "running" } : t
+        )
+      );
+
       const uploadResult = await documentsApi.sync(caseData.id);
+      const uploadDetails: string[] = [];
+      if (uploadResult.discovered > 0) {
+        uploadDetails.push(`${uploadResult.discovered} fichier(s) découvert(s)`);
+      }
 
-      // Sync linked directories
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "scan-uploaded"
+            ? { ...t, status: "completed", details: uploadDetails.length > 0 ? uploadDetails : ["Aucun changement"] }
+            : t
+        )
+      );
+
+      // Step 2: Sync linked directories
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "scan-linked" ? { ...t, status: "running" } : t
+        )
+      );
+
       const linkedResult = await documentsApi.syncLinkedDirectories(caseData.id);
+      const linkedDetails: string[] = [];
+      if (linkedResult.added > 0) {
+        linkedDetails.push(`${linkedResult.added} fichier(s) ajouté(s)`);
+      }
+      if (linkedResult.updated > 0) {
+        linkedDetails.push(`${linkedResult.updated} fichier(s) mis à jour`);
+      }
+      if (linkedResult.removed > 0) {
+        linkedDetails.push(`${linkedResult.removed} fichier(s) supprimé(s)`);
+      }
 
-      // Refresh documents list
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "scan-linked"
+            ? { ...t, status: "completed", details: linkedDetails.length > 0 ? linkedDetails : ["Aucun changement"] }
+            : t
+        )
+      );
+
+      // Step 3: Refresh documents list
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "refresh" ? { ...t, status: "running" } : t
+        )
+      );
+
       if (onDocumentsChange) {
         await onDocumentsChange();
       }
 
-      // Build summary message
-      const messages = [];
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.id === "refresh" ? { ...t, status: "completed" } : t
+        )
+      );
 
-      if (uploadResult.discovered > 0) {
-        messages.push(`${uploadResult.discovered} fichier(s) uploadé(s) découvert(s)`);
-      }
+      // Set final result
+      setSyncResult({
+        uploadedDiscovered: uploadResult.discovered,
+        linkedAdded: linkedResult.added,
+        linkedUpdated: linkedResult.updated,
+        linkedRemoved: linkedResult.removed,
+      });
 
-      if (linkedResult.added > 0 || linkedResult.updated > 0 || linkedResult.removed > 0) {
-        const parts = [];
-        if (linkedResult.added > 0) parts.push(`${linkedResult.added} ajouté(s)`);
-        if (linkedResult.updated > 0) parts.push(`${linkedResult.updated} mis à jour`);
-        if (linkedResult.removed > 0) parts.push(`${linkedResult.removed} supprimé(s)`);
-        messages.push(`Répertoires liés : ${parts.join(", ")}`);
-      }
-
-      if (messages.length > 0) {
-        setSyncResultTitle("Synchronisation réussie");
-        setSyncResultMessage(messages.join("\n"));
-      } else {
-        setSyncResultTitle("Synchronisation réussie");
-        setSyncResultMessage("Aucun changement détecté.");
-      }
-
-      setSyncResultDialogOpen(true);
+      setSyncComplete(true);
+      setSyncHasError(false);
     } catch (err) {
-      setSyncResultTitle("Erreur de synchronisation");
-      setSyncResultMessage(err instanceof Error ? err.message : "Erreur lors de la synchronisation");
-      setSyncResultDialogOpen(true);
-    } finally {
-      setSyncingDocuments(false);
+      // Mark current running task as error
+      setSyncTasks((prev) =>
+        prev.map((t) =>
+          t.status === "running"
+            ? {
+                ...t,
+                status: "error",
+                error: err instanceof Error ? err.message : "Erreur inconnue",
+              }
+            : t
+        )
+      );
+      setSyncComplete(true);
+      setSyncHasError(true);
+      toast.error("Erreur lors de la synchronisation");
     }
   };
 
@@ -326,9 +402,9 @@ export function CaseDetailsPanel({
       <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
-          {caseData.description && (
+          {caseData.course_name && (
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <span>{caseData.description}</span>
+              <span>{caseData.course_name}</span>
             </div>
           )}
         </div>
@@ -382,7 +458,7 @@ export function CaseDetailsPanel({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-course-name">Nom du cours</Label>
+                <Label htmlFor="edit-course-name">Titre du cours</Label>
                 <Input
                   id="edit-course-name"
                   value={editCourseName}
@@ -495,10 +571,10 @@ export function CaseDetailsPanel({
           <Button
             size="sm"
             onClick={handleSyncDocuments}
-            disabled={syncingDocuments}
+            disabled={syncModalOpen && !syncComplete}
             className="gap-2"
           >
-            {syncingDocuments ? (
+            {syncModalOpen && !syncComplete ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -679,20 +755,15 @@ export function CaseDetailsPanel({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Sync Result Dialog */}
-      <AlertDialog open={syncResultDialogOpen} onOpenChange={setSyncResultDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{syncResultTitle}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {syncResultMessage}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setSyncResultDialogOpen(false)}>OK</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Sync Progress Modal */}
+      <SyncProgressModal
+        open={syncModalOpen}
+        onOpenChange={setSyncModalOpen}
+        tasks={syncTasks}
+        result={syncResult}
+        isComplete={syncComplete}
+        hasError={syncHasError}
+      />
     </div>
   );
 }
