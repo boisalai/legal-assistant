@@ -47,29 +47,32 @@ export const createColumns = (
     header: t("table.columns.code"),
     cell: ({ row }) => {
       const courseCode = row.original.course_code;
+      const fullId = row.original.id;
+      const urlId = fullId.replace("case:", "");
       return courseCode ? (
-        <span className="text-sm">
+        <Link
+          href={`/cases/${urlId}`}
+          className="text-sm hover:underline"
+        >
           {courseCode}
-        </span>
+        </Link>
       ) : (
-        <span className="text-muted-foreground">-</span>
+        <span className="text-sm">-</span>
       );
     },
   },
   {
     accessorKey: "title",
-    header: t("table.columns.name"),
+    header: t("table.columns.title"),
     cell: ({ row }) => {
-      const fullId = row.original.id;
-      const urlId = fullId.replace("case:", "");
+      // Display course_name for academic courses, otherwise display title
+      const courseName = row.original.course_name;
       const title = row.getValue("title") as string;
+      const displayText = courseName || title;
       return (
-        <Link
-          href={`/cases/${urlId}`}
-          className="font-medium hover:underline"
-        >
-          {title}
-        </Link>
+        <span className="text-sm">
+          {displayText}
+        </span>
       );
     },
   },
@@ -79,7 +82,7 @@ export const createColumns = (
     cell: ({ row }) => {
       const description = row.getValue("description") as string | undefined;
       return (
-        <span className="text-muted-foreground max-w-md truncate block">
+        <span className="text-sm max-w-md truncate block">
           {description || "-"}
         </span>
       );
@@ -92,7 +95,7 @@ export const createColumns = (
       const professor = row.original.professor;
       return (
         <span className="text-sm">
-          {professor || <span className="text-muted-foreground">-</span>}
+          {professor || "-"}
         </span>
       );
     },
@@ -102,9 +105,9 @@ export const createColumns = (
     header: t("table.columns.date"),
     cell: ({ row }) => {
       const date = row.getValue("created_at") as string;
-      if (!date) return <span className="text-muted-foreground">-</span>;
+      if (!date) return <span className="text-sm">-</span>;
       return (
-        <span className="text-muted-foreground">
+        <span className="text-sm">
           {new Date(date).toLocaleDateString("fr-CA")}
         </span>
       );

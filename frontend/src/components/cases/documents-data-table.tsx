@@ -105,7 +105,7 @@ export function DocumentsDataTable({
 
         return (
           <div className="flex items-center gap-2">
-            <span className="font-medium">{doc.nom_fichier}</span>
+            <span className="font-normal">{doc.nom_fichier}</span>
             {doc.texte_extrait && (
               <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label="Indexé" />
             )}
@@ -167,7 +167,7 @@ export function DocumentsDataTable({
       cell: ({ row }) => {
         const dateStr = row.original.created_at || row.original.uploaded_at;
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-black">
             {dateStr ? new Date(dateStr).toLocaleDateString("fr-CA") : "—"}
           </span>
         );
@@ -363,7 +363,7 @@ export function DocumentsDataTable({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="font-normal text-black">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -371,7 +371,7 @@ export function DocumentsDataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center font-normal text-black">
                   Aucun document trouvé.
                 </TableCell>
               </TableRow>

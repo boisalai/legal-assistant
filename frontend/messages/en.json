@@ -28,8 +28,8 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "cases": "Cases",
-    "newCase": "New case",
+    "cases": "Courses",
+    "newCase": "New courses",
     "analysis": "Analysis",
     "assistant": "AI Assistant",
     "calculator": "Calculator",
@@ -40,10 +40,10 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "subtitle": "Manage your notarial cases",
-    "newCase": "New case",
-    "totalCases": "Total cases",
-    "casesCreated": "cases created",
+    "subtitle": "Manage your notarial courses",
+    "newCase": "New course",
+    "totalCases": "Total courses",
+    "casesCreated": "courses created",
     "newCases": "New",
     "toAnalyze": "to analyze",
     "inAnalysis": "In analysis",
@@ -53,14 +53,14 @@
     "errors": "Errors",
     "toFix": "to fix",
     "archived": "Archived",
-    "noCases": "No cases yet.",
-    "createFirst": "Create your first case",
-    "loadError": "Unable to load cases"
+    "noCases": "No courses yet.",
+    "createFirst": "Create your first course",
+    "loadError": "Unable to load courses"
   },
   "cases": {
-    "title": "Cases",
-    "newCase": "New case",
-    "caseName": "Case name",
+    "title": "Courses",
+    "newCase": "New course",
+    "caseName": "Course name",
     "caseNamePlaceholder": "E.g.: Dupont-Martin Sale",
     "transactionType": "Transaction type",
     "selectType": "Select a type",
@@ -369,7 +369,7 @@
     "lastPage": "Last page",
     "columns": {
       "code": "Code",
-      "name": "Name",
+      "title": "Title",
       "description": "Description",
       "professor": "Professor",
       "date": "Date"
@@ -378,7 +378,7 @@
       "openMenu": "Open menu",
       "actions": "Actions",
       "copyId": "Copy ID",
-      "open": "Open",
+      "open": "View",
       "delete": "Delete",
       "selectAll": "Select all",
       "selectRow": "Select row"

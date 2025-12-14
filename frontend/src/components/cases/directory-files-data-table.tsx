@@ -72,7 +72,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
       cell: ({ row }) => {
         const doc = row.original;
         return (
-          <span className="font-medium truncate">{doc.nom_fichier}</span>
+          <span className="font-normal truncate">{doc.nom_fichier}</span>
         );
       },
     },
@@ -91,7 +91,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
       },
       cell: ({ row }) => {
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-black">
             {formatFileSize(row.original.taille)}
           </span>
         );
@@ -114,7 +114,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
         const doc = row.original;
         const mtime = doc.linked_source?.source_mtime;
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-black">
             {formatDate(mtime)}
           </span>
         );
@@ -137,7 +137,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
         const doc = row.original;
         const folder = doc.linked_source?.parent_folder || "root";
         return (
-          <span className="text-sm text-muted-foreground font-mono truncate max-w-xs">
+          <span className="text-sm text-black font-mono truncate max-w-xs">
             {folder === "root" ? "/" : folder}
           </span>
         );
@@ -182,7 +182,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} className="font-bold text-foreground">
+                    <TableHead key={header.id} className="bg-blue-50 font-bold text-black">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -203,7 +203,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="font-normal text-black">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -211,7 +211,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center font-normal text-black">
                   Aucun fichier trouvé.
                 </TableCell>
               </TableRow>

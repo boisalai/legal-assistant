@@ -29,7 +29,7 @@
   "nav": {
     "dashboard": "Tableau de bord",
     "cases": "Cours",
-    "newCase": "Nouveau dossier",
+    "newCase": "Nouveau cours",
     "analysis": "Analyse",
     "assistant": "Assistant IA",
     "calculator": "Calculatrice",
@@ -378,7 +378,7 @@
     "lastPage": "Dernière page",
     "columns": {
       "code": "Code",
-      "name": "Nom",
+      "title": "Titre",
       "description": "Description",
       "professor": "Professeur",
       "date": "Date"
@@ -387,7 +387,7 @@
       "openMenu": "Ouvrir le menu",
       "actions": "Actions",
       "copyId": "Copier l'ID",
-      "open": "Ouvrir",
+      "open": "Consulter",
       "delete": "Supprimer",
       "selectAll": "Sélectionner tout",
       "selectRow": "Sélectionner la ligne"
