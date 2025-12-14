@@ -82,7 +82,7 @@ export default function CasesListPage() {
     }
   };
 
-  const columns = createColumns(handleDelete, handleTogglePin);
+  const columns = createColumns(handleDelete, handleTogglePin, (key: string) => t(key));
 
   // Sort cases: pinned first, then by updated_at descending
   const sortedCases = [...cases].sort((a, b) => {

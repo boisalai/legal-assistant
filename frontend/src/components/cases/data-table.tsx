@@ -13,6 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { useTranslations } from "next-intl";
 
 import {
   Table,
@@ -69,8 +70,9 @@ export function DataTable<TData extends { id: string }, TValue>({
   onDeleteSelected,
   initialFilter = "",
   onNewCase,
-  newCaseLabel = "Nouveau dossier",
+  newCaseLabel,
 }: DataTableProps<TData, TValue>) {
+  const t = useTranslations("table");
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     initialFilter ? [{ id: "title", value: initialFilter }] : []
@@ -120,7 +122,7 @@ export function DataTable<TData extends { id: string }, TValue>({
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Filtrer par nom..."
+            placeholder={t("filterByName")}
             value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
             onChange={(event) =>
               table.getColumn("title")?.setFilterValue(event.target.value)
@@ -134,21 +136,23 @@ export function DataTable<TData extends { id: string }, TValue>({
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm">
                   <Trash2 className="h-4 w-4" />
-                  Supprimer ({selectedIds.length})
+                  {t("deleteSelected", { count: selectedIds.length })}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                  <AlertDialogTitle>{t("confirmDeletion")}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Etes-vous sur de vouloir supprimer {selectedIds.length} dossier{selectedIds.length > 1 ? "s" : ""} ?
-                    Cette action est irreversible.
+                    {t("deleteWarning", {
+                      count: selectedIds.length,
+                      plural: selectedIds.length > 1 ? "s" : ""
+                    })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDeleteSelected}>
-                    Supprimer
+                    {t("delete")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -208,7 +212,7 @@ export function DataTable<TData extends { id: string }, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Aucun dossier.
+                  {t("noCases")}
                 </TableCell>
               </TableRow>
             )}
@@ -220,10 +224,13 @@ export function DataTable<TData extends { id: string }, TValue>({
       <div className="flex items-center justify-between py-4">
         <div className="flex items-center gap-6">
           <div className="text-sm text-muted-foreground">
-            {selectedIds.length} sur {table.getFilteredRowModel().rows.length} sélectionné(s)
+            {t("selected", {
+              selected: selectedIds.length,
+              total: table.getFilteredRowModel().rows.length
+            })}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Rows per page</span>
+            <span className="text-sm text-muted-foreground">{t("rowsPerPage")}</span>
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => {
@@ -244,9 +251,11 @@ export function DataTable<TData extends { id: string }, TValue>({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-sm font-medium text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
+          <div className="text-sm text-muted-foreground">
+            {t("page", {
+              current: table.getState().pagination.pageIndex + 1,
+              total: table.getPageCount()
+            })}
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -255,7 +264,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               className="h-8 w-8"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
-              title="Première page"
+              title={t("firstPage")}
             >
               <ChevronsLeft className="h-4 w-4" />
             </Button>
@@ -265,7 +274,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               className="h-8 w-8"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              title="Précédent"
+              title={t("previousPage")}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -275,7 +284,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               className="h-8 w-8"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              title="Suivant"
+              title={t("nextPage")}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -285,7 +294,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               className="h-8 w-8"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
-              title="Dernière page"
+              title={t("lastPage")}
             >
               <ChevronsRight className="h-4 w-4" />
             </Button>

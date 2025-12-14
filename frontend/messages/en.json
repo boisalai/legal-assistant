@@ -351,5 +351,37 @@
       "active": "Active",
       "inactive": "Inactive"
     }
+  },
+  "table": {
+    "filterByName": "Filter by name...",
+    "delete": "Delete",
+    "deleteSelected": "Delete ({count})",
+    "confirmDeletion": "Confirm deletion",
+    "deleteWarning": "Are you sure you want to delete {count} case{plural}? This action is irreversible.",
+    "cancel": "Cancel",
+    "noCases": "No cases.",
+    "selected": "{selected} of {total} selected",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {current} of {total}",
+    "firstPage": "First page",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "lastPage": "Last page",
+    "columns": {
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "professor": "Professor",
+      "date": "Date"
+    },
+    "actions": {
+      "openMenu": "Open menu",
+      "actions": "Actions",
+      "copyId": "Copy ID",
+      "open": "Open",
+      "delete": "Delete",
+      "selectAll": "Select all",
+      "selectRow": "Select row"
+    }
   }
 }

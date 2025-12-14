@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import type { Case } from "@/types";
-import { MoreHorizontal, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
 export const createColumns = (
   onDelete: (id: string) => void,
-  onTogglePin: (id: string) => void
+  onTogglePin: (id: string) => void,
+  t: (key: string) => string
 ): ColumnDef<Case>[] => [
   {
     id: "select",
@@ -28,33 +29,36 @@ export const createColumns = (
           (table.getIsSomePageRowsSelected() && "indeterminate")
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Selectionner tout"
+        aria-label={t("table.actions.selectAll")}
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
         onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Selectionner la ligne"
+        aria-label={t("table.actions.selectRow")}
       />
     ),
     enableSorting: false,
     enableHiding: false,
   },
   {
-    accessorKey: "title",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Nom
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+    accessorKey: "course_code",
+    header: t("table.columns.code"),
+    cell: ({ row }) => {
+      const courseCode = row.original.course_code;
+      return courseCode ? (
+        <span className="text-sm">
+          {courseCode}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">-</span>
       );
     },
+  },
+  {
+    accessorKey: "title",
+    header: t("table.columns.name"),
     cell: ({ row }) => {
       const fullId = row.original.id;
       const urlId = fullId.replace("case:", "");
@@ -70,46 +74,8 @@ export const createColumns = (
     },
   },
   {
-    accessorKey: "course_code",
-    header: "Code",
-    cell: ({ row }) => {
-      const courseCode = row.original.course_code;
-      return courseCode ? (
-        <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-          {courseCode}
-        </code>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-  },
-  {
-    accessorKey: "professor",
-    header: "Professeur",
-    cell: ({ row }) => {
-      const professor = row.original.professor;
-      return (
-        <span className="text-sm">
-          {professor || <span className="text-muted-foreground">-</span>}
-        </span>
-      );
-    },
-  },
-  {
-    accessorKey: "credits",
-    header: "Crédits",
-    cell: ({ row }) => {
-      const credits = row.original.credits;
-      return credits ? (
-        <span className="text-sm font-medium">{credits}</span>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-  },
-  {
     accessorKey: "description",
-    header: "Description",
+    header: t("table.columns.description"),
     cell: ({ row }) => {
       const description = row.getValue("description") as string | undefined;
       return (
@@ -120,19 +86,20 @@ export const createColumns = (
     },
   },
   {
-    accessorKey: "created_at",
-    header: ({ column }) => {
+    accessorKey: "professor",
+    header: t("table.columns.professor"),
+    cell: ({ row }) => {
+      const professor = row.original.professor;
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Date
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <span className="text-sm">
+          {professor || <span className="text-muted-foreground">-</span>}
+        </span>
       );
     },
+  },
+  {
+    accessorKey: "created_at",
+    header: t("table.columns.date"),
     cell: ({ row }) => {
       const date = row.getValue("created_at") as string;
       if (!date) return <span className="text-muted-foreground">-</span>;
@@ -153,28 +120,28 @@ export const createColumns = (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">{t("table.actions.openMenu")}</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("table.actions.actions")}</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(caseItem.id)}
             >
-              Copier l'ID
+              {t("table.actions.copyId")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => window.location.href = `/cases/${caseItem.id.replace("case:", "")}`}
             >
-              Ouvrir
+              {t("table.actions.open")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete(caseItem.id)}
               className="text-red-600"
             >
-              Supprimer
+              {t("table.actions.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
