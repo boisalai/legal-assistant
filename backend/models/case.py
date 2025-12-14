@@ -21,6 +21,14 @@ class CaseBase(BaseModel):
     # Metadata
     keywords: list[str] = Field(default_factory=list, description="Mots-cles")
 
+    # Academic fields (optional - dual mode support)
+    session_id: Optional[str] = Field(None, description="ID de la session académique")
+    course_code: Optional[str] = Field(None, description="Code du cours (ex: 'DRT-1151G')")
+    course_name: Optional[str] = Field(None, description="Nom du cours")
+    professor: Optional[str] = Field(None, description="Nom du professeur")
+    credits: int = Field(3, ge=1, le=12, description="Nombre de crédits (1-12)")
+    color: Optional[str] = Field(None, description="Couleur pour l'UI (hex code)")
+
 
 class CaseCreate(CaseBase):
     """Schema pour creer un nouveau dossier."""
@@ -33,6 +41,14 @@ class CaseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     keywords: Optional[list[str]] = None
+
+    # Academic fields (optional)
+    session_id: Optional[str] = None
+    course_code: Optional[str] = None
+    course_name: Optional[str] = None
+    professor: Optional[str] = None
+    credits: Optional[int] = Field(None, ge=1, le=12)
+    color: Optional[str] = None
 
 
 class Case(CaseBase):

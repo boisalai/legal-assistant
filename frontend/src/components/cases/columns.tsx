@@ -42,15 +42,6 @@ export const createColumns = (
     enableHiding: false,
   },
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      const id = row.getValue("id") as string;
-      const shortId = id.replace("case:", "").substring(0, 8);
-      return <code className="text-xs font-mono text-muted-foreground">{shortId}</code>;
-    },
-  },
-  {
     accessorKey: "title",
     header: ({ column }) => {
       return (
@@ -65,7 +56,7 @@ export const createColumns = (
       );
     },
     cell: ({ row }) => {
-      const fullId = row.getValue("id") as string;
+      const fullId = row.original.id;
       const urlId = fullId.replace("case:", "");
       const title = row.getValue("title") as string;
       return (
@@ -75,6 +66,44 @@ export const createColumns = (
         >
           {title}
         </Link>
+      );
+    },
+  },
+  {
+    accessorKey: "course_code",
+    header: "Code",
+    cell: ({ row }) => {
+      const courseCode = row.original.course_code;
+      return courseCode ? (
+        <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+          {courseCode}
+        </code>
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
+    },
+  },
+  {
+    accessorKey: "professor",
+    header: "Professeur",
+    cell: ({ row }) => {
+      const professor = row.original.professor;
+      return (
+        <span className="text-sm">
+          {professor || <span className="text-muted-foreground">-</span>}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "credits",
+    header: "Crédits",
+    cell: ({ row }) => {
+      const credits = row.original.credits;
+      return credits ? (
+        <span className="text-sm font-medium">{credits}</span>
+      ) : (
+        <span className="text-muted-foreground">-</span>
       );
     },
   },

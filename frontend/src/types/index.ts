@@ -2,6 +2,22 @@
 // Assistant d'etudes juridiques - Gestion de dossiers
 
 // ============================================
+// Session Types (Academic)
+// ============================================
+
+// Academic session (e.g., "Automne 2024", "Hiver 2025")
+export interface Session {
+  id: string;
+  title: string;              // Session title (e.g., "Automne 2024")
+  semester: string;           // Semester (e.g., "Automne", "Hiver", "Été")
+  year: number;               // Academic year
+  start_date: string;         // ISO datetime string
+  end_date: string;           // ISO datetime string
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
 // Case Types
 // ============================================
 
@@ -15,6 +31,15 @@ export interface Case {
   created_at: string;
   updated_at?: string;
   pinned?: boolean;           // Optional pinned flag
+
+  // Academic fields (optional - dual mode support)
+  session_id?: string;        // Link to academic session
+  course_code?: string;       // Course code (e.g., "DRT-1151G")
+  course_name?: string;       // Course name
+  professor?: string;         // Professor name
+  credits?: number;           // Number of credits (1-12)
+  color?: string;             // UI color (hex code)
+
   // Legacy fields for analysis page
   nom_dossier?: string;       // Deprecated: use title instead
   type_transaction?: string;  // Deprecated: legacy field
