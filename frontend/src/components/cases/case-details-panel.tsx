@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SessionSelector } from "@/components/cases/session-selector";
 import {
   FileUp,
   Mic,
@@ -46,7 +48,16 @@ interface CaseDetailsPanelProps {
   onRecordAudio: () => void;
   onLinkFile: () => void;
   onAnalyze: () => void;
-  onUpdateCase: (data: { description?: string; type_transaction?: string }) => Promise<void>;
+  onUpdateCase: (data: {
+    description?: string;
+    type_transaction?: string;
+    session_id?: string;
+    course_code?: string;
+    course_name?: string;
+    professor?: string;
+    credits?: number;
+    color?: string;
+  }) => Promise<void>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onPreviewDocument: (docId: string) => void;
   onPreviewDirectory: (directory: LinkedDirectory) => void;
@@ -78,6 +89,14 @@ export function CaseDetailsPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState(caseData.description || "");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Academic fields for editing
+  const [editSessionId, setEditSessionId] = useState(caseData.session_id || "");
+  const [editCourseCode, setEditCourseCode] = useState(caseData.course_code || "");
+  const [editCourseName, setEditCourseName] = useState(caseData.course_name || "");
+  const [editProfessor, setEditProfessor] = useState(caseData.professor || "");
+  const [editCredits, setEditCredits] = useState(caseData.credits?.toString() || "3");
+  const [editColor, setEditColor] = useState(caseData.color || "#3B82F6");
   const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
   const [transcribingDocId, setTranscribingDocId] = useState<string | null>(null);
   const [clearingDocId, setClearingDocId] = useState<string | null>(null);
@@ -271,9 +290,19 @@ export function CaseDetailsPanel({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onUpdateCase({
+      const updateData: any = {
         description: editDescription,
-      });
+      };
+
+      // Add academic fields if they have values
+      if (editSessionId) updateData.session_id = editSessionId;
+      if (editCourseCode) updateData.course_code = editCourseCode;
+      if (editCourseName) updateData.course_name = editCourseName;
+      if (editProfessor) updateData.professor = editProfessor;
+      if (editCredits) updateData.credits = parseInt(editCredits, 10);
+      if (editColor) updateData.color = editColor;
+
+      await onUpdateCase(updateData);
       setIsEditing(false);
     } finally {
       setIsSaving(false);
@@ -282,6 +311,12 @@ export function CaseDetailsPanel({
 
   const handleCancelEdit = () => {
     setEditDescription(caseData.description || "");
+    setEditSessionId(caseData.session_id || "");
+    setEditCourseCode(caseData.course_code || "");
+    setEditCourseName(caseData.course_name || "");
+    setEditProfessor(caseData.professor || "");
+    setEditCredits(caseData.credits?.toString() || "3");
+    setEditColor(caseData.color || "#3B82F6");
     setIsEditing(false);
   };
 
@@ -303,19 +338,100 @@ export function CaseDetailsPanel({
       <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
         {/* Mode édition */}
         {isEditing && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label> 
-              <Textarea
-                id="edit-description"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="Description du dossier"
-                disabled={isSaving}
-                className="text-sm min-h-[80px]"
-              />
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+            <h3 className="font-semibold text-sm">Modifier le dossier</h3>
+
+            {/* Academic fields */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm text-muted-foreground">Informations académiques</h4>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-session">Session</Label>
+                <SessionSelector
+                  value={editSessionId}
+                  onValueChange={setEditSessionId}
+                  disabled={isSaving}
+                  placeholder="Sélectionner une session"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-course-code">Code du cours</Label>
+                  <Input
+                    id="edit-course-code"
+                    value={editCourseCode}
+                    onChange={(e) => setEditCourseCode(e.target.value)}
+                    placeholder="Ex: DRT-1151G"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-credits">Crédits</Label>
+                  <Input
+                    id="edit-credits"
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={editCredits}
+                    onChange={(e) => setEditCredits(e.target.value)}
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-course-name">Nom du cours</Label>
+                <Input
+                  id="edit-course-name"
+                  value={editCourseName}
+                  onChange={(e) => setEditCourseName(e.target.value)}
+                  placeholder="Ex: Introduction au droit constitutionnel"
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Description du dossier"
+                  disabled={isSaving}
+                  className="text-sm min-h-[80px]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-professor">Professeur</Label>
+                <Input
+                  id="edit-professor"
+                  value={editProfessor}
+                  onChange={(e) => setEditProfessor(e.target.value)}
+                  placeholder="Ex: Prof. Dupont"
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-color">Couleur</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="edit-color"
+                    type="color"
+                    value={editColor}
+                    onChange={(e) => setEditColor(e.target.value)}
+                    disabled={isSaving}
+                    className="w-20 h-10"
+                  />
+                  <span className="text-sm text-muted-foreground">{editColor}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 pt-2">
               <Button
                 size="sm"
                 onClick={handleSave}

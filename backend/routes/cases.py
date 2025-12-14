@@ -22,6 +22,8 @@ from pydantic import BaseModel
 
 from config.settings import settings
 from services.surreal_service import get_surreal_service
+from models.case import Case, CaseCreate, CaseUpdate
+from services.course_service import get_course_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,32 +39,28 @@ from routes.auth import active_sessions
 # Pydantic Models
 # ============================================================================
 
-class CaseBase(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-
-
-class CaseCreate(CaseBase):
-    pass
-
-
-class CaseResponse(CaseBase):
+class CaseResponse(BaseModel):
+    """Response model for a case/course."""
     id: str
+    title: str
+    description: Optional[str] = None
     keywords: list[str] = []
     created_at: str
     updated_at: Optional[str] = None
 
+    # Academic fields
+    session_id: Optional[str] = None
+    course_code: Optional[str] = None
+    course_name: Optional[str] = None
+    professor: Optional[str] = None
+    credits: Optional[int] = None
+    color: Optional[str] = None
+
 
 class CaseListResponse(BaseModel):
+    """Response model for a list of cases/courses."""
     cases: list[CaseResponse]
     total: int
-
-
-class CaseUpdate(BaseModel):
-    """Model for updating a case."""
-    title: Optional[str] = None
-    description: Optional[str] = None
-    keywords: Optional[list[str]] = None
 
 
 # ============================================================================
@@ -170,11 +168,18 @@ async def list_cases(
                 for item in items:
                     cases.append(CaseResponse(
                         id=str(item.get("id", "")),
-                        title=item.get("title"),
+                        title=item.get("title", ""),
                         description=item.get("description"),
                         keywords=item.get("keywords", []),
                         created_at=item.get("created_at", ""),
                         updated_at=item.get("updated_at"),
+                        # Academic fields
+                        session_id=str(item.get("session_id")) if item.get("session_id") else None,
+                        course_code=item.get("course_code"),
+                        course_name=item.get("course_name"),
+                        professor=item.get("professor"),
+                        credits=item.get("credits"),
+                        color=item.get("color"),
                     ))
 
         return CaseListResponse(cases=cases, total=len(cases))
@@ -189,14 +194,14 @@ async def list_cases(
 
 @router.post("", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_case(
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
+    case_create: CaseCreate,
     user_id: str = Depends(require_auth)
 ):
     """
-    Cree un nouveau dossier.
-    """
+    Cree un nouveau dossier / cours.
 
+    Supports both legal mode (basic fields) and academic mode (with session, course code, etc.)
+    """
     case_id = str(uuid.uuid4())[:8]
 
     # Create case in database
@@ -206,22 +211,63 @@ async def create_case(
             await service.connect()
 
         now = datetime.utcnow().isoformat()
-        case_data = {
-            "title": title or "Sans titre",
-            "description": description,
-            "keywords": [],
-            "created_at": now,
-            "updated_at": now,
-        }
+
+        # Convert Pydantic model to dict
+        case_data = case_create.model_dump(exclude_unset=True)
+        case_data["created_at"] = now
+        case_data["updated_at"] = now
+
+        # Ensure title exists
+        if "title" not in case_data or not case_data["title"]:
+            case_data["title"] = "Sans titre"
+
+        # Normalize session_id if present
+        if "session_id" in case_data and case_data["session_id"]:
+            if not case_data["session_id"].startswith("session:"):
+                case_data["session_id"] = f"session:{case_data['session_id']}"
+
+        # Check for duplicate course_code in same session (if academic mode)
+        if case_data.get("course_code") and case_data.get("session_id"):
+            course_service = get_course_service()
+            exists = await course_service.check_course_code_exists(
+                course_code=case_data["course_code"],
+                session_id=case_data["session_id"]
+            )
+            if exists:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Course code '{case_data['course_code']}' already exists in this session"
+                )
 
         result = await service.create("case", case_data, record_id=case_id)
-        logger.info(f"Case created: {case_id}")
+        logger.info(f"Case/Course created: {case_id}")
+
+        # Get the created case to return full data
+        created_case = await get_case_by_id(service, f"case:{case_id}")
+        if not created_case:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Case created but could not be retrieved"
+            )
 
         return CaseResponse(
-            id=f"case:{case_id}",
-            **case_data
+            id=str(created_case.get("id", f"case:{case_id}")),
+            title=created_case.get("title", ""),
+            description=created_case.get("description"),
+            keywords=created_case.get("keywords", []),
+            created_at=created_case.get("created_at", now),
+            updated_at=created_case.get("updated_at"),
+            # Academic fields
+            session_id=str(created_case.get("session_id")) if created_case.get("session_id") else None,
+            course_code=created_case.get("course_code"),
+            course_name=created_case.get("course_name"),
+            professor=created_case.get("professor"),
+            credits=created_case.get("credits"),
+            color=created_case.get("color"),
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating case: {e}")
         raise HTTPException(
@@ -257,11 +303,18 @@ async def get_case(
 
         return CaseResponse(
             id=str(item.get("id", case_id)),
-            title=item.get("title"),
+            title=item.get("title", ""),
             description=item.get("description"),
             keywords=item.get("keywords", []),
             created_at=item.get("created_at", ""),
             updated_at=item.get("updated_at"),
+            # Academic fields
+            session_id=str(item.get("session_id")) if item.get("session_id") else None,
+            course_code=item.get("course_code"),
+            course_name=item.get("course_name"),
+            professor=item.get("professor"),
+            credits=item.get("credits"),
+            color=item.get("color"),
         )
 
     except HTTPException:
@@ -300,16 +353,32 @@ async def update_case(
                 detail="Dossier non trouve"
             )
 
-        # Build update dict (only non-None values)
+        # Build update dict (only explicitly set values)
         now = datetime.utcnow().isoformat()
-        updates = {"updated_at": now}
+        updates = update_data.model_dump(exclude_unset=True)
+        updates["updated_at"] = now
 
-        if update_data.title is not None:
-            updates["title"] = update_data.title
-        if update_data.description is not None:
-            updates["description"] = update_data.description
-        if update_data.keywords is not None:
-            updates["keywords"] = update_data.keywords
+        # Normalize session_id if present
+        if "session_id" in updates and updates["session_id"]:
+            if not updates["session_id"].startswith("session:"):
+                updates["session_id"] = f"session:{updates['session_id']}"
+
+        # Check for duplicate course_code if updating it
+        if "course_code" in updates and updates["course_code"]:
+            # Get current session_id (from updates or existing item)
+            session_id = updates.get("session_id") or item.get("session_id")
+            if session_id:
+                course_service = get_course_service()
+                exists = await course_service.check_course_code_exists(
+                    course_code=updates["course_code"],
+                    session_id=session_id,
+                    exclude_id=case_id
+                )
+                if exists:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Course code '{updates['course_code']}' already exists in this session"
+                    )
 
         # Update in database
         await service.merge(case_id, updates)
@@ -317,15 +386,22 @@ async def update_case(
         # Fetch updated record
         updated_item = await get_case_by_id(service, case_id)
 
-        logger.info(f"Case updated: {case_id}")
+        logger.info(f"Case/Course updated: {case_id}")
 
         return CaseResponse(
             id=str(updated_item.get("id", case_id)),
-            title=updated_item.get("title"),
+            title=updated_item.get("title", ""),
             description=updated_item.get("description"),
             keywords=updated_item.get("keywords", []),
             created_at=updated_item.get("created_at", ""),
             updated_at=updated_item.get("updated_at"),
+            # Academic fields
+            session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
+            course_code=updated_item.get("course_code"),
+            course_name=updated_item.get("course_name"),
+            professor=updated_item.get("professor"),
+            credits=updated_item.get("credits"),
+            color=updated_item.get("color"),
         )
 
     except HTTPException:

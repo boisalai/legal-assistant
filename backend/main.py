@@ -133,12 +133,14 @@ except ImportError as e:
 
 from routes import auth_router, cases_router, documents_router, analysis_router, chat_router, docusaurus_router, activity_router, linked_directory_router
 from routes.settings import router as settings_router
+from routes.sessions import router as sessions_router
 from routes.transcription import router as transcription_router
 from routes.extraction import router as extraction_router
 from routes.model_servers import router as model_servers_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(cases_router, tags=["Cases"])
+app.include_router(sessions_router, tags=["Sessions"])
 app.include_router(documents_router, tags=["Documents"])
 app.include_router(transcription_router, tags=["Transcription"])
 app.include_router(extraction_router, tags=["Extraction"])
@@ -150,7 +152,7 @@ app.include_router(docusaurus_router, tags=["Docusaurus"])
 app.include_router(linked_directory_router, tags=["Linked Directory"])
 app.include_router(activity_router, tags=["Activity"])
 
-logger.info("Routes configured: /api/auth, /api/cases, /api/cases/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
+logger.info("Routes configured: /api/auth, /api/cases, /api/sessions, /api/cases/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
 
 
 # ============================================================
