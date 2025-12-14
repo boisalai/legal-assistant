@@ -612,11 +612,15 @@ async def sync_linked_directories_endpoint(
                             content = extract_text_from_file(source_file)
                             doc_id = existing_doc["id"]
 
+                            # Mettre à jour l'objet linked_source complet
+                            updated_linked_source = existing_linked_source.copy()
+                            updated_linked_source["source_hash"] = new_hash
+                            updated_linked_source["source_mtime"] = file_info.modified_time
+                            updated_linked_source["last_sync"] = now
+
                             # Mettre à jour les métadonnées
                             update_data = {
-                                "linked_source.source_hash": new_hash,
-                                "linked_source.source_mtime": file_info.modified_time,
-                                "linked_source.last_sync": now,
+                                "linked_source": updated_linked_source,
                                 "texte_extrait": content if content and not content.startswith("[Contenu") else None,
                                 "taille": file_info.size,
                                 "indexed": False
