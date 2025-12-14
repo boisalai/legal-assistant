@@ -28,7 +28,7 @@
   },
   "nav": {
     "dashboard": "Tableau de bord",
-    "cases": "Dossiers",
+    "cases": "Cours",
     "newCase": "Nouveau dossier",
     "analysis": "Analyse",
     "assistant": "Assistant IA",
@@ -359,6 +359,38 @@
     "status": {
       "active": "Actif",
       "inactive": "Inactif"
+    }
+  },
+  "table": {
+    "filterByName": "Filtrer par nom...",
+    "delete": "Supprimer",
+    "deleteSelected": "Supprimer ({count})",
+    "confirmDeletion": "Confirmer la suppression",
+    "deleteWarning": "Êtes-vous sûr de vouloir supprimer {count} dossier{plural} ? Cette action est irréversible.",
+    "cancel": "Annuler",
+    "noCases": "Aucun dossier.",
+    "selected": "{selected} sur {total} sélectionné(s)",
+    "rowsPerPage": "Lignes par page",
+    "page": "Page {current} de {total}",
+    "firstPage": "Première page",
+    "previousPage": "Précédent",
+    "nextPage": "Suivant",
+    "lastPage": "Dernière page",
+    "columns": {
+      "code": "Code",
+      "name": "Nom",
+      "description": "Description",
+      "professor": "Professeur",
+      "date": "Date"
+    },
+    "actions": {
+      "openMenu": "Ouvrir le menu",
+      "actions": "Actions",
+      "copyId": "Copier l'ID",
+      "open": "Ouvrir",
+      "delete": "Supprimer",
+      "selectAll": "Sélectionner tout",
+      "selectRow": "Sélectionner la ligne"
     }
   }
 }

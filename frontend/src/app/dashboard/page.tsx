@@ -86,7 +86,7 @@ function DashboardContent() {
     }
   };
 
-  const columns = createColumns(handleDelete, handleTogglePin);
+  const columns = createColumns(handleDelete, handleTogglePin, (key: string) => t(key));
 
   if (loading) {
     return (

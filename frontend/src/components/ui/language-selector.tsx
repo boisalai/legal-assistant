@@ -1,40 +1,27 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useLocale, locales, localeNames, localeFlags, type Locale } from "@/i18n";
 
 export function LanguageSelector() {
   const t = useTranslations("common");
   const { locale, changeLocale } = useLocale();
 
+  // Get the other locale (not current one)
+  const otherLocale = locales.find((loc) => loc !== locale) || locale;
+  const otherLocaleName = localeNames[otherLocale];
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title={t("language")}>
-          <Globe className="h-4 w-4" />
-          <span className="sr-only">{t("language")}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {locales.map((loc) => (
-          <DropdownMenuItem
-            key={loc}
-            onClick={() => changeLocale(loc)}
-            className={locale === loc ? "bg-accent" : ""}
-          >
-            {localeNames[loc]}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => changeLocale(otherLocale)}
+      title={t("language")}
+      className="text-sm"
+    >
+      {otherLocaleName}
+    </Button>
   );
 }
 
