@@ -2,31 +2,37 @@
 Utilitaires pour la normalisation des IDs SurrealDB.
 
 Ces fonctions garantissent que les IDs sont formatés correctement
-pour SurrealDB, que ce soit "case:", "judgment:", ou "document:".
+pour SurrealDB, que ce soit "course:", "document:", etc.
 """
 
 
-def normalize_case_id(case_id: str) -> str:
+def normalize_course_id(course_id: str) -> str:
     """
-    Normalise un ID de dossier au format SurrealDB "case:".
+    Normalise un ID de cours au format SurrealDB "course:".
 
     Args:
-        case_id: ID brut (peut être "case:xxx", "judgment:xxx", ou "xxx")
+        course_id: ID brut (peut être "course:xxx", "case:xxx", "judgment:xxx", ou "xxx")
 
     Returns:
-        ID normalisé au format "case:xxx"
+        ID normalisé au format "course:xxx"
 
     Examples:
-        >>> normalize_case_id("case:123")
-        'case:123'
-        >>> normalize_case_id("judgment:123")
-        'case:123'
-        >>> normalize_case_id("123")
-        'case:123'
+        >>> normalize_course_id("course:123")
+        'course:123'
+        >>> normalize_course_id("case:123")
+        'course:123'
+        >>> normalize_course_id("judgment:123")
+        'course:123'
+        >>> normalize_course_id("123")
+        'course:123'
     """
-    # Supprimer les préfixes existants
-    clean_id = case_id.replace("case:", "").replace("judgment:", "")
-    return f"case:{clean_id}"
+    # Supprimer les préfixes existants (support legacy case: et judgment:)
+    clean_id = course_id.replace("course:", "").replace("case:", "").replace("judgment:", "")
+    return f"course:{clean_id}"
+
+
+# Backward compatibility alias
+normalize_case_id = normalize_course_id
 
 
 def normalize_document_id(doc_id: str) -> str:
@@ -55,14 +61,14 @@ def extract_record_id(full_id: str, expected_prefix: str = None) -> str:
     Extrait la partie UUID d'un ID SurrealDB complet.
 
     Args:
-        full_id: ID complet (ex: "judgment:123" ou "document:456")
+        full_id: ID complet (ex: "course:123" ou "document:456")
         expected_prefix: Préfixe attendu pour validation (optionnel)
 
     Returns:
         UUID seul sans préfixe
 
     Examples:
-        >>> extract_record_id("judgment:123")
+        >>> extract_record_id("course:123")
         '123'
         >>> extract_record_id("document:456", "document")
         '456'

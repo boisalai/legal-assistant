@@ -3,7 +3,7 @@ Routes pour la liaison de répertoires locaux dans Legal Assistant.
 
 Endpoints:
 - POST /api/linked-directory/scan - Scanne un répertoire et retourne les statistiques
-- POST /api/cases/{case_id}/link-directory - Lie et indexe les fichiers d'un répertoire
+- POST /api/cases/{course_id}/link-directory - Lie et indexe les fichiers d'un répertoire
 - POST /api/linked-directory/{link_id}/refresh - Rafraîchit les fichiers d'un répertoire lié
 """
 
@@ -251,9 +251,9 @@ async def scan_directory_endpoint(
         )
 
 
-@router.post("/cases/{case_id}/link-directory")
+@router.post("/cases/{course_id}/link-directory")
 async def link_directory_endpoint(
-    case_id: str,
+    course_id: str,
     request: LinkDirectoryRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -273,8 +273,8 @@ async def link_directory_endpoint(
             await service.connect()
 
         # Normaliser l'ID du dossier
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Scanner le répertoire
         scan_result = scan_directory(request.directory_path)
@@ -342,7 +342,7 @@ async def link_directory_endpoint(
 
                         # Créer le document dans SurrealDB
                         document_data = {
-                            "case_id": case_id,
+                            "course_id": course_id,
                             "nom_fichier": source_file.name,
                             "type_fichier": file_info.extension,
                             "type_mime": type_mime,
@@ -363,7 +363,7 @@ async def link_directory_endpoint(
                             try:
                                 result = await indexing_service.index_document(
                                     document_id=f"document:{doc_id}",
-                                    case_id=case_id,
+                                    course_id=course_id,
                                     text_content=content
                                 )
 
@@ -425,9 +425,9 @@ async def link_directory_endpoint(
         )
 
 
-@router.post("/cases/{case_id}/sync-linked-directories")
+@router.post("/cases/{course_id}/sync-linked-directories")
 async def sync_linked_directories_endpoint(
-    case_id: str,
+    course_id: str,
     user_id: str = Depends(require_auth)
 ):
     """
@@ -452,17 +452,17 @@ async def sync_linked_directories_endpoint(
             await service.connect()
 
         # Normaliser l'ID du dossier
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Récupérer tous les documents liés pour ce dossier
         query = """
             SELECT * FROM document
-            WHERE case_id = $case_id
+            WHERE course_id = $course_id
             AND source_type = 'linked'
             AND linked_source IS NOT NONE
         """
-        result = await service.db.query(query, {"case_id": case_id})
+        result = await service.db.query(query, {"course_id": course_id})
         # Note: result est directement la liste de documents, pas result[0]
         linked_docs = result if result else []
 
@@ -556,7 +556,7 @@ async def sync_linked_directories_endpoint(
                         type_mime = mime_types.get(file_info.extension, "application/octet-stream")
 
                         document_data = {
-                            "case_id": case_id,
+                            "course_id": course_id,
                             "nom_fichier": source_file.name,
                             "type_fichier": file_info.extension,
                             "type_mime": type_mime,
@@ -577,7 +577,7 @@ async def sync_linked_directories_endpoint(
                             try:
                                 result = await indexing_service.index_document(
                                     document_id=f"document:{doc_id}",
-                                    case_id=case_id,
+                                    course_id=course_id,
                                     text_content=content
                                 )
 
@@ -633,7 +633,7 @@ async def sync_linked_directories_endpoint(
                                 try:
                                     result = await indexing_service.index_document(
                                         document_id=doc_id,
-                                        case_id=case_id,
+                                        course_id=course_id,
                                         text_content=content
                                     )
 
