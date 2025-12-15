@@ -29,7 +29,14 @@ async def validate_pre_migration():
     logger.info("📊 PRE-MIGRATION VALIDATION")
     logger.info("=" * 70)
 
-    service = get_surreal_service()
+    from services.surreal_service import init_surreal_service
+    from config.settings import settings
+
+    service = init_surreal_service(
+        url=settings.surreal_url,
+        namespace=settings.surreal_namespace,
+        database=settings.surreal_database
+    )
     await service.connect()
 
     # Count records in each table
@@ -79,10 +86,12 @@ async def run_migration():
     logger.info("🚀 EXECUTING MIGRATION")
     logger.info("=" * 70)
 
-    service = get_surreal_service()
-    await service.connect()
+    service = get_surreal_service()  # Already initialized in validate_pre_migration
+    if not service.db:
+        await service.connect()
 
-    migration_file = Path(__file__).parent / "003_rename_to_course.surql"
+    # Use simple version since DB is empty
+    migration_file = Path(__file__).parent / "003_rename_to_course_simple.surql"
 
     if not migration_file.exists():
         raise FileNotFoundError(f"Migration file not found: {migration_file}")
@@ -118,8 +127,9 @@ async def validate_post_migration(expected_count: int):
     logger.info("🔍 POST-MIGRATION VALIDATION")
     logger.info("=" * 70)
 
-    service = get_surreal_service()
-    await service.connect()
+    service = get_surreal_service()  # Already initialized
+    if not service.db:
+        await service.connect()
 
     success = True
 
