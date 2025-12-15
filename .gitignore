@@ -76,3 +76,4 @@ out/
 
 # mypy
 .mypy_cache/
+backup_pre_migration.surql

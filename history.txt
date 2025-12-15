@@ -1,0 +1,17 @@
+#V2
+SELECT id, name, created_at, updated_at FROM document WHERE case_id = 'case:a66381db' LIMIT 5;
+SELECT id, name, case_id, created_at, updated_at FROM document LIMIT 3;
+INFO FOR DB;
+SELECT id, name, created_at, updated_at FROM document LIMIT 3;
+SELECT id, name, source_type, created_at, updated_at FROM document WHERE source_type = 'linked' LIMIT 5;
+-- Migration 002: Academic Schema for Legal Study Assistant
+-- Description: Adds support for academic organization (sessions, courses, modules)
+-- Date: 2024-12-12
+-- Author: Legal Study Assistant Migration
+-- =========================================
+-- 1. CREATE SESSION TABLE
+-- =========================================
+-- Sessions académiques (ex: "Automne 2024", "Hiver 2025")
+DEFINE TABLE session SCHEMAFULL;
+-- Fields
+DEFINE FIELD title ON session TYPE string
