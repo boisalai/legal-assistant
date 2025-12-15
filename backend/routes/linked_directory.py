@@ -3,7 +3,7 @@ Routes pour la liaison de répertoires locaux dans Legal Assistant.
 
 Endpoints:
 - POST /api/linked-directory/scan - Scanne un répertoire et retourne les statistiques
-- POST /api/cases/{course_id}/link-directory - Lie et indexe les fichiers d'un répertoire
+- POST /api/courses/{course_id}/link-directory - Lie et indexe les fichiers d'un répertoire
 - POST /api/linked-directory/{link_id}/refresh - Rafraîchit les fichiers d'un répertoire lié
 """
 
@@ -251,7 +251,7 @@ async def scan_directory_endpoint(
         )
 
 
-@router.post("/cases/{course_id}/link-directory")
+@router.post("/courses/{course_id}/link-directory")
 async def link_directory_endpoint(
     course_id: str,
     request: LinkDirectoryRequest,
@@ -425,7 +425,7 @@ async def link_directory_endpoint(
         )
 
 
-@router.post("/cases/{course_id}/sync-linked-directories")
+@router.post("/courses/{course_id}/sync-linked-directories")
 async def sync_linked_directories_endpoint(
     course_id: str,
     user_id: str = Depends(require_auth)

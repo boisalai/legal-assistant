@@ -3,8 +3,8 @@ Routes pour l'import de documentation Docusaurus dans Legal Assistant.
 
 Endpoints:
 - GET /api/docusaurus/list - Liste les fichiers Markdown disponibles
-- POST /api/cases/{course_id}/import-docusaurus - Importe des fichiers sélectionnés
-- POST /api/cases/{course_id}/check-docusaurus-updates - Vérifie les mises à jour
+- POST /api/courses/{course_id}/import-docusaurus - Importe des fichiers sélectionnés
+- POST /api/courses/{course_id}/check-docusaurus-updates - Vérifie les mises à jour
 - POST /api/documents/{doc_id}/reindex-docusaurus - Réindexe un document
 """
 
@@ -186,7 +186,7 @@ async def list_docusaurus_files(
         )
 
 
-@router.post("/cases/{course_id}/import-docusaurus", response_model=List[DocumentResponse])
+@router.post("/courses/{course_id}/import-docusaurus", response_model=List[DocumentResponse])
 async def import_docusaurus_files(
     course_id: str,
     request: ImportDocusaurusRequest,
@@ -333,7 +333,7 @@ async def import_docusaurus_files(
         )
 
 
-@router.post("/cases/{course_id}/check-docusaurus-updates", response_model=CheckUpdatesResponse)
+@router.post("/courses/{course_id}/check-docusaurus-updates", response_model=CheckUpdatesResponse)
 async def check_docusaurus_updates(
     course_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)

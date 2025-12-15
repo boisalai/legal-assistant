@@ -14,7 +14,7 @@ from services.user_activity_service import get_activity_service, ActivityType
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cases", tags=["Activity"])
+router = APIRouter(prefix="/api/courses", tags=["Activity"])
 
 
 class TrackActivityRequest(BaseModel):

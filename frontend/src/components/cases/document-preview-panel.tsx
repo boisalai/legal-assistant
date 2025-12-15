@@ -83,7 +83,7 @@ export function DocumentPreviewPanel({
       try {
         if (isPdf || isAudio) {
           // Build the download URL with inline=true for browser display
-          const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
+          const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/${cleanCaseId}/documents/${cleanDocId}/download`;
           const url = `${baseUrl}?inline=true`;
           if (isPdf) {
             setPdfUrl(url);
@@ -97,7 +97,7 @@ export function DocumentPreviewPanel({
             setMarkdownContent(cleanedContent);
           } else {
             // Fallback to downloading the file if texte_extrait is not available
-            const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
+            const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/${cleanCaseId}/documents/${cleanDocId}/download`;
             try {
               const response = await fetch(downloadUrl);
               if (response.ok) {
@@ -132,7 +132,7 @@ export function DocumentPreviewPanel({
     if (document.file_path) {
       // For linked files, we can't directly open them in browser
       // But we can provide a download link
-      const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/${cleanCaseId}/documents/${cleanDocId}/download`;
       window.open(url, "_blank");
     }
   };
@@ -160,7 +160,7 @@ export function DocumentPreviewPanel({
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/${cleanCaseId}/documents/${cleanDocId}/tts`,
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/${cleanCaseId}/documents/${cleanDocId}/tts`,
         {
           method: "POST",
           headers: {
