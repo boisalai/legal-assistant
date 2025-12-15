@@ -16,18 +16,18 @@ import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { casesApi, documentsApi, analysisApi } from "@/lib/api";
-import type { Case, Checklist, Document } from "@/types";
+import { coursesApi, documentsApi, analysisApi } from "@/lib/api";
+import type { Course, Checklist, Document } from "@/types";
 
-export default function CaseDetailPage() {
+export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
 
   // Use the raw ID - the API will handle the judgment: prefix
   const rawId = params.id as string;
-  const caseId = rawId;
+  const courseId = rawId;
 
-  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [courseData, setCourseData] = useState<Course | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,11 +49,11 @@ export default function CaseDetailPage() {
 
   const fetchCaseDetails = useCallback(async () => {
     try {
-      const data = await casesApi.get(caseId);
-      setCaseData(data);
+      const data = await coursesApi.get(courseId);
+      setCourseData(data);
 
       try {
-        const docs = await documentsApi.list(caseId);
+        const docs = await documentsApi.list(courseId);
         setDocuments(docs);
       } catch {
         // Documents endpoint may not exist yet
@@ -61,7 +61,7 @@ export default function CaseDetailPage() {
 
       if (data.status && ["termine", "summarized", "analyse_complete", "complete"].includes(data.status)) {
         try {
-          const checklistData = await analysisApi.getChecklist(caseId);
+          const checklistData = await analysisApi.getChecklist(courseId);
           setChecklist(checklistData);
         } catch {
           // Checklist may not exist yet
@@ -72,24 +72,24 @@ export default function CaseDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [courseId]);
 
   useEffect(() => {
-    if (caseId) fetchCaseDetails();
-  }, [caseId, fetchCaseDetails]);
+    if (courseId) fetchCaseDetails();
+  }, [courseId, fetchCaseDetails]);
 
   // Poll for updates during analysis
   useEffect(() => {
-    if (caseData?.status === "en_analyse" || caseData?.status === "analyzing") {
+    if (courseData?.status === "en_analyse" || courseData?.status === "analyzing") {
       const interval = setInterval(fetchCaseDetails, 5000);
       return () => clearInterval(interval);
     }
-  }, [caseData?.status, fetchCaseDetails]);
+  }, [courseData?.status, fetchCaseDetails]);
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await casesApi.delete(caseId);
+      await coursesApi.delete(courseId);
       toast.success("Dossier supprimé avec succès");
       router.push("/cases");
     } catch (err) {
@@ -117,7 +117,7 @@ export default function CaseDetailPage() {
 
   const handleAnalyze = async () => {
     try {
-      await analysisApi.start(caseId);
+      await analysisApi.start(courseId);
       toast.success("Analyse demarree");
       await fetchCaseDetails();
     } catch (err) {
@@ -137,8 +137,8 @@ export default function CaseDetailPage() {
 
   const handleUpdateCase = async (data: { description?: string; type_transaction?: string }) => {
     try {
-      const updated = await casesApi.update(caseId, data);
-      setCaseData(updated);
+      const updated = await coursesApi.update(courseId, data);
+      setCourseData(updated);
       toast.success("Dossier mis à jour avec succès");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de la mise à jour");
@@ -153,7 +153,7 @@ export default function CaseDetailPage() {
       const filename = doc?.nom_fichier;
       const filePath = doc?.file_path;
 
-      await documentsApi.delete(caseId, docId, filename, filePath);
+      await documentsApi.delete(courseId, docId, filename, filePath);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
       toast.success("Document retiré");
     } catch (err) {
@@ -196,7 +196,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  if (error || !caseData) {
+  if (error || !courseData) {
     return (
       <AppShell>
         <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -214,7 +214,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  const isAnalyzing = caseData.status === "en_analyse" || caseData.status === "analyzing";
+  const isAnalyzing = courseData.status === "en_analyse" || courseData.status === "analyzing";
 
   return (
     <AppShell noPadding>
@@ -227,7 +227,7 @@ export default function CaseDetailPage() {
               {previewDocument ? (
                 <DocumentPreviewPanel
                   document={previewDocument}
-                  caseId={caseId}
+                  caseId={courseId}
                   onClose={handleClosePreview}
                 />
               ) : previewDirectory ? (
@@ -258,12 +258,12 @@ export default function CaseDetailPage() {
                     <DirectoryTreeView
                       documents={previewDirectory.documents}
                       basePath={previewDirectory.basePath}
-                      caseId={caseId}
+                      caseId={courseId}
                       onPreviewDocument={handlePreviewDocument}
                       onExtractPDF={async (doc) => {
                         try {
                           toast.info("Extraction en cours...");
-                          const result = await documentsApi.extractPDFToMarkdown(caseId, doc.id);
+                          const result = await documentsApi.extractPDFToMarkdown(courseId, doc.id);
                           if (result.success) {
                             toast.success("Markdown créé avec succès");
                             await fetchCaseDetails();
@@ -277,7 +277,7 @@ export default function CaseDetailPage() {
                       onTranscribe={async (doc) => {
                         try {
                           toast.info("Transcription en cours...");
-                          const result = await documentsApi.transcribeWithWorkflow(caseId, doc.id, {
+                          const result = await documentsApi.transcribeWithWorkflow(courseId, doc.id, {
                             language: "fr",
                             createMarkdown: true,
                           });
@@ -296,7 +296,7 @@ export default function CaseDetailPage() {
                 </div>
               ) : (
                 <CaseDetailsPanel
-                  caseData={caseData}
+                  caseData={courseData}
                   documents={documents}
                   checklist={checklist}
                   onUploadDocuments={handleUploadDocuments}
@@ -323,7 +323,7 @@ export default function CaseDetailPage() {
             <Panel defaultSize={40} minSize={30} className="overflow-hidden">
               <div className="h-full overflow-hidden">
                 <AssistantPanel
-                  caseId={caseId}
+                  caseId={courseId}
                   onAnalyze={handleAnalyze}
                   isAnalyzing={isAnalyzing}
                   hasDocuments={documents.length > 0}
@@ -340,19 +340,19 @@ export default function CaseDetailPage() {
         <DocumentUploadModal
           open={uploadModalOpen}
           onClose={() => setUploadModalOpen(false)}
-          caseId={caseId}
+          caseId={courseId}
           onUploadComplete={handleUploadComplete}
         />
         <AudioRecorderModal
           open={audioModalOpen}
           onClose={() => setAudioModalOpen(false)}
-          caseId={caseId}
+          caseId={courseId}
           onUploadComplete={handleUploadComplete}
         />
         <LinkDirectoryModal
           open={linkDirectoryModalOpen}
           onOpenChange={setLinkDirectoryModalOpen}
-          caseId={caseId}
+          caseId={courseId}
           onLinkSuccess={handleUploadComplete}
         />
       </div>
