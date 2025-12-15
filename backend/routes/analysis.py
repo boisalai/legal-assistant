@@ -9,9 +9,9 @@ Pipeline d'analyse:
 5. Generer un resume avec le LLM
 
 Endpoints:
-- POST /api/analysis/{case_id}/start - Demarre l'analyse complete
-- GET /api/analysis/{case_id}/status - Statut de l'analyse
-- GET /api/analysis/{case_id}/checklist - Recupere la checklist generee
+- POST /api/analysis/{course_id}/start - Demarre l'analyse complete
+- GET /api/analysis/{course_id}/status - Statut de l'analyse
+- GET /api/analysis/{course_id}/checklist - Recupere la checklist generee
 """
 
 import logging
@@ -43,7 +43,7 @@ class AnalysisRequest(BaseModel):
 
 
 class AnalysisStatusResponse(BaseModel):
-    case_id: str
+    course_id: str
     status: str  # pending, extracting, embedding, summarizing, complete, error
     progress: float  # 0-100
     message: str
@@ -58,7 +58,7 @@ class ChecklistItem(BaseModel):
 
 
 class AnalysisResultResponse(BaseModel):
-    case_id: str
+    course_id: str
     summary: str
     key_points: list[str]
     checklist: list[ChecklistItem]
@@ -72,15 +72,15 @@ class AnalysisResultResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
-async def get_case_documents(service, case_id: str) -> list[dict]:
+async def get_case_documents(service, course_id: str) -> list[dict]:
     """Recupere tous les documents d'un dossier."""
     # Normalize ID
-    if not case_id.startswith("case:"):
-        case_id = f"case:{case_id}"
+    if not course_id.startswith("course:"):
+        course_id = f"course:{course_id}"
 
     result = await service.query(
-        "SELECT * FROM document WHERE case_id = $case_id",
-        {"case_id": case_id}
+        "SELECT * FROM document WHERE course_id = $course_id",
+        {"course_id": course_id}
     )
 
     if not result or len(result) == 0:
@@ -102,7 +102,7 @@ async def get_case_documents(service, case_id: str) -> list[dict]:
 
 
 async def run_analysis_pipeline(
-    case_id: str,
+    course_id: str,
     model_id: str,
     user_id: str
 ):
@@ -118,27 +118,27 @@ async def run_analysis_pipeline(
 
     try:
         # Normaliser l'ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Mettre a jour le statut: en cours
-        await service.merge(case_id, {
+        await service.merge(course_id, {
             "status": "analyzing",
             "updated_at": datetime.utcnow().isoformat()
         })
 
         # 1. Recuperer les documents
-        documents = await get_case_documents(service, case_id)
+        documents = await get_case_documents(service, course_id)
 
         if not documents:
-            await service.merge(case_id, {
+            await service.merge(course_id, {
                 "status": "error",
                 "error_message": "Aucun document trouve dans le dossier",
                 "updated_at": datetime.utcnow().isoformat()
             })
             return
 
-        logger.info(f"Analyse de {len(documents)} documents pour {case_id}")
+        logger.info(f"Analyse de {len(documents)} documents pour {course_id}")
 
         # 2. Extraire le texte de chaque document
         all_text_parts = []
@@ -181,7 +181,7 @@ async def run_analysis_pipeline(
                 logger.warning(f"Extraction echouee pour {file_path}: {extraction.error}")
 
         if not all_text_parts:
-            await service.merge(case_id, {
+            await service.merge(course_id, {
                 "status": "error",
                 "error_message": "Aucun texte n'a pu etre extrait des documents",
                 "updated_at": datetime.utcnow().isoformat()
@@ -198,7 +198,7 @@ async def run_analysis_pipeline(
                 chunk_id = str(uuid.uuid4())[:8]
                 await service.create("document_chunk", {
                     "document_id": chunk_data["document_id"],
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "chunk_index": chunk_data["chunk_index"],
                     "text": chunk_data["text"],
                     "embedding": embedding_result.embedding,
@@ -274,7 +274,7 @@ Repondez en francais avec un format structure."""
             now = datetime.utcnow().isoformat()
 
             analysis_data = {
-                "case_id": case_id,
+                "course_id": course_id,
                 "summary": summary_text,
                 "key_points": key_points or ["Voir le resume pour les details"],
                 "checklist": checklist_items or [{"titre": "Analyser le dossier en detail", "complete": False}],
@@ -288,7 +288,7 @@ Repondez en francais avec un format structure."""
             await service.create("analysis_result", analysis_data, record_id=analysis_id)
 
             # Mettre a jour le dossier avec le resume
-            await service.merge(case_id, {
+            await service.merge(course_id, {
                 "status": "complete",
                 "text": combined_text[:10000],  # Stocker le texte extrait
                 "summary": summary_text[:5000],
@@ -296,12 +296,12 @@ Repondez en francais avec un format structure."""
                 "updated_at": now
             })
 
-            logger.info(f"Analyse complete pour {case_id}")
+            logger.info(f"Analyse complete pour {course_id}")
 
         except Exception as llm_error:
             logger.error(f"Erreur LLM: {llm_error}")
             # Meme en cas d'erreur LLM, on sauvegarde le texte extrait
-            await service.merge(case_id, {
+            await service.merge(course_id, {
                 "status": "complete",
                 "text": combined_text[:10000],
                 "summary": "Resume automatique non disponible. Texte extrait disponible.",
@@ -311,7 +311,7 @@ Repondez en francais avec un format structure."""
     except Exception as e:
         logger.error(f"Erreur pipeline analyse: {e}")
         try:
-            await service.merge(case_id, {
+            await service.merge(course_id, {
                 "status": "error",
                 "error_message": str(e),
                 "updated_at": datetime.utcnow().isoformat()
@@ -324,9 +324,9 @@ Repondez en francais avec un format structure."""
 # Endpoints
 # ============================================================================
 
-@router.post("/{case_id}/start")
+@router.post("/{course_id}/start")
 async def start_analysis(
-    case_id: str,
+    course_id: str,
     request: Optional[AnalysisRequest] = None,
     background_tasks: BackgroundTasks = None,
     user_id: str = Depends(require_auth)
@@ -340,12 +340,12 @@ async def start_analysis(
             await service.connect()
 
         # Normaliser l'ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Verifier que le dossier existe - importer le helper depuis judgments
-        from routes.judgments import get_judgment_by_id
-        judgment = await get_judgment_by_id(service, case_id)
+        from routes.courses import get_course_by_id
+        judgment = await get_course_by_id(service, course_id)
 
         if not judgment:
             raise HTTPException(
@@ -354,7 +354,7 @@ async def start_analysis(
             )
 
         # Verifier qu'il y a des documents
-        documents = await get_case_documents(service, case_id)
+        documents = await get_case_documents(service, course_id)
         if not documents:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -367,14 +367,14 @@ async def start_analysis(
         # Lancer l'analyse en arriere-plan
         background_tasks.add_task(
             run_analysis_pipeline,
-            case_id,
+            course_id,
             model_id,
             user_id
         )
 
         return {
             "message": "Analyse demarree",
-            "case_id": case_id,
+            "course_id": course_id,
             "documents_count": len(documents),
             "model": model_id
         }
@@ -389,9 +389,9 @@ async def start_analysis(
         )
 
 
-@router.get("/{case_id}/status", response_model=AnalysisStatusResponse)
+@router.get("/{course_id}/status", response_model=AnalysisStatusResponse)
 async def get_analysis_status(
-    case_id: str,
+    course_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
@@ -402,12 +402,12 @@ async def get_analysis_status(
         if not service.db:
             await service.connect()
 
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Use helper from judgments route
-        from routes.judgments import get_judgment_by_id
-        item = await get_judgment_by_id(service, case_id)
+        from routes.courses import get_course_by_id
+        item = await get_course_by_id(service, course_id)
 
         if not item:
             raise HTTPException(
@@ -434,10 +434,10 @@ async def get_analysis_status(
             "error": 0
         }
 
-        documents = await get_case_documents(service, case_id)
+        documents = await get_case_documents(service, course_id)
 
         return AnalysisStatusResponse(
-            case_id=case_id,
+            course_id=course_id,
             status=case_status,
             progress=progress_map.get(case_status, 0),
             message=status_messages.get(case_status, case_status),
@@ -455,9 +455,9 @@ async def get_analysis_status(
         )
 
 
-@router.get("/{case_id}/checklist")
+@router.get("/{course_id}/checklist")
 async def get_analysis_checklist(
-    case_id: str,
+    course_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
@@ -468,13 +468,13 @@ async def get_analysis_checklist(
         if not service.db:
             await service.connect()
 
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Chercher le resultat d'analyse le plus recent
         result = await service.query(
-            "SELECT * FROM analysis_result WHERE case_id = $case_id ORDER BY created_at DESC LIMIT 1",
-            {"case_id": case_id}
+            "SELECT * FROM analysis_result WHERE course_id = $course_id ORDER BY created_at DESC LIMIT 1",
+            {"course_id": course_id}
         )
 
         if not result or len(result) == 0:

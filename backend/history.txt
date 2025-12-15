@@ -1,0 +1,7 @@
+#V2
+SELECT * FROM session;
+SELECT * FROM case WHERE id = 'case:2c2f556d';
+SELECT * FROM case WHERE course_code = 'DRT-1151G';
+SELECT * FROM session;
+DELETE session:4y7uae2lnf1fg7sh7zjm;
+INFO FOR DB;

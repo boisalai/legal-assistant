@@ -3,8 +3,8 @@ Routes pour l'import de documentation Docusaurus dans Legal Assistant.
 
 Endpoints:
 - GET /api/docusaurus/list - Liste les fichiers Markdown disponibles
-- POST /api/cases/{case_id}/import-docusaurus - Importe des fichiers sélectionnés
-- POST /api/cases/{case_id}/check-docusaurus-updates - Vérifie les mises à jour
+- POST /api/cases/{course_id}/import-docusaurus - Importe des fichiers sélectionnés
+- POST /api/cases/{course_id}/check-docusaurus-updates - Vérifie les mises à jour
 - POST /api/documents/{doc_id}/reindex-docusaurus - Réindexe un document
 """
 
@@ -186,9 +186,9 @@ async def list_docusaurus_files(
         )
 
 
-@router.post("/cases/{case_id}/import-docusaurus", response_model=List[DocumentResponse])
+@router.post("/cases/{course_id}/import-docusaurus", response_model=List[DocumentResponse])
 async def import_docusaurus_files(
-    case_id: str,
+    course_id: str,
     request: ImportDocusaurusRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -198,12 +198,12 @@ async def import_docusaurus_files(
     Pour chaque fichier :
     1. Lit le contenu
     2. Calcule le hash SHA-256
-    3. Copie le fichier dans data/uploads/{case_id}/
+    3. Copie le fichier dans data/uploads/{course_id}/
     4. Crée un document dans SurrealDB avec les métadonnées Docusaurus
     5. Indexe le contenu pour la recherche sémantique
 
     Args:
-        case_id: ID du dossier
+        course_id: ID du dossier
         request: Liste des chemins de fichiers à importer
     """
     try:
@@ -212,11 +212,11 @@ async def import_docusaurus_files(
             await service.connect()
 
         # Normaliser l'ID du dossier
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Créer le répertoire d'upload
-        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+        upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         imported_documents = []
@@ -264,7 +264,7 @@ async def import_docusaurus_files(
 
                 # Créer le document dans SurrealDB
                 document_data = {
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "nom_fichier": source_file.name,
                     "type_fichier": source_file.suffix.lstrip('.'),
                     "type_mime": "text/markdown",
@@ -286,7 +286,7 @@ async def import_docusaurus_files(
                     indexing_service = DocumentIndexingService()
                     result = await indexing_service.index_document(
                         document_id=f"document:{doc_id}",
-                        case_id=case_id,
+                        course_id=course_id,
                         text_content=content
                     )
 
@@ -303,7 +303,7 @@ async def import_docusaurus_files(
                 # Ajouter à la liste des résultats
                 imported_documents.append(DocumentResponse(
                     id=f"document:{doc_id}",
-                    case_id=case_id,
+                    course_id=course_id,
                     nom_fichier=source_file.name,
                     type_fichier=source_file.suffix.lstrip('.'),
                     type_mime="text/markdown",
@@ -333,9 +333,9 @@ async def import_docusaurus_files(
         )
 
 
-@router.post("/cases/{case_id}/check-docusaurus-updates", response_model=CheckUpdatesResponse)
+@router.post("/cases/{course_id}/check-docusaurus-updates", response_model=CheckUpdatesResponse)
 async def check_docusaurus_updates(
-    case_id: str,
+    course_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
@@ -345,7 +345,7 @@ async def check_docusaurus_updates(
     Si différent, marque le document comme nécessitant une réindexation.
 
     Args:
-        case_id: ID du dossier
+        course_id: ID du dossier
     """
     try:
         service = get_surreal_service()
@@ -353,17 +353,17 @@ async def check_docusaurus_updates(
             await service.connect()
 
         # Normaliser l'ID du dossier
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Récupérer tous les documents Docusaurus du dossier
         result = await service.query(
             """
             SELECT * FROM document
-            WHERE case_id = $case_id
+            WHERE course_id = $course_id
             AND source_type = 'docusaurus'
             """,
-            {"case_id": case_id}
+            {"course_id": course_id}
         )
 
         documents_checked = 0
@@ -491,7 +491,7 @@ async def reindex_docusaurus_document(
         indexing_service = DocumentIndexingService()
         result = await indexing_service.index_document(
             document_id=doc_id,
-            case_id=result.get("case_id"),
+            course_id=result.get("course_id"),
             text_content=content,
             force_reindex=True  # Forcer la réindexation
         )

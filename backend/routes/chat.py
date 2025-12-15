@@ -41,7 +41,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Request body for chat endpoint."""
     message: str
-    case_id: Optional[str] = None
+    course_id: Optional[str] = None
     model_id: str = "ollama:qwen2.5:7b"
     history: list[ChatMessage] = []
 
@@ -68,9 +68,9 @@ async def chat(request: ChatRequest):
     Send a message to the AI assistant.
 
     The assistant can respond to general questions or questions about a specific case
-    if a case_id is provided.
+    if a course_id is provided.
     """
-    logger.info(f"Chat request: model={request.model_id}, case_id={request.case_id}")
+    logger.info(f"Chat request: model={request.model_id}, course_id={request.course_id}")
     logger.info(f"DEBUG - model_id type: {type(request.model_id)}, value: '{request.model_id}'")
     logger.info(f"DEBUG - Checking if model_id starts with mlx/vllm/huggingface...")
 
@@ -112,13 +112,13 @@ async def chat(request: ChatRequest):
         # Get tools description
         tools_desc = get_tools_description()
 
-        # Get user activity context if we have a case_id
+        # Get user activity context if we have a course_id
         activity_context = ""
-        if request.case_id:
+        if request.course_id:
             try:
                 activity_service = get_activity_service()
                 activity_context = await activity_service.get_activity_context(
-                    case_id=request.case_id,
+                    course_id=request.course_id,
                     limit=20  # Show last 20 activities for context
                 )
             except Exception as e:
@@ -181,24 +181,24 @@ Quand utiliser les outils - RÈGLES IMPORTANTES:
 
 **En résumé**: Utilise TOUJOURS `semantic_search` pour répondre aux questions. Ne réponds JAMAIS avec tes connaissances générales."""
 
-        # If we have a case_id, try to get case context
-        if request.case_id:
+        # If we have a course_id, try to get case context
+        if request.course_id:
             try:
                 service = get_surreal_service()
                 if not service.db:
                     await service.connect()
 
-                logger.info(f"Fetching case context for case_id={request.case_id}")
+                logger.info(f"Fetching case context for course_id={request.course_id}")
 
                 # Normalize judgment ID (same pattern as documents.py)
-                case_id = request.case_id
-                if not case_id.startswith("case:"):
-                    case_id = f"case:{case_id}"
+                course_id = request.course_id
+                if not course_id.startswith("course:"):
+                    course_id = f"course:{course_id}"
 
-                logger.info(f"Looking for case with case_id={case_id}")
+                logger.info(f"Looking for case with course_id={course_id}")
 
                 # Get case info - use direct record access
-                case_result = await service.query(f"SELECT * FROM {case_id}")
+                case_result = await service.query(f"SELECT * FROM {course_id}")
                 logger.info(f"Case query result: {case_result}")
 
                 if case_result and len(case_result) > 0:
@@ -235,8 +235,8 @@ Contexte du dossier actuel:
 
                         # Get documents for this case (same pattern as documents.py)
                         docs_result = await service.query(
-                            "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
-                            {"case_id": case_id}
+                            "SELECT * FROM document WHERE course_id = $course_id ORDER BY created_at DESC",
+                            {"course_id": course_id}
                         )
                         logger.info(f"Documents query result type: {type(docs_result)}, len: {len(docs_result) if docs_result else 0}")
 
@@ -406,7 +406,7 @@ Contenu des documents:"""
         logger.info(f"Sending conversation to agent with {len(request.history)} history messages")
 
         # Create an Agent with all available tools
-        # Pass case_id in the context for the tool to use
+        # Pass course_id in the context for the tool to use
         agent = Agent(
             name="LegalAssistant",
             model=model,
@@ -424,9 +424,9 @@ Contenu des documents:"""
             markdown=True,
         )
 
-        # Inject case_id into the tool's context by modifying the prompt
-        if request.case_id:
-            conversation_prompt += f"\n\n[Contexte: L'identifiant du dossier actuel est '{request.case_id}']"
+        # Inject course_id into the tool's context by modifying the prompt
+        if request.course_id:
+            conversation_prompt += f"\n\n[Contexte: L'identifiant du dossier actuel est '{request.course_id}']"
 
         # Get response from agent (use arun for async tools support)
         response = await agent.arun(conversation_prompt)
@@ -440,19 +440,19 @@ Contenu des documents:"""
 
         logger.info(f"Got response: {len(assistant_message)} chars")
 
-        # Save conversation to database if we have a case_id
-        if request.case_id:
+        # Save conversation to database if we have a course_id
+        if request.course_id:
             try:
                 conv_service = get_conversation_service()
                 # Save user message
                 await conv_service.save_message(
-                    case_id=request.case_id,
+                    course_id=request.course_id,
                     role="user",
                     content=request.message
                 )
                 # Save assistant response
                 await conv_service.save_message(
-                    case_id=request.case_id,
+                    course_id=request.course_id,
                     role="assistant",
                     content=assistant_message,
                     model_id=request.model_id,
@@ -460,7 +460,7 @@ Contenu des documents:"""
                         "sources": [s.dict() for s in sources_list] if sources_list else []
                     }
                 )
-                logger.info(f"Saved conversation to database for case {request.case_id}")
+                logger.info(f"Saved conversation to database for case {request.course_id}")
             except Exception as e:
                 logger.warning(f"Failed to save conversation: {e}")
 
@@ -503,14 +503,14 @@ async def chat_stream(request: ChatRequest):
     - document_created: Notification when a document is created
     - done: Final event when streaming is complete
     """
-    logger.info(f"Chat stream request: model={request.model_id}, case_id={request.case_id}")
+    logger.info(f"Chat stream request: model={request.model_id}, course_id={request.course_id}")
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
             # Check if user is asking for transcription
             is_transcription_request = _is_transcription_request(request.message)
 
-            if is_transcription_request and request.case_id:
+            if is_transcription_request and request.course_id:
                 # Handle transcription with streaming messages
                 async for event in _handle_transcription_stream(request):
                     yield event
@@ -566,7 +566,7 @@ async def _handle_transcription_stream(request: ChatRequest) -> AsyncGenerator[s
     try:
         # Run the transcription
         result = await transcribe_audio_streaming(
-            case_id=request.case_id,
+            course_id=request.course_id,
             audio_filename=audio_filename,
             language="fr"
         )
@@ -714,13 +714,13 @@ Directives:
         yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur: {str(e)}', 'role': 'assistant'})}\n\n"
 
 
-@router.get("/chat/history/{case_id}")
-async def get_chat_history(case_id: str, limit: int = 50, offset: int = 0):
+@router.get("/chat/history/{course_id}")
+async def get_chat_history(course_id: str, limit: int = 50, offset: int = 0):
     """
     Get conversation history for a case.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the case
         limit: Maximum number of messages to retrieve (default: 50)
         offset: Number of messages to skip (default: 0)
 
@@ -730,13 +730,13 @@ async def get_chat_history(case_id: str, limit: int = 50, offset: int = 0):
     try:
         conv_service = get_conversation_service()
         messages = await conv_service.get_conversation_history(
-            case_id=case_id,
+            course_id=course_id,
             limit=limit,
             offset=offset
         )
 
         return {
-            "case_id": case_id,
+            "course_id": course_id,
             "messages": messages,
             "count": len(messages)
         }
@@ -749,20 +749,20 @@ async def get_chat_history(case_id: str, limit: int = 50, offset: int = 0):
         )
 
 
-@router.delete("/chat/history/{case_id}")
-async def clear_chat_history(case_id: str):
+@router.delete("/chat/history/{course_id}")
+async def clear_chat_history(course_id: str):
     """
     Clear all conversation history for a case.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the case
 
     Returns:
         Success status
     """
     try:
         conv_service = get_conversation_service()
-        success = await conv_service.clear_conversation(case_id=case_id)
+        success = await conv_service.clear_conversation(course_id=course_id)
 
         if success:
             return {"success": True, "message": "Historique effacé avec succès"}
@@ -782,23 +782,23 @@ async def clear_chat_history(case_id: str):
         )
 
 
-@router.get("/chat/stats/{case_id}")
-async def get_chat_stats(case_id: str):
+@router.get("/chat/stats/{course_id}")
+async def get_chat_stats(course_id: str):
     """
     Get conversation statistics for a case.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the case
 
     Returns:
         Statistics including message count and timestamps
     """
     try:
         conv_service = get_conversation_service()
-        stats = await conv_service.get_conversation_stats(case_id=case_id)
+        stats = await conv_service.get_conversation_stats(course_id=course_id)
 
         return {
-            "case_id": case_id,
+            "course_id": course_id,
             **stats
         }
 

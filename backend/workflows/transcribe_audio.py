@@ -11,7 +11,7 @@ Usage:
     workflow = TranscriptionWorkflow(whisper_model="large-v3-turbo")
     result = await workflow.run(
         audio_path="/path/to/audio.mp3",
-        judgment_id="case:xxx",
+        course_id="course:xxx",
         language="fr"
     )
 """
@@ -302,7 +302,7 @@ Transcription brute:
 
     async def _save_step(
         self,
-        judgment_id: str,
+        course_id: str,
         audio_filename: str,
         markdown_content: str,
         duration: float,
@@ -325,9 +325,9 @@ Transcription brute:
             if not service.db:
                 await service.connect()
 
-            # Normaliser le judgment_id
-            if not judgment_id.startswith("case:"):
-                judgment_id = f"case:{judgment_id}"
+            # Normaliser le course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             # Générer le nom du fichier markdown
             base_name = Path(audio_filename).stem
@@ -339,7 +339,7 @@ Transcription brute:
             else:
                 # Fallback to default upload directory if no audio path
                 from config.settings import settings
-                save_dir = Path(settings.upload_dir) / judgment_id.replace("case:", "")
+                save_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                 save_dir.mkdir(parents=True, exist_ok=True)
 
             # Définir le chemin du fichier markdown
@@ -360,8 +360,8 @@ Transcription brute:
                 # Supprimer l'ancien enregistrement en DB s'il existe
                 try:
                     existing_docs_result = await service.query(
-                        "SELECT id FROM document WHERE judgment_id = $judgment_id AND nom_fichier = $filename",
-                        {"judgment_id": judgment_id, "filename": md_filename}
+                        "SELECT id FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
+                        {"course_id": course_id, "filename": md_filename}
                     )
                     if existing_docs_result and len(existing_docs_result) > 0:
                         first_item = existing_docs_result[0]
@@ -394,7 +394,7 @@ Transcription brute:
             now = datetime.utcnow().isoformat()
 
             document_data = {
-                "judgment_id": judgment_id,
+                "course_id": course_id,
                 "nom_fichier": md_filename,
                 "type_fichier": "md",
                 "type_mime": "text/markdown",
@@ -430,7 +430,7 @@ Transcription brute:
                 indexing_service = get_document_indexing_service()
                 index_result = await indexing_service.index_document(
                     document_id=f"document:{doc_id}",
-                    judgment_id=judgment_id,
+                    course_id=course_id,
                     text_content=markdown_content,
                     force_reindex=False
                 )
@@ -460,7 +460,7 @@ Transcription brute:
     async def run(
         self,
         audio_path: str,
-        judgment_id: str,
+        course_id: str,
         language: str = "fr",
         create_markdown_doc: bool = True,
         original_filename: str = "",
@@ -477,7 +477,7 @@ Transcription brute:
 
         Args:
             audio_path: Chemin vers le fichier audio
-            judgment_id: ID du dossier (judgment:xxx)
+            course_id: ID du dossier (judgment:xxx)
             language: Langue de l'audio
             create_markdown_doc: Si True, crée un document markdown dans le dossier
             original_filename: Nom original du fichier (si différent du nom sur disque)
@@ -525,7 +525,7 @@ Transcription brute:
             # ============================================================
             if create_markdown_doc:
                 doc_result = await self._save_step(
-                    judgment_id=judgment_id,
+                    course_id=course_id,
                     audio_filename=audio_filename,
                     markdown_content=result.formatted_markdown,
                     duration=result.duration_seconds,
@@ -603,7 +603,7 @@ def create_transcription_workflow_declarative(
 
 async def transcribe_audio_to_markdown(
     audio_path: str,
-    judgment_id: str,
+    course_id: str,
     language: str = "fr",
     model: Optional[Any] = None,
     on_progress: Optional[Callable[[str, str, int], None]] = None,
@@ -614,7 +614,7 @@ async def transcribe_audio_to_markdown(
 
     Args:
         audio_path: Chemin vers le fichier audio
-        judgment_id: ID du dossier
+        course_id: ID du dossier
         language: Langue de l'audio
         model: Modèle LLM optionnel
         on_progress: Callback de progression optionnel
@@ -630,7 +630,7 @@ async def transcribe_audio_to_markdown(
 
     return await workflow.run(
         audio_path=audio_path,
-        judgment_id=judgment_id,
+        course_id=course_id,
         language=language,
         raw_mode=raw_mode,
     )

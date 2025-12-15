@@ -2,11 +2,11 @@
 Routes pour la gestion des documents d'un dossier.
 
 Endpoints:
-- GET /api/cases/{case_id}/documents - Liste des documents
-- POST /api/cases/{case_id}/documents - Upload d'un document
-- GET /api/cases/{case_id}/documents/{doc_id} - Details d'un document
-- DELETE /api/cases/{case_id}/documents/{doc_id} - Supprimer un document
-- GET /api/cases/{case_id}/documents/{doc_id}/download - Telecharger un document
+- GET /api/cases/{course_id}/documents - Liste des documents
+- POST /api/cases/{course_id}/documents - Upload d'un document
+- GET /api/cases/{course_id}/documents/{doc_id} - Details d'un document
+- DELETE /api/cases/{course_id}/documents/{doc_id} - Supprimer un document
+- GET /api/cases/{course_id}/documents/{doc_id}/download - Telecharger un document
 """
 
 import logging
@@ -61,7 +61,7 @@ MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un dossier
 
 class DocumentResponse(BaseModel):
     id: str
-    case_id: str
+    course_id: str
     nom_fichier: str
     type_fichier: str
     type_mime: str
@@ -170,9 +170,9 @@ def get_mime_type(filename: str) -> str:
 # Endpoints
 # ============================================================================
 
-@router.get("/{case_id}/documents", response_model=DocumentListResponse)
+@router.get("/{course_id}/documents", response_model=DocumentListResponse)
 async def list_documents(
-    case_id: str,
+    course_id: str,
     verify_files: bool = True,
     auto_remove_missing: bool = True,
     auto_discover: bool = False,  # Désactivé par défaut pour éviter les duplicatas
@@ -183,7 +183,7 @@ async def list_documents(
     Liste les documents d'un dossier.
 
     Args:
-        case_id: ID du dossier
+        course_id: ID du dossier
         verify_files: Si True, verifie que les fichiers existent sur le disque
         auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
         auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
@@ -195,25 +195,25 @@ async def list_documents(
             await service.connect()
 
         # Normalize case ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Query documents for this case
-        # TEMPORARY: Support both "case:" and "judgment:" formats during migration
-        legacy_case_id = case_id.replace("case:", "judgment:")
+        # TEMPORARY: Support both "course:" and "course:" formats during migration
+        legacy_course_id = course_id.replace("course:", "course:")
 
         if include_derived:
             # Include all documents
             result = await service.query(
-                "SELECT * FROM document WHERE case_id IN [$case_id, $legacy_case_id] ORDER BY created_at DESC",
-                {"case_id": case_id, "legacy_case_id": legacy_case_id}
+                "SELECT * FROM document WHERE course_id IN [$course_id, $legacy_course_id] ORDER BY created_at DESC",
+                {"course_id": course_id, "legacy_course_id": legacy_course_id}
             )
         else:
             # Exclude derived documents (only show source documents)
             # Use "!= true" instead of "= false OR IS NULL" for SurrealDB compatibility
             result = await service.query(
-                "SELECT * FROM document WHERE case_id IN [$case_id, $legacy_case_id] AND is_derived != true ORDER BY created_at DESC",
-                {"case_id": case_id, "legacy_case_id": legacy_case_id}
+                "SELECT * FROM document WHERE course_id IN [$course_id, $legacy_course_id] AND is_derived != true ORDER BY created_at DESC",
+                {"course_id": course_id, "legacy_course_id": legacy_course_id}
             )
 
         # Unwrap SurrealDB query result
@@ -231,12 +231,12 @@ async def list_documents(
                 items = result
 
         logger.info(f"GET /documents unwrapped result: {len(items)} documents")
-        logger.info(f"Query case_id: {case_id}, legacy_case_id: {legacy_case_id}")
+        logger.info(f"Query course_id: {course_id}, legacy_course_id: {legacy_course_id}")
         logger.info(f"Raw query result: {result}")
         if items and len(items) > 0:
             logger.info(f"First 3 documents from unwrapped result:")
             for doc in items[:3]:
-                logger.info(f"  - {doc.get('nom_fichier')} (case_id: {doc.get('case_id')}, source_type: {doc.get('source_type')})")
+                logger.info(f"  - {doc.get('nom_fichier')} (course_id: {doc.get('course_id')}, source_type: {doc.get('source_type')})")
 
         documents = []
         missing_files = []
@@ -279,7 +279,7 @@ async def list_documents(
 
                     doc_response = DocumentResponse(
                         id=str(item.get("id", "")),
-                        case_id=item.get("case_id", case_id),
+                        course_id=item.get("course_id", course_id),
                         nom_fichier=item.get("nom_fichier", ""),
                         type_fichier=item.get("type_fichier", ""),
                         type_mime=item.get("type_mime", ""),
@@ -310,7 +310,7 @@ async def list_documents(
 
         # Auto-discover orphaned files in uploads directory
         if auto_discover:
-            upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+            upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
             if upload_dir.exists() and upload_dir.is_dir():
                 for file_path in upload_dir.iterdir():
                     if file_path.is_file():
@@ -337,10 +337,10 @@ async def list_documents(
                                     now = datetime.utcnow().isoformat()
 
                                     # Use relative path (consistent with upload endpoint)
-                                    relative_path = f"data/uploads/{case_id.replace('case:', '')}/{file_path.name}"
+                                    relative_path = f"data/uploads/{course_id.replace('course:', '')}/{file_path.name}"
 
                                     document_data = {
-                                        "case_id": case_id,
+                                        "course_id": course_id,
                                         "nom_fichier": file_path.name,
                                         "type_fichier": ext.lstrip('.'),
                                         "type_mime": get_mime_type(file_path.name),
@@ -358,7 +358,7 @@ async def list_documents(
                                     # Add to response
                                     documents.append(DocumentResponse(
                                         id=f"document:{doc_id}",
-                                        case_id=case_id,
+                                        course_id=course_id,
                                         nom_fichier=file_path.name,
                                         type_fichier=ext.lstrip('.'),
                                         type_mime=get_mime_type(file_path.name),
@@ -390,9 +390,9 @@ async def list_documents(
         )
 
 
-@router.post("/{case_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{course_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    case_id: str,
+    course_id: str,
     file: UploadFile = File(...),
     user_id: str = Depends(require_auth)
 ):
@@ -423,15 +423,15 @@ async def upload_document(
             await service.connect()
 
         # Normalize case ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Generate document ID and save file
         doc_id = str(uuid.uuid4())[:8]
         ext = get_file_extension(file.filename)
 
         # Create upload directory
-        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+        upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Save file
@@ -444,7 +444,7 @@ async def upload_document(
         # Create document record in database
         now = datetime.utcnow().isoformat()
         document_data = {
-            "case_id": case_id,
+            "course_id": course_id,
             "nom_fichier": file.filename,
             "type_fichier": ext.lstrip('.'),
             "type_mime": get_mime_type(file.filename),
@@ -460,7 +460,7 @@ async def upload_document(
 
         return DocumentResponse(
             id=f"document:{doc_id}",
-            case_id=case_id,
+            course_id=course_id,
             nom_fichier=file.filename,
             type_fichier=ext.lstrip('.'),
             type_mime=get_mime_type(file.filename),
@@ -479,9 +479,9 @@ async def upload_document(
         )
 
 
-@router.post("/{case_id}/documents/register", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{course_id}/documents/register", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def register_document(
-    case_id: str,
+    course_id: str,
     request: RegisterDocumentRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -521,8 +521,8 @@ async def register_document(
             await service.connect()
 
         # Normalize case ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Get file info
         file_size = file_path.stat().st_size
@@ -544,7 +544,7 @@ async def register_document(
         # Create document record in database (no file copy!)
         now = datetime.utcnow().isoformat()
         document_data = {
-            "case_id": case_id,
+            "course_id": course_id,
             "nom_fichier": filename,
             "type_fichier": ext.lstrip('.'),
             "type_mime": get_mime_type(filename),
@@ -559,7 +559,7 @@ async def register_document(
 
         return DocumentResponse(
             id=f"document:{doc_id}",
-            case_id=case_id,
+            course_id=course_id,
             nom_fichier=filename,
             type_fichier=ext.lstrip('.'),
             type_mime=get_mime_type(filename),
@@ -579,9 +579,9 @@ async def register_document(
         )
 
 
-@router.post("/{case_id}/documents/link", response_model=LinkPathResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{course_id}/documents/link", response_model=LinkPathResponse, status_code=status.HTTP_201_CREATED)
 async def link_file_or_folder(
-    case_id: str,
+    course_id: str,
     request: LinkPathRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -614,8 +614,8 @@ async def link_file_or_folder(
             await service.connect()
 
         # Normalize case ID (must match GET endpoint normalization)
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Determine if path is file or folder
         files_to_link = []
@@ -692,7 +692,7 @@ async def link_file_or_folder(
 
                 # Create document record
                 document_data = {
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "nom_fichier": file_path.name,
                     "type_fichier": ext.lstrip('.'),
                     "type_mime": get_mime_type(file_path.name),
@@ -709,7 +709,7 @@ async def link_file_or_folder(
                 created_doc = await service.create("document", document_data, record_id=doc_id)
                 logger.info(f"Linked file: {file_path.name} -> document:{doc_id}")
                 logger.info(f"Created document in DB: {created_doc}")
-                logger.info(f"Document case_id: {document_data['case_id']}")
+                logger.info(f"Document course_id: {document_data['course_id']}")
 
                 # Index text content if available
                 if texte_extrait:
@@ -717,7 +717,7 @@ async def link_file_or_folder(
                         indexing_service = DocumentIndexingService()
                         result = await indexing_service.index_document(
                             document_id=f"document:{doc_id}",
-                            case_id=case_id,
+                            course_id=course_id,
                             text_content=texte_extrait
                         )
 
@@ -730,7 +730,7 @@ async def link_file_or_folder(
                 # Add to response
                 linked_documents.append(DocumentResponse(
                     id=f"document:{doc_id}",
-                    case_id=case_id,
+                    course_id=course_id,
                     nom_fichier=file_path.name,
                     type_fichier=ext.lstrip('.'),
                     type_mime=get_mime_type(file_path.name),
@@ -770,9 +770,9 @@ async def link_file_or_folder(
         )
 
 
-@router.get("/{case_id}/documents/{doc_id}/derived")
+@router.get("/{course_id}/documents/{doc_id}/derived")
 async def get_derived_documents(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
@@ -788,8 +788,8 @@ async def get_derived_documents(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -810,7 +810,7 @@ async def get_derived_documents(
 
                     derived.append(DocumentResponse(
                         id=str(item.get("id", "")),
-                        case_id=item.get("case_id", case_id),
+                        course_id=item.get("course_id", course_id),
                         nom_fichier=item.get("nom_fichier", ""),
                         type_fichier=item.get("type_fichier", ""),
                         type_mime=item.get("type_mime", ""),
@@ -834,9 +834,9 @@ async def get_derived_documents(
         )
 
 
-@router.get("/{case_id}/documents/{doc_id}", response_model=DocumentResponse)
+@router.get("/{course_id}/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
@@ -849,8 +849,8 @@ async def get_document(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -879,7 +879,7 @@ async def get_document(
 
         return DocumentResponse(
             id=str(item.get("id", doc_id)),
-            case_id=item.get("case_id", case_id),
+            course_id=item.get("course_id", course_id),
             nom_fichier=item.get("nom_fichier", ""),
             type_fichier=item.get("type_fichier", ""),
             type_mime=item.get("type_mime", ""),
@@ -898,9 +898,9 @@ async def get_document(
         )
 
 
-@router.delete("/{case_id}/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{course_id}/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     filename: Optional[str] = None,
     file_path: Optional[str] = None,
@@ -919,8 +919,8 @@ async def delete_document(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -960,14 +960,14 @@ async def delete_document(
             # If this is a transcription document, clear texte_extrait from the source audio
             if item.get("is_transcription") and item.get("source_audio"):
                 source_audio_filename = item.get("source_audio")
-                case_id_for_query = item.get("case_id", case_id)
-                if not case_id_for_query.startswith("case:"):
-                    case_id_for_query = f"case:{case_id_for_query}"
+                course_id_for_query = item.get("course_id", course_id)
+                if not course_id_for_query.startswith("course:"):
+                    course_id_for_query = f"course:{course_id_for_query}"
 
                 # Find the source audio document
                 audio_result = await service.query(
-                    "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $filename",
-                    {"case_id": case_id_for_query, "filename": source_audio_filename}
+                    "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
+                    {"course_id": course_id_for_query, "filename": source_audio_filename}
                 )
 
                 if audio_result and len(audio_result) > 0:
@@ -1024,7 +1024,7 @@ async def delete_document(
                     logger.warning(f"Orphaned file does not exist: {file_path}")
             elif filename:
                 # Use filename to find file in uploads directory
-                upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+                upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                 if upload_dir.exists():
                     file_path_obj = upload_dir / filename
                     if file_path_obj.exists():
@@ -1037,7 +1037,7 @@ async def delete_document(
                         logger.warning(f"Orphaned file does not exist: {file_path_obj}")
             else:
                 # Fallback: try to find file with matching ID in name (old behavior)
-                upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+                upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                 if upload_dir.exists():
                     # Look for file with matching ID in name
                     clean_id_short = clean_id[:8] if len(clean_id) > 8 else clean_id
@@ -1062,9 +1062,9 @@ async def delete_document(
         )
 
 
-@router.get("/{case_id}/documents/{doc_id}/download")
+@router.get("/{course_id}/documents/{doc_id}/download")
 async def download_document(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     inline: bool = False,
     user_id: Optional[str] = Depends(get_current_user_id)
@@ -1153,9 +1153,9 @@ class ExtractionResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{case_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
+@router.post("/{course_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
 async def extract_document_text(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -1170,8 +1170,8 @@ async def extract_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1258,9 +1258,9 @@ async def extract_document_text(
         )
 
 
-@router.delete("/{case_id}/documents/{doc_id}/text")
+@router.delete("/{course_id}/documents/{doc_id}/text")
 async def clear_document_text(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -1275,8 +1275,8 @@ async def clear_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1323,9 +1323,9 @@ class TranscriptionResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{case_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
+@router.post("/{course_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
 async def transcribe_document(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     language: str = "fr",
     user_id: str = Depends(require_auth)
@@ -1342,8 +1342,8 @@ async def transcribe_document(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1469,9 +1469,9 @@ class YouTubeDownloadRequest(BaseModel):
     auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
 
 
-@router.post("/{case_id}/documents/{doc_id}/transcribe-workflow")
+@router.post("/{course_id}/documents/{doc_id}/transcribe-workflow")
 async def transcribe_document_workflow(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     request: TranscribeWorkflowRequest = TranscribeWorkflowRequest(),
     user_id: str = Depends(require_auth)
@@ -1492,8 +1492,8 @@ async def transcribe_document_workflow(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1577,7 +1577,7 @@ async def transcribe_document_workflow(
                 try:
                     result = await workflow.run(
                         audio_path=file_path,
-                        judgment_id=case_id,
+                        course_id=course_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
                         raw_mode=request.raw_mode,
@@ -1642,9 +1642,9 @@ async def transcribe_document_workflow(
 # PDF Extraction to Markdown
 # ============================================================================
 
-@router.post("/{case_id}/documents/{doc_id}/extract-to-markdown")
+@router.post("/{course_id}/documents/{doc_id}/extract-to-markdown")
 async def extract_pdf_to_markdown(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -1664,8 +1664,8 @@ async def extract_pdf_to_markdown(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -1726,7 +1726,7 @@ async def extract_pdf_to_markdown(
                     markdown_filename = Path(original_filename).stem + ".md"
 
                     # Get judgment directory
-                    judgment_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+                    judgment_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                     markdown_path = judgment_dir / markdown_filename
 
                     # Check if markdown file exists on disk
@@ -1739,8 +1739,8 @@ async def extract_pdf_to_markdown(
 
                     # Check existing documents in database
                     docs_result = await service.query(
-                        "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $filename",
-                        {"case_id": case_id, "filename": markdown_filename}
+                        "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
+                        {"course_id": course_id, "filename": markdown_filename}
                     )
 
                     if docs_result and len(docs_result) > 0:
@@ -1810,7 +1810,7 @@ async def extract_pdf_to_markdown(
                     new_doc_id = str(uuid.uuid4())
                     doc_record = {
                         # ❌ NE PAS inclure "id" dans doc_record car CREATE va l'ajouter automatiquement
-                        "case_id": case_id,
+                        "course_id": course_id,
                         "nom_fichier": markdown_filename,
                         "type_fichier": "md",
                         "type_mime": "text/markdown",
@@ -1841,7 +1841,7 @@ async def extract_pdf_to_markdown(
                         indexing_service = get_document_indexing_service()
                         index_result = await indexing_service.index_document(
                             document_id=f"document:{new_doc_id}",
-                            case_id=case_id,
+                            course_id=course_id,
                             text_content=extraction_result.text,
                             force_reindex=False
                         )
@@ -1932,9 +1932,9 @@ class YouTubeDownloadResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{case_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
+@router.post("/{course_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
 async def get_youtube_info(
-    case_id: str,
+    course_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -1978,9 +1978,9 @@ async def get_youtube_info(
         )
 
 
-@router.post("/{case_id}/documents/youtube", response_model=YouTubeDownloadResponse)
+@router.post("/{course_id}/documents/youtube", response_model=YouTubeDownloadResponse)
 async def download_youtube_audio(
-    case_id: str,
+    course_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -2011,11 +2011,11 @@ async def download_youtube_audio(
             await service.connect()
 
         # Normalize case ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Create upload directory for this judgment
-        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+        upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Download audio
@@ -2034,7 +2034,7 @@ async def download_youtube_audio(
 
         file_path = Path(result.file_path)
         document_data = {
-            "case_id": case_id,
+            "course_id": course_id,
             "nom_fichier": result.filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -2136,9 +2136,9 @@ class TTSResponse(BaseModel):
     error: str = ""
 
 
-@router.post("/{case_id}/documents/{doc_id}/tts", response_model=TTSResponse)
+@router.post("/{course_id}/documents/{doc_id}/tts", response_model=TTSResponse)
 async def generate_tts(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     request: TTSRequest = TTSRequest(),
     user_id: str = Depends(require_auth)
@@ -2163,8 +2163,8 @@ async def generate_tts(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -2203,7 +2203,7 @@ async def generate_tts(
         tts_service = get_tts_service()
 
         # Create output path
-        judgment_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+        judgment_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         judgment_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate filename based on document name
@@ -2238,7 +2238,7 @@ async def generate_tts(
         now = datetime.utcnow().isoformat()
 
         tts_doc_data = {
-            "case_id": case_id,
+            "course_id": course_id,
             "nom_fichier": audio_filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -2264,8 +2264,8 @@ async def generate_tts(
         logger.info(f"TTS audio saved as document: {tts_doc_id}")
 
         # Return URL for downloading/streaming
-        clean_case_id = case_id.replace("case:", "")
-        audio_url = f"/api/cases/{clean_case_id}/documents/document:{tts_doc_id}/download?inline=true"
+        clean_course_id = course_id.replace("course:", "")
+        audio_url = f"/api/cases/{clean_course_id}/documents/document:{tts_doc_id}/download?inline=true"
 
         return TTSResponse(
             success=True,
@@ -2296,9 +2296,9 @@ class DiagnosticResult(BaseModel):
     ok_count: int
 
 
-@router.get("/{case_id}/documents/diagnostic", response_model=DiagnosticResult)
+@router.get("/{course_id}/documents/diagnostic", response_model=DiagnosticResult)
 async def diagnose_documents(
-    case_id: str,
+    course_id: str,
     user_id: str = Depends(get_current_user_id)
 ):
     """
@@ -2312,14 +2312,14 @@ async def diagnose_documents(
     if not service.db:
         await service.connect()
 
-    # Normaliser case_id
-    if not case_id.startswith("case:"):
-        case_id = f"case:{case_id}"
+    # Normaliser course_id
+    if not course_id.startswith("course:"):
+        course_id = f"course:{course_id}"
 
     # Récupérer tous les documents de la base de données
     docs_result = await service.query(
-        "SELECT * FROM document WHERE case_id = $case_id",
-        {"case_id": case_id}
+        "SELECT * FROM document WHERE course_id = $course_id",
+        {"course_id": course_id}
     )
 
     documents = []
