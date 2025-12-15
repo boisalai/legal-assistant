@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bot, User, Send, Loader2, Sparkles, AlertCircle, Wifi, WifiOff } from "lucide-react";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, settingsApi, documentsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
-import type { Case, Document } from "@/types";
+import type { Course, Document } from "@/types";
 import { TranscriptionProgress, useTranscriptionProgress } from "../transcription-progress";
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 import { useActivityTracker } from "@/lib/activity-tracker";
@@ -30,7 +30,7 @@ interface Message {
 }
 
 interface AssistantTabProps {
-  caseData: Case;
+  caseData: Course;
 }
 
 const SUGGESTED_QUESTIONS = [

@@ -60,7 +60,7 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
         if (color) payload.color = color;
       }
 
-      const newCase = await casesApi.upload(payload);
+      const newCase = await coursesApi.upload(payload);
 
       // Reset form
       resetForm();

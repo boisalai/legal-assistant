@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Case, Document, Checklist } from "@/types";
+import type { Course, Document, Checklist } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
 import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
@@ -42,7 +42,7 @@ import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
 
 interface CaseDetailsPanelProps {
-  caseData: Case;
+  caseData: Course;
   documents: Document[];
   checklist: Checklist | null;
   onUploadDocuments: () => void;

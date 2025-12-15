@@ -5,11 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertTriangle, FileWarning, CheckCircle2, User, MapPin, Calendar, DollarSign, FileText, Building } from "lucide-react";
-import type { Case, Checklist, Document } from "@/types";
+import type { Course, Checklist, Document } from "@/types";
 import { useState } from "react";
 
 interface OverviewTabProps {
-  caseData: Case;
+  caseData: Course;
   documents: Document[];
   checklist: Checklist | null;
 }
