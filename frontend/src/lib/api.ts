@@ -1,7 +1,7 @@
 // API client for Legal Assistant
 // Handles communication with FastAPI backend
 
-import type { Case, AuthToken, User, Document, AnalysisResult, Checklist } from "@/types";
+import type { Course, AuthToken, User, Document, AnalysisResult, Checklist } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -52,29 +52,29 @@ async function fetchApi<T>(
 }
 
 // ============================================
-// Cases API (maps to /api/cases in backend)
+// Courses API (maps to /api/courses in backend)
 // ============================================
 
-export interface CaseListResponse {
-  cases: Case[];
+export interface CourseListResponse {
+  courses: Course[];
   total: number;
 }
 
-export const casesApi = {
-  // List all cases
-  async list(skip: number = 0, limit: number = 20): Promise<Case[]> {
-    const response = await fetchApi<CaseListResponse>(
-      `/api/cases?skip=${skip}&limit=${limit}`
+export const coursesApi = {
+  // List all courses
+  async list(skip: number = 0, limit: number = 20): Promise<Course[]> {
+    const response = await fetchApi<CourseListResponse>(
+      `/api/courses?skip=${skip}&limit=${limit}`
     );
-    return response.cases;
+    return response.courses;
   },
 
-  // Get single judgment by ID
-  async get(id: string): Promise<Case> {
-    return fetchApi<Case>(`/api/cases/${encodeURIComponent(id)}`);
+  // Get single course by ID
+  async get(id: string): Promise<Course> {
+    return fetchApi<Course>(`/api/courses/${encodeURIComponent(id)}`);
   },
 
-  // Upload new judgment (PDF or text)
+  // Upload new course (PDF or text)
   async upload(data: {
     file?: File;
     text?: string;
@@ -84,7 +84,7 @@ export const casesApi = {
     court?: string;
     decision_date?: string;
     legal_domain?: string;
-  }): Promise<Case> {
+  }): Promise<Course> {
     const formData = new FormData();
 
     if (data.file) {
@@ -112,7 +112,7 @@ export const casesApi = {
       formData.append("legal_domain", data.legal_domain);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/cases`, {
+    const response = await fetch(`${API_BASE_URL}/api/courses`, {
       method: "POST",
       body: formData,
       headers: {
@@ -130,7 +130,7 @@ export const casesApi = {
     return response.json();
   },
 
-  // Update case
+  // Update course
   async update(
     id: string,
     data: {
@@ -145,34 +145,34 @@ export const casesApi = {
       credits?: number;
       color?: string;
     }
-  ): Promise<Case> {
-    // Remove "judgment:" or "case:" prefix if present
-    const cleanId = id.replace("judgment:", "").replace("case:", "");
-    return fetchApi<Case>(`/api/cases/${encodeURIComponent(cleanId)}`, {
+  ): Promise<Course> {
+    // Remove "course:", "judgment:", or "case:" prefix if present
+    const cleanId = id.replace("course:", "").replace("judgment:", "").replace("case:", "");
+    return fetchApi<Course>(`/api/courses/${encodeURIComponent(cleanId)}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
   },
 
-  // Delete judgment
+  // Delete course
   async delete(id: string): Promise<void> {
     // Remove "judgment:" prefix if present
-    const cleanId = id.replace("judgment:", "");
-    await fetchApi<void>(`/api/cases/${encodeURIComponent(cleanId)}`, {
+    const cleanId = id.replace("course:", "").replace("judgment:", "");
+    await fetchApi<void>(`/api/courses/${encodeURIComponent(cleanId)}`, {
       method: "DELETE",
     });
   },
 
-  // Batch delete cases
+  // Batch delete courses
   async deleteMany(ids: string[]): Promise<void> {
     await Promise.all(ids.map((id) => this.delete(id)));
   },
 
-  // Generate summary (case brief) for a judgment
+  // Generate summary (course brief) for a course
   async summarize(id: string, modelId?: string): Promise<any> {
-    const cleanId = id.replace("judgment:", "");
+    const cleanId = id.replace("course:", "").replace("judgment:", "");
     return fetchApi<any>(
-      `/api/cases/${encodeURIComponent(cleanId)}/summarize`,
+      `/api/courses/${encodeURIComponent(cleanId)}/summarize`,
       {
         method: "POST",
         body: JSON.stringify({ model_id: modelId }),
@@ -180,11 +180,11 @@ export const casesApi = {
     );
   },
 
-  // Get existing summary for a judgment
+  // Get existing summary for a course
   async getSummary(id: string): Promise<any> {
-    const cleanId = id.replace("judgment:", "");
+    const cleanId = id.replace("course:", "").replace("judgment:", "");
     return fetchApi<any>(
-      `/api/cases/${encodeURIComponent(cleanId)}/summary`
+      `/api/courses/${encodeURIComponent(cleanId)}/summary`
     );
   },
 };
@@ -369,18 +369,18 @@ export interface YouTubeDownloadResult {
 export const documentsApi = {
   async list(caseId: string): Promise<Document[]> {
     // Clean ID (remove judgment: prefix if present)
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
     const response = await fetchApi<DocumentListResponse>(
-      `/api/cases/${encodeURIComponent(cleanId)}/documents`
+      `/api/courses/${encodeURIComponent(cleanId)}/documents`
     );
     return response.documents;
   },
 
   // Sync documents - auto-discover orphaned files in uploads directory
   async sync(caseId: string): Promise<{ documents: Document[]; discovered: number }> {
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
     const response = await fetchApi<DocumentListResponse>(
-      `/api/cases/${encodeURIComponent(cleanId)}/documents?auto_discover=true`
+      `/api/courses/${encodeURIComponent(cleanId)}/documents?auto_discover=true`
     );
     // Count newly discovered documents (those with auto_discovered flag)
     const discovered = response.documents.filter((d: any) => d.auto_discovered).length;
@@ -395,19 +395,19 @@ export const documentsApi = {
     unchanged: number;
     message: string;
   }> {
-    const cleanId = caseId.replace("judgment:", "").replace("case:", "");
+    const cleanId = caseId.replace("course:", "").replace("course:", "").replace("judgment:", "").replace("course:", "").replace("case:", "");
     return fetchApi(
-      `/api/cases/${encodeURIComponent(cleanId)}/sync-linked-directories`,
+      `/api/courses/${encodeURIComponent(cleanId)}/sync-linked-directories`,
       { method: "POST" }
     );
   },
 
   // Get derived documents (transcriptions, extractions, TTS) for a source document
   async getDerived(caseId: string, documentId: string): Promise<{ derived: Document[]; total: number }> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
     const response = await fetchApi<{ derived: Document[]; total: number }>(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/derived`
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/derived`
     );
     return response;
   },
@@ -424,13 +424,13 @@ export const documentsApi = {
       onStepComplete?: (step: string, success: boolean) => void;
     } = {}
   ): Promise<TranscriptionResult> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
     const response = await fetch(
-      `${API_BASE_URL}/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/transcribe-workflow`,
+      `${API_BASE_URL}/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/transcribe-workflow`,
       {
         method: "POST",
         headers: {
@@ -521,13 +521,13 @@ export const documentsApi = {
       onStepComplete?: (step: string, success: boolean) => void;
     } = {}
   ): Promise<PDFExtractionResult> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
     const response = await fetch(
-      `${API_BASE_URL}/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract-to-markdown`,
+      `${API_BASE_URL}/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract-to-markdown`,
       {
         method: "POST",
         headers: {
@@ -605,12 +605,12 @@ export const documentsApi = {
 
   async upload(caseId: string, file: File): Promise<Document> {
     // Clean ID (remove judgment: prefix if present)
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${API_BASE_URL}/api/cases/${encodeURIComponent(cleanId)}/documents`, {
+    const response = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(cleanId)}/documents`, {
       method: "POST",
       body: formData,
       headers: {
@@ -630,10 +630,10 @@ export const documentsApi = {
 
   async register(caseId: string, filePath: string): Promise<Document> {
     // Register a document by file path (no upload/copy)
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
 
     return fetchApi<Document>(
-      `/api/cases/${encodeURIComponent(cleanId)}/documents/register`,
+      `/api/courses/${encodeURIComponent(cleanId)}/documents/register`,
       {
         method: "POST",
         body: JSON.stringify({ file_path: filePath }),
@@ -643,10 +643,10 @@ export const documentsApi = {
 
   // Link a file or folder (without copying)
   async link(caseId: string, path: string): Promise<{ success: boolean; linked_count: number; documents: Document[]; warnings?: string[] }> {
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
 
     return fetchApi<{ success: boolean; linked_count: number; documents: Document[]; warnings?: string[] }>(
-      `/api/cases/${encodeURIComponent(cleanId)}/documents/link`,
+      `/api/courses/${encodeURIComponent(cleanId)}/documents/link`,
       {
         method: "POST",
         body: JSON.stringify({ path }),
@@ -656,7 +656,7 @@ export const documentsApi = {
 
   async delete(caseId: string, documentId: string, filename?: string, filePath?: string): Promise<void> {
     // Clean IDs
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     // Build URL with optional query parameters
@@ -665,15 +665,15 @@ export const documentsApi = {
     if (filePath) params.append("file_path", filePath);
 
     const queryString = params.toString();
-    const url = `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}${queryString ? `?${queryString}` : ""}`;
+    const url = `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}${queryString ? `?${queryString}` : ""}`;
 
     await fetchApi<void>(url, { method: "DELETE" });
   },
 
   getDownloadUrl(caseId: string, documentId: string): string {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
-    return `${API_BASE_URL}/api/cases/${cleanCaseId}/documents/${cleanDocId}/download`;
+    return `${API_BASE_URL}/api/courses/${cleanCaseId}/documents/${cleanDocId}/download`;
   },
 
   getPreviewUrl(caseId: string, documentId: string): string {
@@ -704,11 +704,11 @@ export const documentsApi = {
     error?: string;
   }> {
     // Extract text from a document (PDF, Word, text, etc.)
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     return fetchApi(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract`,
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract`,
       { method: "POST" }
     );
   },
@@ -718,20 +718,20 @@ export const documentsApi = {
     message?: string;
   }> {
     // Clear extracted text from a document
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     return fetchApi(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/text`,
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/text`,
       { method: "DELETE" }
     );
   },
 
   // YouTube methods
   async getYouTubeInfo(caseId: string, url: string): Promise<YouTubeVideoInfo> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     return fetchApi<YouTubeVideoInfo>(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/youtube/info`,
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/youtube/info`,
       {
         method: "POST",
         body: JSON.stringify({ url }),
@@ -740,9 +740,9 @@ export const documentsApi = {
   },
 
   async downloadYouTube(caseId: string, url: string): Promise<YouTubeDownloadResult> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     return fetchApi<YouTubeDownloadResult>(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/youtube`,
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/youtube`,
       {
         method: "POST",
         body: JSON.stringify({ url }),
@@ -792,7 +792,7 @@ export const chatApi = {
       method: "POST",
       body: JSON.stringify({
         message,
-        case_id: context.caseId,
+        course_id: context.caseId,
         model_id: context.model || "ollama:qwen2.5:7b",
         history: context.history || [],
       }),
@@ -817,7 +817,7 @@ export const chatApi = {
       },
       body: JSON.stringify({
         message,
-        case_id: context.caseId,
+        course_id: context.caseId,
         model_id: context.model || "ollama:qwen2.5:7b",
         history: context.history || [],
       }),
@@ -948,13 +948,13 @@ export const adminApi = {
 
 export interface AnalysisStartResponse {
   message: string;
-  case_id: string;
+  course_id: string;
   documents_count: number;
   model: string;
 }
 
 export interface AnalysisStatus {
-  case_id: string;
+  course_id: string;
   status: string;
   progress: number;
   message: string;
@@ -975,7 +975,7 @@ export interface AnalysisChecklistResponse {
 export const analysisApi = {
   // Demarre l'analyse complete d'un dossier
   async start(caseId: string, modelId?: string): Promise<AnalysisStartResponse> {
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
     return fetchApi<AnalysisStartResponse>(
       `/api/analysis/${encodeURIComponent(cleanId)}/start`,
       {
@@ -987,7 +987,7 @@ export const analysisApi = {
 
   // Recupere le statut de l'analyse
   async getStatus(caseId: string): Promise<AnalysisStatus> {
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
     return fetchApi<AnalysisStatus>(
       `/api/analysis/${encodeURIComponent(cleanId)}/status`
     );
@@ -995,13 +995,13 @@ export const analysisApi = {
 
   // Recupere la checklist generee par l'analyse
   async getChecklist(caseId: string): Promise<Checklist> {
-    const cleanId = caseId.replace("judgment:", "");
+    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
     try {
       const response = await fetchApi<AnalysisChecklistResponse>(
         `/api/analysis/${encodeURIComponent(cleanId)}/checklist`
       );
       return {
-        case_id: caseId,
+        course_id: caseId,
         items: response.items.map(item => ({
           titre: item.titre,
           description: item.description || "",
@@ -1017,7 +1017,7 @@ export const analysisApi = {
     } catch {
       // Fallback si pas d'analyse disponible
       return {
-        case_id: caseId,
+        course_id: caseId,
         items: [],
         points_attention: [],
         documents_manquants: [],
@@ -1033,11 +1033,11 @@ export const analysisApi = {
 
   // Get derived documents (transcriptions, extractions, TTS) for a source document
   async getDerived(caseId: string, documentId: string): Promise<{ derived: Document[]; total: number }> {
-    const cleanCaseId = caseId.replace("judgment:", "");
+    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     const cleanDocId = documentId.replace("document:", "");
 
     const response = await fetchApi<{ derived: Document[]; total: number }>(
-      `/api/cases/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/derived`
+      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/derived`
     );
     return response;
   },
@@ -1077,8 +1077,8 @@ export const docusaurusApi = {
 
   // Import selected Docusaurus files into a case
   async importFiles(caseId: string, filePaths: string[]): Promise<Document[]> {
-    const cleanId = caseId.replace("case:", "");
-    return fetchApi<Document[]>(`/api/cases/${cleanId}/import-docusaurus`, {
+    const cleanId = caseId.replace("course:", "").replace("case:", "");
+    return fetchApi<Document[]>(`/api/courses/${cleanId}/import-docusaurus`, {
       method: "POST",
       body: JSON.stringify({ file_paths: filePaths }),
     });
@@ -1086,8 +1086,8 @@ export const docusaurusApi = {
 
   // Check for updates on Docusaurus documents
   async checkUpdates(caseId: string): Promise<CheckUpdatesResponse> {
-    const cleanId = caseId.replace("case:", "");
-    return fetchApi<CheckUpdatesResponse>(`/api/cases/${cleanId}/check-docusaurus-updates`, {
+    const cleanId = caseId.replace("course:", "").replace("case:", "");
+    return fetchApi<CheckUpdatesResponse>(`/api/courses/${cleanId}/check-docusaurus-updates`, {
       method: "POST",
     });
   },
@@ -1124,8 +1124,8 @@ export const linkedDirectoryApi = {
     onComplete?: (result: { success: boolean; total_indexed: number; link_id: string }) => void,
     onError?: (error: string) => void
   ): Promise<void> {
-    const cleanId = caseId.replace("case:", "");
-    const url = `${API_BASE_URL}/api/cases/${cleanId}/link-directory`;
+    const cleanId = caseId.replace("course:", "").replace("case:", "");
+    const url = `${API_BASE_URL}/api/courses/${cleanId}/link-directory`;
 
     // Build headers
     const headers: Record<string, string> = {
@@ -1209,7 +1209,7 @@ export interface SessionListResponse {
 }
 
 export interface SessionCoursesResponse {
-  courses: Case[];
+  courses: Course[];
   total: number;
 }
 
@@ -1270,7 +1270,7 @@ export const sessionsApi = {
   },
 
   // Get all courses in a session
-  async getCourses(id: string): Promise<Case[]> {
+  async getCourses(id: string): Promise<Course[]> {
     const response = await fetchApi<SessionCoursesResponse>(
       `/api/sessions/${encodeURIComponent(id)}/courses`
     );
@@ -1283,7 +1283,7 @@ export const sessionsApi = {
 // ============================================
 
 export const api = {
-  cases: casesApi,
+  courses: coursesApi,
   documents: documentsApi,
   analysis: analysisApi,
   chat: chatApi,
@@ -1295,6 +1295,11 @@ export const api = {
   docusaurus: docusaurusApi,
   linkedDirectory: linkedDirectoryApi,
   sessions: sessionsApi,
+  // Backward compatibility
+  cases: coursesApi,
 };
+
+// Backward compatibility: export casesApi as alias
+export const casesApi = coursesApi;
 
 export default api;

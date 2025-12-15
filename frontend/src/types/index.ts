@@ -18,11 +18,11 @@ export interface Session {
 }
 
 // ============================================
-// Case Types
+// Course Types
 // ============================================
 
-// Main Case type (academic folders/courses)
-export interface Case {
+// Main Course type (academic folders/courses)
+export interface Course {
   id: string;
   title?: string;             // Title (e.g., "DRT-1001 - Introduction au droit")
   description?: string;       // Description of the case/course
@@ -46,10 +46,10 @@ export interface Case {
   score_confiance?: number;   // Deprecated: legacy field
 }
 
-// Document attached to a case
+// Document attached to a course
 export interface Document {
   id: string;
-  case_id: string;            // Case ID (formerly case_id)
+  course_id: string;          // Course ID (formerly case_id)
   nom_fichier: string;        // File name
   type_fichier: string;       // File type (pdf, docx, txt, audio, etc.)
   taille: number;             // Size in bytes
@@ -216,7 +216,7 @@ export interface NextStep {
 // Complete checklist
 export interface Checklist {
   id?: string;
-  case_id: string;            // Formerly dossier_id
+  course_id: string;          // Formerly dossier_id and case_id
   items: ChecklistItem[];
   points_attention: string[];
   documents_manquants: string[];
@@ -316,7 +316,7 @@ export type ActivityType =
 
 export interface UserActivity {
   id: string;
-  case_id: string;
+  course_id: string;
   action_type: ActivityType;
   timestamp: string;
   metadata?: {
@@ -335,5 +335,6 @@ export type ItemChecklist = ChecklistItem;
 export type EtapeSuivante = NextStep;
 
 // Legacy aliases for judgment/case compatibility
-export type Judgment = Case;
-export type Dossier = Case;
+export type Judgment = Course;
+export type Dossier = Course;
+export type Case = Course;  // Backward compatibility
