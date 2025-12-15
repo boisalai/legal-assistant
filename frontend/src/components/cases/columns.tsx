@@ -12,14 +12,14 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import type { Case } from "@/types";
+import type { Course } from "@/types";
 import { MoreHorizontal } from "lucide-react";
 
 export const createColumns = (
   onDelete: (id: string) => void,
   onTogglePin: (id: string) => void,
   t: (key: string) => string
-): ColumnDef<Case>[] => [
+): ColumnDef<Course>[] => [
   {
     id: "select",
     header: ({ table }) => (

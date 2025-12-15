@@ -26,13 +26,13 @@ import {
   FileSearch,
 } from "lucide-react";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
-import type { Case, Document } from "@/types";
+import type { Course, Document } from "@/types";
 import { analysisApi } from "@/lib/api";
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 
 interface AnalysisTabProps {
   caseId: string;
-  caseData: Case;
+  caseData: Course;
   documents: Document[];
   onAnalysisComplete: () => void;
 }
