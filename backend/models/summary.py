@@ -71,7 +71,7 @@ class AnalysisPoint(BaseModel):
 class CaseBriefCreate(BaseModel):
     """Schema pour creer un resume."""
 
-    judgment_id: str = Field(..., description="ID du jugement source")
+    course_id: str = Field(..., description="ID du cours source")
     summary_type: SummaryType = Field(default="case_brief", description="Type de resume")
     model_id: Optional[str] = Field(None, description="Modele LLM utilise")
 
@@ -80,7 +80,7 @@ class CaseBrief(BaseModel):
     """Resume complet d'un jugement (Case Brief)."""
 
     id: str = Field(..., description="ID unique du resume")
-    judgment_id: str = Field(..., description="ID du jugement source")
+    course_id: str = Field(..., description="ID du cours source")
 
     # ===== Identification =====
     case_name: str = Field(..., description="Nom de l'affaire")
@@ -151,7 +151,7 @@ class QuickSummary(BaseModel):
     """Resume rapide (points cles seulement)."""
 
     id: str
-    judgment_id: str
+    course_id: str
     case_name: str
     citation: Optional[str]
 
