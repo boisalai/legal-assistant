@@ -95,7 +95,7 @@ app = FastAPI(
     ## Endpoints principaux
 
     - `/api/auth/*` - Authentification (login, register, logout)
-    - `/api/cases/*` - Gestion des dossiers
+    - `/api/courses/*` - Gestion des dossiers
     """,
     version="0.1.0",
     lifespan=lifespan,
@@ -170,7 +170,7 @@ async def root():
             "docs": "/docs",
             "health": "/health",
             "auth": "/api/auth",
-            "cases": "/api/cases"
+            "courses": "/api/courses"
         }
     }
 

@@ -77,7 +77,7 @@ export function DocumentChatView({
   const cleanDocId = activeDocument.id.replace("document:", "");
   const documentUrl = `${
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-  }/api/cases/${cleanCaseId}/documents/${cleanDocId}/download?inline=true`;
+  }/api/courses/${cleanCaseId}/documents/${cleanDocId}/download?inline=true`;
 
   // Handle source navigation
   const handleSourceClick = (documentId: string, page?: number) => {

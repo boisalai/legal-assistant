@@ -74,7 +74,7 @@ export default function SettingsPage() {
     try {
       // Load TTS voices first (independent of other settings)
       try {
-        const voicesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/cases/tts/voices`);
+        const voicesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/tts/voices`);
         if (voicesRes.ok) {
           const voices = await voicesRes.json();
           if (Array.isArray(voices)) {

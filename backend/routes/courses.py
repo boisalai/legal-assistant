@@ -200,7 +200,7 @@ async def list_courses(
                         color=item.get("color"),
                     ))
 
-        return CourseListResponse(cases=cases, total=len(cases))
+        return CourseListResponse(courses=courses, total=len(courses))
 
     except Exception as e:
         logger.error(f"Error listing courses: {e}")

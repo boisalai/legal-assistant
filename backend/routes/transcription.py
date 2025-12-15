@@ -2,10 +2,10 @@
 Routes pour la transcription audio et le téléchargement YouTube.
 
 Endpoints:
-- POST /api/cases/{case_id}/documents/{doc_id}/transcribe - Transcription simple Whisper
-- POST /api/cases/{case_id}/documents/{doc_id}/transcribe-workflow - Transcription avec workflow Agno
-- POST /api/cases/{case_id}/documents/youtube/info - Informations vidéo YouTube
-- POST /api/cases/{case_id}/documents/youtube - Télécharger audio YouTube
+- POST /api/courses/{case_id}/documents/{doc_id}/transcribe - Transcription simple Whisper
+- POST /api/courses/{case_id}/documents/{doc_id}/transcribe-workflow - Transcription avec workflow Agno
+- POST /api/courses/{case_id}/documents/youtube/info - Informations vidéo YouTube
+- POST /api/courses/{case_id}/documents/youtube - Télécharger audio YouTube
 """
 
 import logging
@@ -27,7 +27,7 @@ from utils.file_utils import AUDIO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cases", tags=["Transcription"])
+router = APIRouter(prefix="/api/courses", tags=["Transcription"])
 
 
 # ============================================================================

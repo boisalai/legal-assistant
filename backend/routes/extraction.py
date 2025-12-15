@@ -2,9 +2,9 @@
 Routes pour l'extraction de texte depuis les documents.
 
 Endpoints:
-- POST /api/cases/{case_id}/documents/{doc_id}/extract - Extraction simple de texte
-- DELETE /api/cases/{case_id}/documents/{doc_id}/text - Effacer le texte extrait
-- POST /api/cases/{case_id}/documents/{doc_id}/extract-to-markdown - Extraction PDF avancée avec Docling
+- POST /api/courses/{case_id}/documents/{doc_id}/extract - Extraction simple de texte
+- DELETE /api/courses/{case_id}/documents/{doc_id}/text - Effacer le texte extrait
+- POST /api/courses/{case_id}/documents/{doc_id}/extract-to-markdown - Extraction PDF avancée avec Docling
 """
 
 import logging
@@ -25,7 +25,7 @@ from utils.file_utils import AUDIO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cases", tags=["Extraction"])
+router = APIRouter(prefix="/api/courses", tags=["Extraction"])
 
 
 # ============================================================================

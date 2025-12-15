@@ -2,11 +2,11 @@
 Routes pour la gestion des documents d'un dossier.
 
 Endpoints:
-- GET /api/cases/{course_id}/documents - Liste des documents
-- POST /api/cases/{course_id}/documents - Upload d'un document
-- GET /api/cases/{course_id}/documents/{doc_id} - Details d'un document
-- DELETE /api/cases/{course_id}/documents/{doc_id} - Supprimer un document
-- GET /api/cases/{course_id}/documents/{doc_id}/download - Telecharger un document
+- GET /api/courses/{course_id}/documents - Liste des documents
+- POST /api/courses/{course_id}/documents - Upload d'un document
+- GET /api/courses/{course_id}/documents/{doc_id} - Details d'un document
+- DELETE /api/courses/{course_id}/documents/{doc_id} - Supprimer un document
+- GET /api/courses/{course_id}/documents/{doc_id}/download - Telecharger un document
 """
 
 import logging
@@ -28,7 +28,7 @@ from utils.text_utils import remove_yaml_frontmatter
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cases", tags=["Documents"])
+router = APIRouter(prefix="/api/courses", tags=["Documents"])
 
 # Import auth helpers
 from auth.helpers import require_auth, get_current_user_id
@@ -2265,7 +2265,7 @@ async def generate_tts(
 
         # Return URL for downloading/streaming
         clean_course_id = course_id.replace("course:", "")
-        audio_url = f"/api/cases/{clean_course_id}/documents/document:{tts_doc_id}/download?inline=true"
+        audio_url = f"/api/courses/{clean_course_id}/documents/document:{tts_doc_id}/download?inline=true"
 
         return TTSResponse(
             success=True,
