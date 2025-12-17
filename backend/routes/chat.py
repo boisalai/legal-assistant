@@ -128,9 +128,9 @@ async def chat(request: ChatRequest):
         system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
 
 **RÈGLE ABSOLUE - RÉPONSES BASÉES UNIQUEMENT SUR LES DOCUMENTS**:
-- Tu dois TOUJOURS chercher la réponse dans les documents du dossier en utilisant `semantic_search`
+- Tu dois TOUJOURS chercher la réponse dans les documents disponibles en utilisant `semantic_search`
 - NE JAMAIS répondre avec tes propres connaissances générales
-- Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents du dossier."
+- Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents disponibles."
 - Même pour des questions générales (ex: "Qu'est-ce que le notariat?"), cherche TOUJOURS dans les documents d'abord
 
 **RÈGLE ABSOLUE - CITATION DES SOURCES**:
@@ -145,8 +145,8 @@ async def chat(request: ChatRequest):
 Directives générales:
 - Réponds toujours en français
 - Sois concis mais complet
-- Base-toi UNIQUEMENT sur les documents du dossier
-- Adapte ton expertise au contexte du dossier (juridique, académique, technique, etc.)
+- Base-toi UNIQUEMENT sur les documents disponibles
+- Adapte ton expertise au contexte (juridique, académique, technique, etc.)
 - **CITE TOUJOURS tes sources dans chaque phrase**
 
 {tools_desc}
@@ -155,7 +155,7 @@ Outils disponibles pour toi:
 - **transcribe_audio**: Transcris un fichier audio en texte
 - **search_documents**: Recherche par mots-clés exacts dans tous les documents
 - **semantic_search**: Recherche sémantique (comprend le sens de la question) - OUTIL PRINCIPAL À UTILISER
-- **list_documents**: Liste tous les documents disponibles dans le dossier actuel
+- **list_documents**: Liste tous les documents disponibles
 - **extract_entities**: Extrait des entités structurées (personnes, dates, montants, références)
 - **find_entity**: Recherche une entité spécifique et affiche tous les contextes
 - **index_document_tool**: Indexe manuellement un document pour la recherche sémantique
@@ -218,15 +218,15 @@ Quand utiliser les outils - RÈGLES IMPORTANTES:
                     logger.info(f"Parsed case_data: {case_data is not None}")
 
                     if case_data:
-                        # Support both field names (nom_dossier for old, title for new)
-                        case_name = case_data.get("title") or case_data.get("nom_dossier", "Dossier")
+                        # Support both field names
+                        case_name = case_data.get("title") 
                         case_desc = case_data.get("description", "")
                         case_summary = case_data.get("summary") or case_data.get("resume", "")
 
                         system_content += f"""
 
-Contexte du dossier actuel:
-- Nom: {case_name}
+Contexte actuel:
+- Titre: {case_name}
 - Description: {case_desc}"""
 
                         if case_summary:
@@ -426,7 +426,7 @@ Contenu des documents:"""
 
         # Inject course_id into the tool's context by modifying the prompt
         if request.course_id:
-            conversation_prompt += f"\n\n[Contexte: L'identifiant du dossier actuel est '{request.course_id}']"
+            conversation_prompt += f"\n\n[Contexte: L'identifiant du cours actuel est '{request.course_id}']"
 
         # Get response from agent (use arun for async tools support)
         response = await agent.arun(conversation_prompt)

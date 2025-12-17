@@ -63,7 +63,7 @@ class DocumentIndexingService:
 
         Args:
             document_id: ID du document (ex: "document:abc123")
-            case_id: ID du dossier (ex: "case:xyz")
+            case_id: ID du cours (ex: "course:xyz")
             text_content: Contenu textuel à indexer
             force_reindex: Si True, supprime les embeddings existants avant de réindexer
 
@@ -265,7 +265,7 @@ class DocumentIndexingService:
 
         Args:
             query_text: Texte de la requête
-            case_id: Optionnel, limiter la recherche à un dossier
+            case_id: Optionnel, limiter la recherche à un cours
             top_k: Nombre maximum de résultats
             min_similarity: Score de similarité minimum (0-1)
 
@@ -392,7 +392,7 @@ class DocumentIndexingService:
         Obtient des statistiques sur l'index.
 
         Args:
-            case_id: Optionnel, filtrer par dossier
+            case_id: Optionnel, filtrer par cours
 
         Returns:
             Dict avec total_chunks, total_documents, embedding_model

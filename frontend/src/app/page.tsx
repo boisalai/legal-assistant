@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { NewCaseModal } from "@/components/cases/new-case-modal";
+import { NewCaseModal } from "@/components/cases/new-course-modal";
 import { LanguageSelector } from "@/components/ui/language-selector";
 
 export default function Home() {

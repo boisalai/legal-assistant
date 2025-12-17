@@ -23,7 +23,7 @@ async def semantic_search(
     top_k: int = 5
 ) -> str:
     """
-    Recherche sémantique dans les documents d'un dossier.
+    Recherche sémantique dans les documents d'un cours.
 
     ⚠️ OUTIL PRINCIPAL: Utilisez cet outil pour TOUTE question de l'utilisateur.
     Cet outil utilise l'IA pour comprendre le sens de la question et trouve les passages pertinents dans les documents.
@@ -38,14 +38,14 @@ async def semantic_search(
     - "Comment fonctionne X ?" → Cherche les explications sur X dans les documents
 
     Si la recherche ne trouve rien de pertinent, vous DEVEZ informer l'utilisateur que l'information
-    n'est pas disponible dans les documents du dossier.
+    n'est pas disponible dans les documents du cours.
 
     DIFFÉRENCE avec search_documents:
     - search_documents: Recherche de mots-clés exacts (ex: "signature")
     - semantic_search: Comprend le sens de la question (ex: "quelles sont les obligations du vendeur ?")
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         query: La question de l'utilisateur (ex: "qu'est-ce que le notariat ?")
         top_k: Nombre de passages pertinents à retourner (défaut: 5)
 
@@ -72,7 +72,7 @@ async def semantic_search(
         logger.info(f"[semantic_search] Stats: {stats}")
 
         if stats.get("total_chunks", 0) == 0:
-            return """Les documents de ce dossier ne sont pas encore indexés pour la recherche sémantique.
+            return """Les documents de ce cours ne sont pas encore indexés pour la recherche sémantique.
 
 Pour utiliser la recherche sémantique:
 1. Les documents avec du texte extrait sont automatiquement indexés lors de l'upload
@@ -91,7 +91,7 @@ En attendant, je ne peux pas répondre à votre question car je n'ai pas accès 
         logger.info(f"[semantic_search] Found {len(results)} results")
 
         if not results:
-            return f"""Je n'ai pas trouvé d'information pertinente sur "{query}" dans les documents du dossier.
+            return f"""Je n'ai pas trouvé d'information pertinente sur "{query}" dans les documents du cours.
 
 Cela peut signifier que:
 - Les documents ne contiennent pas d'informations sur ce sujet
@@ -99,7 +99,7 @@ Cela peut signifier que:
 
 Vous pouvez:
 - Reformuler votre question de manière différente
-- Vérifier si les documents du dossier traitent bien de ce sujet"""
+- Vérifier si les documents du cours traitent bien de ce sujet"""
 
         # Récupérer les informations des documents sources
         logger.info(f"[semantic_search] Getting surreal service...")
@@ -171,7 +171,7 @@ async def index_document_tool(
     n'a pas fonctionné ou si vous voulez forcer la réindexation.
 
     Args:
-        case_id: L'identifiant du dossier
+        case_id: L'identifiant du cours
         document_name: Nom du fichier à indexer
 
     Returns:
@@ -204,7 +204,7 @@ async def index_document_tool(
                 documents = doc_result
 
         if not documents:
-            return f"Document '{document_name}' non trouvé dans le dossier {case_id}."
+            return f"Document '{document_name}' non trouvé dans le cours {case_id}."
 
         document = documents[0]
         doc_id = document.get("id")
@@ -238,10 +238,10 @@ async def index_document_tool(
 @tool(name="get_index_stats")
 async def get_index_stats(case_id: str) -> str:
     """
-    Affiche les statistiques de l'index de recherche sémantique pour un dossier.
+    Affiche les statistiques de l'index de recherche sémantique pour un cours.
 
     Args:
-        case_id: L'identifiant du dossier
+        case_id: L'identifiant du cours
 
     Returns:
         Statistiques de l'index
@@ -263,7 +263,7 @@ async def get_index_stats(case_id: str) -> str:
         embedding_dimensions = stats.get("embedding_dimensions", 0)
 
         if total_chunks == 0:
-            return f"""**Index de recherche sémantique pour le dossier {case_id}:**
+            return f"""**Index de recherche sémantique pour le cours {case_id}:**
 
 📊 **Statut:** Aucun document indexé
 
@@ -271,14 +271,14 @@ Pour indexer des documents:
 1. Les documents avec du texte extrait sont automatiquement indexés lors de l'upload
 2. Utilisez l'outil `index_document` pour indexer manuellement un document spécifique"""
 
-        return f"""**Index de recherche sémantique pour le dossier {case_id}:**
+        return f"""**Index de recherche sémantique pour le cours {case_id}:**
 
 📊 **Statistiques:**
 - Segments indexés: {total_chunks}
 - Modèle d'embeddings: {embedding_model}
 - Dimensions: {embedding_dimensions}
 
-✅ La recherche sémantique est disponible pour ce dossier!
+✅ La recherche sémantique est disponible pour ce cours!
 Utilisez `semantic_search` pour poser des questions en langage naturel."""
 
     except Exception as e:

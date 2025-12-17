@@ -477,9 +477,9 @@ Transcription brute:
 
         Args:
             audio_path: Chemin vers le fichier audio
-            course_id: ID du dossier (judgment:xxx)
+            course_id: ID du cours (course:xxx)
             language: Langue de l'audio
-            create_markdown_doc: Si True, crée un document markdown dans le dossier
+            create_markdown_doc: Si True, crée un document markdown dans le cours
             original_filename: Nom original du fichier (si différent du nom sur disque)
             raw_mode: Si True, sauvegarde la transcription brute sans formatage LLM
             source_document_id: ID du document audio source (pour lier le fichier dérivé)
@@ -614,7 +614,7 @@ async def transcribe_audio_to_markdown(
 
     Args:
         audio_path: Chemin vers le fichier audio
-        course_id: ID du dossier
+        course_id: ID du cours (course:xxx)
         language: Langue de l'audio
         model: Modèle LLM optionnel
         on_progress: Callback de progression optionnel

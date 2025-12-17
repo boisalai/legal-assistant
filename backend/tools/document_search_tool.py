@@ -114,7 +114,7 @@ async def search_documents(
     max_results: int = 10
 ) -> str:
     """
-    Recherche par mots-clés EXACTS dans les documents d'un dossier.
+    Recherche par mots-clés EXACTS dans les documents d'un cours.
 
     ⚠️ ATTENTION: Utilisez cet outil UNIQUEMENT si l'utilisateur demande explicitement de chercher un mot/phrase exact.
     Pour les questions normales, utilisez plutôt `semantic_search` qui comprend le sens de la question.
@@ -130,7 +130,7 @@ async def search_documents(
     - "Résume ce document" → utilisez semantic_search
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         keywords: Mots-clés à rechercher, séparés par des virgules (ex: "contrat, signature, date")
         max_results: Nombre maximum de résultats à retourner par mot-clé (défaut: 10)
 
@@ -148,7 +148,7 @@ async def search_documents(
         documents = await _get_case_documents(case_id)
 
         if not documents:
-            return "Aucun document avec du contenu extractible trouvé dans ce dossier. Les documents doivent être transcrits ou avoir du texte extrait pour être recherchés."
+            return "Aucun document avec du contenu extractible trouvé dans ce cours. Les documents doivent être transcrits ou avoir du texte extrait pour être recherchés."
 
         # Search in each document
         all_results = []
@@ -174,7 +174,7 @@ async def search_documents(
 
         if not all_results:
             keywords_str = ", ".join([f"'{k}'" for k in keyword_list])
-            return f"Aucune occurrence trouvée pour les mots-clés {keywords_str} dans les {len(documents)} documents du dossier."
+            return f"Aucune occurrence trouvée pour les mots-clés {keywords_str} dans les {len(documents)} documents du cours."
 
         # Format response
         keywords_str = ", ".join([f"**{k}**" for k in keyword_list])
@@ -225,13 +225,13 @@ async def search_documents(
 @tool(name="list_documents")
 async def list_documents(case_id: str) -> str:
     """
-    Liste tous les documents d'un dossier avec leur statut.
+    Liste tous les documents d'un cours avec leur statut.
 
-    Cet outil permet de voir tous les documents disponibles dans un dossier,
+    Cet outil permet de voir tous les documents disponibles dans un cours,
     leur type, et s'ils ont du contenu extractible (texte ou transcription).
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
 
     Returns:
         Une liste formatée des documents avec leur statut
@@ -264,9 +264,9 @@ async def list_documents(case_id: str) -> str:
                 documents = first_item
 
         if not documents:
-            return "Aucun document trouvé dans ce dossier."
+            return "Aucun document trouvé dans ce cours."
 
-        response = f"**{len(documents)} document(s) dans ce dossier:**\n\n"
+        response = f"**{len(documents)} document(s) dans ce cours:**\n\n"
 
         # Build a map of source relationships
         source_map = {}  # audio_filename -> transcription_filename

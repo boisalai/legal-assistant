@@ -17,7 +17,7 @@ import {
 import { FileUpload } from "@/components/ui/file-upload";
 import { AdvancedSettings, type AnalysisSettings } from "@/components/AdvancedSettings";
 import { ArrowLeft, FolderPlus } from "lucide-react";
-import { casesApi, documentsApi, analysisApi } from "@/lib/api";
+import { casesApi, documentsApi } from "@/lib/api";
 
 export default function NewCasePage() {
   const router = useRouter();
@@ -25,7 +25,6 @@ export default function NewCasePage() {
   const [typeTransaction, setTypeTransaction] = useState("vente");
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisSettings, setAnalysisSettings] = useState<AnalysisSettings>({
     model_id: "ollama:qwen2.5:7b",
@@ -51,10 +50,6 @@ export default function NewCasePage() {
       }
 
       setUploading(false);
-      setAnalyzing(true);
-
-      // Start analysis (fire and forget)
-      analysisApi.startStream(newCase.id).catch(console.error);
 
       // Strip "dossier:" prefix for URL
       const urlId = newCase.id.replace("dossier:", "");
@@ -62,7 +57,6 @@ export default function NewCasePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
       setUploading(false);
-      setAnalyzing(false);
     }
   };
 

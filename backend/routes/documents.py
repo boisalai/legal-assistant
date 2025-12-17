@@ -1,5 +1,5 @@
 """
-Routes pour la gestion des documents d'un dossier.
+Routes pour la gestion des documents d'un cours.
 
 Endpoints:
 - GET /api/courses/{course_id}/documents - Liste des documents
@@ -48,11 +48,11 @@ ALLOWED_EXTENSIONS = {
     '.webm': 'audio/webm',
 }
 
-# Types de fichiers supportés pour les liens (fichiers/dossiers)
+# Types de fichiers supportés pour les liens (fichiers/répertoires)
 LINKABLE_EXTENSIONS = {'.md', '.mdx', '.pdf', '.txt', '.docx'}
 
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB - Pour supporter les enregistrements audio de 3h+
-MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un dossier
+MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un répertoire
 
 
 # ============================================================================
@@ -180,10 +180,10 @@ async def list_documents(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Liste les documents d'un dossier.
+    Liste les documents d'un cours.
 
     Args:
-        course_id: ID du dossier
+        course_id: ID du cours
         verify_files: Si True, verifie que les fichiers existent sur le disque
         auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
         auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
@@ -397,7 +397,7 @@ async def upload_document(
     user_id: str = Depends(require_auth)
 ):
     """
-    Upload un document pour un dossier.
+    Upload un document pour un cours.
     Accepte: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
     """
     # Validate file type
@@ -586,16 +586,16 @@ async def link_file_or_folder(
     user_id: str = Depends(require_auth)
 ):
     """
-    Lie un fichier ou un dossier sans copie.
+    Lie un fichier ou un répertoire sans copie.
 
     - Si le chemin est un fichier : lie ce fichier uniquement
-    - Si le chemin est un dossier : lie tous les fichiers supportés du dossier (non-récursif)
+    - Si le chemin est un répertoire : lie tous les fichiers supportés du répertoire (non-récursif)
 
     Les fichiers sont référencés à leur emplacement d'origine.
     Un hash SHA-256 et mtime sont stockés pour détecter les modifications.
 
     Types supportés : .md, .mdx, .pdf, .txt, .docx
-    Limite : 50 fichiers maximum par dossier
+    Limite : 50 fichiers maximum par répertoire
     """
     path = Path(request.path)
     warnings = []
@@ -636,7 +636,7 @@ async def link_file_or_folder(
             if len(files_to_link) == 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Aucun fichier supporté trouvé dans ce dossier. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
+                    detail=f"Aucun fichier supporté trouvé dans ce répertoire. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
                 )
 
             if len(files_to_link) == MAX_LINKED_FILES:
@@ -645,7 +645,7 @@ async def link_file_or_folder(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le chemin n'est ni un fichier ni un dossier"
+                detail="Le chemin n'est ni un fichier ni un répertoire"
             )
 
         # Link each file
@@ -1987,7 +1987,7 @@ async def download_youtube_audio(
     """
     Télécharge l'audio d'une vidéo YouTube et l'ajoute comme document.
 
-    Le fichier est téléchargé en MP3 et enregistré dans le dossier du jugement.
+    Le fichier est téléchargé en MP3 et enregistré dans le répertoire du cours.
     """
     try:
         from services.youtube_service import get_youtube_service, YTDLP_AVAILABLE

@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bot, User, Send, Loader2, Sparkles, AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { Bot, User, Send, Loader2, Sparkles, AlertCircle, Wifi, WifiOff, Copy, Check } from "lucide-react";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, settingsApi, documentsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
 import type { Course, Document } from "@/types";
@@ -94,6 +94,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // LLM settings hook - persists to localStorage
@@ -403,6 +404,16 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
     setInput(question);
   };
 
+  const handleCopyMessage = async (content: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -508,14 +519,29 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
+                    className={`max-w-[80%] rounded-lg p-3 relative group ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
                   >
                     {message.role === "assistant" ? (
-                      <Markdown className="text-sm">{message.content}</Markdown>
+                      <>
+                        <Markdown className="text-sm">{message.content}</Markdown>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleCopyMessage(message.content, message.id)}
+                          title="Copier le markdown"
+                        >
+                          {copiedMessageId === message.id ? (
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </>
                     ) : (
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     )}

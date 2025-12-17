@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Course, Document, Checklist } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
-import { AnalysisProgressIndicator } from "./analysis-progress-indicator";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
 import { SyncProgressModal, SyncTask, SyncResult } from "./sync-progress-modal";
@@ -48,7 +47,7 @@ interface CaseDetailsPanelProps {
   onUploadDocuments: () => void;
   onRecordAudio: () => void;
   onLinkFile: () => void;
-  onAnalyze: () => void;
+  onAnalyze?: () => void;
   onUpdateCase: (data: {
     description?: string;
     type_transaction?: string;
@@ -63,7 +62,6 @@ interface CaseDetailsPanelProps {
   onPreviewDocument: (docId: string) => void;
   onPreviewDirectory: (directory: LinkedDirectory) => void;
   onDelete: () => void;
-  onAnalysisComplete?: () => void;
   onDocumentsChange?: () => Promise<void>;
   deleting: boolean;
   isAnalyzing: boolean;
@@ -76,13 +74,11 @@ export function CaseDetailsPanel({
   onUploadDocuments,
   onRecordAudio,
   onLinkFile,
-  onAnalyze,
   onUpdateCase,
   onDeleteDocument,
   onPreviewDocument,
   onPreviewDirectory,
   onDelete,
-  onAnalysisComplete,
   onDocumentsChange,
   deleting,
   isAnalyzing,
@@ -647,13 +643,6 @@ export function CaseDetailsPanel({
           needsExtraction={needsExtraction}
           isPDFFile={isPDFFile}
           isAudioFile={isAudioFile}
-        />
-
-        {/* Analysis Progress Indicator */}
-        <AnalysisProgressIndicator
-          caseId={caseData.id}
-          isAnalyzing={isAnalyzing}
-          onComplete={onAnalysisComplete}
         />
       </div>
 

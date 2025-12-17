@@ -404,7 +404,7 @@ class SurrealDBService:
                 {
                     "prix": 450000,
                     "date_offre": "2025-10-15",
-                    "dossier": "dossier:xyz789"
+                    "course": "course:xyz789"
                 }
             )
             ```

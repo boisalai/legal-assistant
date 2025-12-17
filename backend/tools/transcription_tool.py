@@ -116,8 +116,8 @@ async def transcribe_audio_streaming(
 
         if not document:
             if audio_filename:
-                return {"success": False, "error": f"Fichier audio '{audio_filename}' non trouvé dans ce dossier."}
-            return {"success": False, "error": "Aucun fichier audio trouvé dans ce dossier."}
+                return {"success": False, "error": f"Fichier audio '{audio_filename}' non trouvé dans ce cours."}
+            return {"success": False, "error": "Aucun fichier audio trouvé dans ce cours."}
 
         doc_name = document.get("nom_fichier", "")
         doc_id = document.get("id", "")
@@ -191,13 +191,13 @@ async def transcribe_audio(
     """
     Transcrit un fichier audio en texte en utilisant Whisper.
 
-    Cet outil permet de transcrire un fichier audio associé à un dossier juridique.
+    Cet outil permet de transcrire un fichier audio associé à un cours.
     La transcription utilise Whisper (OpenAI) pour la reconnaissance vocale.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         audio_filename: Nom du fichier audio à transcrire (optionnel - si non spécifié,
-                       utilise le premier fichier audio non transcrit du dossier)
+                       utilise le premier fichier audio non transcrit du cours)
         language: Langue de l'audio ("fr" pour français, "en" pour anglais, etc.)
 
     Returns:
@@ -209,8 +209,8 @@ async def transcribe_audio(
 
         if not document:
             if audio_filename:
-                return f"Je n'ai pas trouvé de fichier audio nommé '{audio_filename}' dans ce dossier."
-            return "Je n'ai pas trouvé de fichier audio dans ce dossier."
+                return f"Je n'ai pas trouvé de fichier audio nommé '{audio_filename}' dans ce cours."
+            return "Je n'ai pas trouvé de fichier audio dans ce cours."
 
         doc_name = document.get("nom_fichier", "")
         doc_id = document.get("id", "")
