@@ -46,7 +46,7 @@ class DocusaurusFile(BaseModel):
     filename: str
     size: int
     modified_time: float
-    folder: str  # Dossier parent (ex: "models", "cours/calcul-quebec")
+    folder: str  # Répertoire parent (ex: "models", "cours/calcul-quebec")
 
 
 class DocusaurusListResponse(BaseModel):
@@ -107,7 +107,7 @@ def scan_docusaurus_files(base_path: str = DOCUSAURUS_BASE_PATH) -> List[Docusau
 
     # Trouver tous les fichiers .md et .mdx
     for file_path in base.rglob("*.md"):
-        # Ignorer node_modules et autres dossiers cachés
+        # Ignorer node_modules et autres répertoires cachés
         if any(part.startswith('.') or part == 'node_modules' for part in file_path.parts):
             continue
 
@@ -193,7 +193,7 @@ async def import_docusaurus_files(
     user_id: str = Depends(require_auth)
 ):
     """
-    Importe des fichiers Docusaurus sélectionnés dans un dossier.
+    Importe des fichiers Docusaurus sélectionnés dans un cours.
 
     Pour chaque fichier :
     1. Lit le contenu
@@ -203,7 +203,7 @@ async def import_docusaurus_files(
     5. Indexe le contenu pour la recherche sémantique
 
     Args:
-        course_id: ID du dossier
+        course_id: ID du cours
         request: Liste des chemins de fichiers à importer
     """
     try:
@@ -211,7 +211,7 @@ async def import_docusaurus_files(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du dossier
+        # Normaliser l'ID du cours
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -241,7 +241,7 @@ async def import_docusaurus_files(
                 # Générer un ID unique pour le document
                 doc_id = str(uuid.uuid4())[:8]
 
-                # Copier le fichier dans le dossier d'upload
+                # Copier le fichier dans le répertoire d'upload
                 dest_file = upload_dir / f"{doc_id}{source_file.suffix}"
                 shutil.copy2(source_file, dest_file)
 
@@ -345,18 +345,18 @@ async def check_docusaurus_updates(
     Si différent, marque le document comme nécessitant une réindexation.
 
     Args:
-        course_id: ID du dossier
+        course_id: ID du cours
     """
     try:
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du dossier
+        # Normaliser l'ID du cours
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
-        # Récupérer tous les documents Docusaurus du dossier
+        # Récupérer tous les documents Docusaurus du cours
         result = await service.query(
             """
             SELECT * FROM document

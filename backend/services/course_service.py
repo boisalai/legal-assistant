@@ -9,7 +9,7 @@ import logging
 from typing import List, Optional, Dict, Any
 
 from services.surreal_service import get_surreal_service
-from models.case import Case, CaseCreate, CaseUpdate
+from models.course import Case, CaseCreate, CaseUpdate
 
 logger = logging.getLogger(__name__)
 

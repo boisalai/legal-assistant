@@ -258,7 +258,7 @@ async def link_directory_endpoint(
     user_id: str = Depends(require_auth)
 ):
     """
-    Lie un répertoire à un dossier et indexe tous les fichiers.
+    Lie un répertoire à un cours et indexe tous les fichiers.
 
     Utilise Server-Sent Events (SSE) pour envoyer la progression en temps réel.
 
@@ -272,7 +272,7 @@ async def link_directory_endpoint(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du dossier
+        # Normaliser l'ID du cours
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -431,7 +431,7 @@ async def sync_linked_directories_endpoint(
     user_id: str = Depends(require_auth)
 ):
     """
-    Synchronise tous les répertoires liés d'un dossier.
+    Synchronise tous les répertoires liés d'un cours.
 
     Pour chaque répertoire lié:
     - Détecte les nouveaux fichiers (ajoute et indexe)
@@ -451,11 +451,11 @@ async def sync_linked_directories_endpoint(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du dossier
+        # Normaliser l'ID du cours
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
-        # Récupérer tous les documents liés pour ce dossier
+        # Récupérer tous les documents liés pour ce cours
         query = """
             SELECT * FROM document
             WHERE course_id = $course_id

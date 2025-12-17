@@ -227,7 +227,7 @@ class UserActivityService:
         """
         # Map action types to French descriptions
         action_labels = {
-            "view_case": "Ouverture du dossier",
+            "view_case": "Ouverture du cours",
             "view_document": "Visualisation du document",
             "close_document": "Fermeture du document",
             "send_message": "Message envoyé",

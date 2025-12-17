@@ -32,10 +32,10 @@ export function Markdown({ content, children, className }: MarkdownProps) {
         ),
         // Style lists
         ul: ({ children }) => (
-          <ul className="list-disc my-3 space-y-1 marker:text-current">{children}</ul>
+          <ul className="list-disc pl-5 my-3 space-y-1 marker:text-current">{children}</ul>
         ),
         ol: ({ children }) => (
-          <ol className="list-decimal my-3 space-y-1 marker:text-current">{children}</ol>
+          <ol className="list-decimal pl-5 my-3 space-y-1 marker:text-current">{children}</ol>
         ),
         // Style code blocks
         code: ({ className, children, ...props }) => {

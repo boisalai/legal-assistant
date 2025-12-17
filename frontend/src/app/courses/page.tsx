@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
-import { NewCaseModal } from "@/components/cases/new-case-modal";
+import { NewCaseModal } from "@/components/cases/new-course-modal";
 import {
   AlertDialog,
   AlertDialogAction,

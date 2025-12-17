@@ -225,7 +225,7 @@ async def create_course(
     user_id: str = Depends(require_auth)
 ):
     """
-    Cree un nouveau dossier / cours.
+    Cree un nouveau cours.
 
     Supports both legal mode (basic fields) and academic mode (with session, course code, etc.)
     """
@@ -318,7 +318,7 @@ async def get_case(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Recupere les details d'un dossier.
+    Recupere les details d'un cours.
     """
     try:
         service = get_surreal_service()
@@ -380,7 +380,7 @@ async def update_course(
     user_id: str = Depends(require_auth)
 ):
     """
-    Met a jour un dossier.
+    Met a jour un cours.
     """
     try:
         service = get_surreal_service()
@@ -395,7 +395,7 @@ async def update_course(
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dossier non trouve"
+                detail="Cours non trouve"
             )
 
         # Build update dict (only explicitly set values)
@@ -474,7 +474,7 @@ async def delete_course(
     user_id: str = Depends(require_auth)
 ):
     """
-    Supprime un dossier et tous ses fichiers uploades.
+    Supprime un cours et tous ses fichiers uploades.
     Suppression en cascade : conversations, chunks d'embeddings, documents.
     """
 
@@ -491,7 +491,7 @@ async def delete_course(
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dossier non trouve"
+                detail="Cours non trouve"
             )
 
         # Get the record ID without the "course:" prefix

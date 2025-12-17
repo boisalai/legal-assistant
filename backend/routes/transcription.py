@@ -429,7 +429,7 @@ async def download_youtube_audio(
     """
     Télécharge l'audio d'une vidéo YouTube et l'ajoute comme document.
 
-    Le fichier est téléchargé en MP3 et enregistré dans le dossier du jugement.
+    Le fichier est téléchargé en MP3 et enregistré dans le cours.
     """
     try:
         from services.youtube_service import get_youtube_service, YTDLP_AVAILABLE

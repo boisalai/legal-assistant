@@ -6,7 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/layout";
-import { CaseDetailsPanel } from "@/components/cases/case-details-panel";
+import { CaseDetailsPanel } from "@/components/cases/course-details-panel";
 import { AssistantPanel, type Message } from "@/components/cases/assistant-panel";
 import { DocumentPreviewPanel } from "@/components/cases/document-preview-panel";
 import { DirectoryTreeView } from "@/components/cases/directory-tree-view";
@@ -16,7 +16,7 @@ import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { coursesApi, documentsApi, analysisApi } from "@/lib/api";
+import { coursesApi, documentsApi } from "@/lib/api";
 import type { Course, Checklist, Document } from "@/types";
 
 export default function CourseDetailPage() {
@@ -59,14 +59,6 @@ export default function CourseDetailPage() {
         // Documents endpoint may not exist yet
       }
 
-      if (data.status && ["termine", "summarized", "analyse_complete", "complete"].includes(data.status)) {
-        try {
-          const checklistData = await analysisApi.getChecklist(courseId);
-          setChecklist(checklistData);
-        } catch {
-          // Checklist may not exist yet
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -114,21 +106,6 @@ export default function CourseDetailPage() {
     // Refresh documents list
     await fetchCaseDetails();
   };
-
-  const handleAnalyze = async () => {
-    try {
-      await analysisApi.start(courseId);
-      toast.success("Analyse demarree");
-      await fetchCaseDetails();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
-    }
-  };
-
-  const handleAnalysisComplete = useCallback(async () => {
-    toast.success("Analyse terminee!");
-    await fetchCaseDetails();
-  }, [fetchCaseDetails]);
 
   const handleDocumentCreated = useCallback(async () => {
     // Refresh documents list when a new document is created via chat (e.g., transcription)
@@ -302,13 +279,11 @@ export default function CourseDetailPage() {
                   onUploadDocuments={handleUploadDocuments}
                   onRecordAudio={handleRecordAudio}
                   onLinkFile={handleLinkFile}
-                  onAnalyze={handleAnalyze}
                   onUpdateCase={handleUpdateCase}
                   onDeleteDocument={handleDeleteDocument}
                   onPreviewDocument={handlePreviewDocument}
                   onPreviewDirectory={handlePreviewDirectory}
                   onDelete={handleDelete}
-                  onAnalysisComplete={handleAnalysisComplete}
                   onDocumentsChange={fetchCaseDetails}
                   deleting={deleting}
                   isAnalyzing={isAnalyzing}
@@ -324,7 +299,6 @@ export default function CourseDetailPage() {
               <div className="h-full overflow-hidden">
                 <AssistantPanel
                   caseId={courseId}
-                  onAnalyze={handleAnalyze}
                   isAnalyzing={isAnalyzing}
                   hasDocuments={documents.length > 0}
                   onDocumentCreated={handleDocumentCreated}

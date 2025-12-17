@@ -963,107 +963,6 @@ export const adminApi = {
 };
 
 // ============================================
-// Analysis API - Pipeline d'analyse complete
-// ============================================
-
-export interface AnalysisStartResponse {
-  message: string;
-  course_id: string;
-  documents_count: number;
-  model: string;
-}
-
-export interface AnalysisStatus {
-  course_id: string;
-  status: string;
-  progress: number;
-  message: string;
-  documents_processed: number;
-  documents_total: number;
-}
-
-export interface AnalysisChecklistResponse {
-  items: Array<{ titre: string; description?: string; complete: boolean }>;
-  points_attention: string[];
-  key_points: string[];
-  summary: string;
-  confidence_score: number;
-  model_used: string;
-  created_at: string;
-}
-
-export const analysisApi = {
-  // Demarre l'analyse complete d'un dossier
-  async start(caseId: string, modelId?: string): Promise<AnalysisStartResponse> {
-    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
-    return fetchApi<AnalysisStartResponse>(
-      `/api/analysis/${encodeURIComponent(cleanId)}/start`,
-      {
-        method: "POST",
-        body: JSON.stringify({ model_id: modelId }),
-      }
-    );
-  },
-
-  // Recupere le statut de l'analyse
-  async getStatus(caseId: string): Promise<AnalysisStatus> {
-    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
-    return fetchApi<AnalysisStatus>(
-      `/api/analysis/${encodeURIComponent(cleanId)}/status`
-    );
-  },
-
-  // Recupere la checklist generee par l'analyse
-  async getChecklist(caseId: string): Promise<Checklist> {
-    const cleanId = caseId.replace("course:", "").replace("judgment:", "");
-    try {
-      const response = await fetchApi<AnalysisChecklistResponse>(
-        `/api/analysis/${encodeURIComponent(cleanId)}/checklist`
-      );
-      return {
-        course_id: caseId,
-        items: response.items.map(item => ({
-          titre: item.titre,
-          description: item.description || "",
-          statut: item.complete ? "complete" as const : "incomplete" as const,
-          priorite: "normale" as const,
-        })),
-        points_attention: response.points_attention,
-        documents_manquants: [],
-        score_confiance: response.confidence_score * 100,
-        summary: response.summary,
-        key_points: response.key_points,
-      };
-    } catch {
-      // Fallback si pas d'analyse disponible
-      return {
-        course_id: caseId,
-        items: [],
-        points_attention: [],
-        documents_manquants: [],
-        score_confiance: 0,
-      };
-    }
-  },
-
-  // Pour compatibilite arriere
-  async startStream(_caseId: string): Promise<Response> {
-    throw new Error("Streaming analysis not implemented");
-  },
-
-  // Get derived documents (transcriptions, extractions, TTS) for a source document
-  async getDerived(caseId: string, documentId: string): Promise<{ derived: Document[]; total: number }> {
-    const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
-    const cleanDocId = documentId.replace("document:", "");
-
-    const response = await fetchApi<{ derived: Document[]; total: number }>(
-      `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/derived`
-    );
-    return response;
-  },
-};
-
-// ============================================
 // ============================================
 // Docusaurus API (maps to /api/docusaurus)
 // ============================================
@@ -1305,7 +1204,6 @@ export const sessionsApi = {
 export const api = {
   courses: coursesApi,
   documents: documentsApi,
-  analysis: analysisApi,
   chat: chatApi,
   settings: settingsApi,
   models: modelsApi,

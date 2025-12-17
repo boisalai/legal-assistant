@@ -10,6 +10,8 @@ import {
   Loader2,
   AlertCircle,
   MoreVertical,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
@@ -163,6 +165,7 @@ export function AssistantPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
   const [checkingBackend, setCheckingBackend] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
@@ -395,6 +398,16 @@ export function AssistantPanel({
     }
   };
 
+  const handleCopyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full border-l overflow-hidden">
       {/* Header */}
@@ -458,14 +471,29 @@ export function AssistantPanel({
             )}
             <div className="flex flex-col gap-2 max-w-[80%]">
               <div
-                className={`rounded-lg px-3 py-2 ${
+                className={`rounded-lg px-3 py-2 relative group ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
                 }`}
               >
                 {message.role === "assistant" ? (
-                  <Markdown className="text-sm">{message.content}</Markdown>
+                  <>
+                    <Markdown className="text-sm">{message.content}</Markdown>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleCopyMessage(message.content, idx)}
+                      title="Copier le markdown"
+                    >
+                      {copiedIndex === idx ? (
+                        <Check className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 )}

@@ -88,14 +88,14 @@ app = FastAPI(
 
     ## Fonctionnalites
 
-    - **Dossiers**: Gestion de dossiers academiques (cours de droit)
+    - **Cours**: Gestion de cours academiques (cours de droit)
     - **Documents**: Upload et gestion de documents
     - **Authentification**: Systeme de connexion securise
 
     ## Endpoints principaux
 
     - `/api/auth/*` - Authentification (login, register, logout)
-    - `/api/courses/*` - Gestion des dossiers
+    - `/api/courses/*` - Gestion des cours
     """,
     version="0.1.0",
     lifespan=lifespan,
@@ -131,7 +131,7 @@ except ImportError as e:
 # ROUTES
 # ============================================================
 
-from routes import auth_router, courses_router, documents_router, analysis_router, chat_router, docusaurus_router, activity_router, linked_directory_router
+from routes import auth_router, courses_router, documents_router, chat_router, docusaurus_router, activity_router, linked_directory_router
 from routes.settings import router as settings_router
 from routes.sessions import router as sessions_router
 from routes.transcription import router as transcription_router
@@ -144,7 +144,6 @@ app.include_router(sessions_router, tags=["Sessions"])
 app.include_router(documents_router, tags=["Documents"])
 app.include_router(transcription_router, tags=["Transcription"])
 app.include_router(extraction_router, tags=["Extraction"])
-app.include_router(analysis_router, tags=["Analysis"])
 app.include_router(chat_router, tags=["Chat"])
 app.include_router(settings_router, tags=["Settings"])
 app.include_router(model_servers_router, tags=["Model Servers"])
@@ -152,7 +151,7 @@ app.include_router(docusaurus_router, tags=["Docusaurus"])
 app.include_router(linked_directory_router, tags=["Linked Directory"])
 app.include_router(activity_router, tags=["Activity"])
 
-logger.info("Routes configured: /api/auth, /api/courses, /api/sessions, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/analysis, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
+logger.info("Routes configured: /api/auth, /api/courses, /api/sessions, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
 
 
 # ============================================================
@@ -165,7 +164,7 @@ async def root():
     return {
         "name": "Legal Assistant API",
         "version": "0.1.0",
-        "description": "Assistant d'etudes juridiques - Gestion de dossiers",
+        "description": "Assistant d'etudes juridiques - Gestion de cours",
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
