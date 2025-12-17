@@ -42,8 +42,8 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   {
-    titleKey: "nav.cases",
-    href: "/cases",
+    titleKey: "nav.courses",
+    href: "/courses",
     icon: FolderOpen,
   },
   {
@@ -130,7 +130,7 @@ export function Sidebar() {
           </button>
         ) : (
           <Link
-            href="/cases"
+            href="/courses"
             className="flex items-center gap-2"
           >
             <Scale className="h-6 w-6 text-sidebar-foreground" />

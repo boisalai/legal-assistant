@@ -34,11 +34,11 @@ export default function CasesListPage() {
       const data = await casesApi.list();
       setCases(data);
     } catch {
-      setError("Impossible de charger les dossiers");
+      setError(t("dashboard.loadError"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchCases();
@@ -126,9 +126,9 @@ export default function CasesListPage() {
         {cases.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
             <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <p className="mb-4">Aucun dossier pour le moment.</p>
+            <p className="mb-4">{t("table.noCourses")}</p>
             <Button onClick={() => setShowNewCaseModal(true)}>
-              + Nouveau dossier
+              + {t("nav.newCourse")}
             </Button>
           </div>
         ) : (
@@ -137,7 +137,7 @@ export default function CasesListPage() {
             data={sortedCases}
             onDeleteSelected={handleDeleteSelected}
             onNewCase={() => setShowNewCaseModal(true)}
-            newCaseLabel={t("nav.newCase")}
+            newCaseLabel={t("nav.newCourse")}
           />
         )}
 

@@ -39,12 +39,10 @@ export default function NewCasePage() {
     setUploading(true);
 
     try {
-      // Create case
-      // @ts-ignore - TODO: Implement create method in casesApi or remove this functionality
+      // Create course
       const newCase = await casesApi.create({
-        nom_dossier: nomDossier,
-        type_transaction: typeTransaction,
-        user_id: "user:test_notaire",
+        title: nomDossier,
+        description: typeTransaction,
       });
 
       // Upload files
@@ -60,7 +58,7 @@ export default function NewCasePage() {
 
       // Strip "dossier:" prefix for URL
       const urlId = newCase.id.replace("dossier:", "");
-      router.push(`/cases/${urlId}`);
+      router.push(`/courses/${urlId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
       setUploading(false);

@@ -42,7 +42,7 @@ from routes.auth import active_sessions
 # ============================================================================
 
 class CourseResponse(BaseModel):
-    """Response model for a case/course."""
+    """Response model for a course."""
     id: str
     title: str
     description: Optional[str] = None
@@ -87,14 +87,14 @@ class SummaryResponse(BaseModel):
 
 async def get_course_by_id(service, course_id: str) -> Optional[dict]:
     """
-    Fetch a case by ID using SurrealQL query.
-    Returns the case dict or None if not found.
+    Fetch a course by ID using SurrealQL query.
+    Returns the course dict or None if not found.
     """
     # Normalize ID
-    record_id = course_id.replace("case:", "")
+    record_id = course_id.replace("course:", "").replace("course:", "")
 
     query_result = await service.query(
-        "SELECT * FROM course WHERE id = type::thing('case', $record_id)",
+        "SELECT * FROM course WHERE id = type::thing('course', $record_id)",
         {"record_id": record_id}
     )
 
@@ -184,13 +184,22 @@ async def list_courses(
             items = result
             if isinstance(items, list):
                 for item in items:
+                    # Convert datetime objects to ISO strings
+                    created_at = item.get("created_at", "")
+                    if isinstance(created_at, datetime):
+                        created_at = created_at.isoformat()
+
+                    updated_at = item.get("updated_at")
+                    if isinstance(updated_at, datetime):
+                        updated_at = updated_at.isoformat()
+
                     courses.append(CourseResponse(
                         id=str(item.get("id", "")),
                         title=item.get("title", ""),
                         description=item.get("description"),
                         keywords=item.get("keywords", []),
-                        created_at=item.get("created_at", ""),
-                        updated_at=item.get("updated_at"),
+                        created_at=created_at,
+                        updated_at=updated_at,
                         # Academic fields
                         session_id=str(item.get("session_id")) if item.get("session_id") else None,
                         course_code=item.get("course_code"),
@@ -222,13 +231,13 @@ async def create_course(
     """
     course_id = str(uuid.uuid4())[:8]
 
-    # Create case in database
+    # Create course in database
     try:
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
 
         # Convert Pydantic model to dict
         case_data = case_create.model_dump(exclude_unset=True)
@@ -257,24 +266,33 @@ async def create_course(
                     detail=f"Course code '{case_data['course_code']}' already exists in this session"
                 )
 
-        result = await service.create("case", case_data, record_id=course_id)
-        logger.info(f"Case/Course created: {course_id}")
+        result = await service.create("course", case_data, record_id=course_id)
+        logger.info(f"Course created: {course_id}")
 
-        # Get the created case to return full data
-        created_case = await get_course_by_id(service, f"case:{course_id}")
+        # Get the created course to return full data
+        created_case = await get_course_by_id(service, f"course:{course_id}")
         if not created_case:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Case created but could not be retrieved"
+                detail="Course created but could not be retrieved"
             )
 
+        # Convert datetime objects to ISO strings for response
+        created_at = created_case.get("created_at", now)
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+
+        updated_at = created_case.get("updated_at")
+        if isinstance(updated_at, datetime):
+            updated_at = updated_at.isoformat()
+
         return CourseResponse(
-            id=str(created_case.get("id", f"case:{course_id}")),
+            id=str(created_case.get("id", f"course:{course_id}")),
             title=created_case.get("title", ""),
             description=created_case.get("description"),
             keywords=created_case.get("keywords", []),
-            created_at=created_case.get("created_at", now),
-            updated_at=created_case.get("updated_at"),
+            created_at=created_at,
+            updated_at=updated_at,
             # Academic fields
             session_id=str(created_case.get("session_id")) if created_case.get("session_id") else None,
             course_code=created_case.get("course_code"),
@@ -287,7 +305,7 @@ async def create_course(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating case: {e}")
+        logger.error(f"Error creating course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -308,24 +326,33 @@ async def get_case(
             await service.connect()
 
         # Normalize ID
-        if not course_id.startswith("case:"):
-            course_id = f"case:{course_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         item = await get_course_by_id(service, course_id)
 
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dossier non trouve"
+                detail="Course not found"
             )
+
+        # Convert datetime objects to ISO strings for response
+        created_at = item.get("created_at", "")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+
+        updated_at = item.get("updated_at")
+        if isinstance(updated_at, datetime):
+            updated_at = updated_at.isoformat()
 
         return CourseResponse(
             id=str(item.get("id", course_id)),
             title=item.get("title", ""),
             description=item.get("description"),
             keywords=item.get("keywords", []),
-            created_at=item.get("created_at", ""),
-            updated_at=item.get("updated_at"),
+            created_at=created_at,
+            updated_at=updated_at,
             # Academic fields
             session_id=str(item.get("session_id")) if item.get("session_id") else None,
             course_code=item.get("course_code"),
@@ -338,7 +365,7 @@ async def get_case(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting case: {e}")
+        logger.error(f"Error getting course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -360,8 +387,8 @@ async def update_course(
         if not service.db:
             await service.connect()
 
-        if not course_id.startswith("case:"):
-            course_id = f"case:{course_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Check existence
         item = await get_course_by_id(service, course_id)
@@ -372,7 +399,7 @@ async def update_course(
             )
 
         # Build update dict (only explicitly set values)
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
         updates = update_data.model_dump(exclude_unset=True)
         updates["updated_at"] = now
 
@@ -404,15 +431,24 @@ async def update_course(
         # Fetch updated record
         updated_item = await get_course_by_id(service, course_id)
 
-        logger.info(f"Case/Course updated: {course_id}")
+        logger.info(f"Course updated: {course_id}")
+
+        # Convert datetime objects to ISO strings for response
+        created_at = updated_item.get("created_at", "")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+
+        updated_at = updated_item.get("updated_at")
+        if isinstance(updated_at, datetime):
+            updated_at = updated_at.isoformat()
 
         return CourseResponse(
             id=str(updated_item.get("id", course_id)),
             title=updated_item.get("title", ""),
             description=updated_item.get("description"),
             keywords=updated_item.get("keywords", []),
-            created_at=updated_item.get("created_at", ""),
-            updated_at=updated_item.get("updated_at"),
+            created_at=created_at,
+            updated_at=updated_at,
             # Academic fields
             session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
             course_code=updated_item.get("course_code"),
@@ -425,7 +461,7 @@ async def update_course(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating case: {e}")
+        logger.error(f"Error updating course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -447,8 +483,8 @@ async def delete_course(
         if not service.db:
             await service.connect()
 
-        if not course_id.startswith("case:"):
-            course_id = f"case:{course_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Check existence
         item = await get_course_by_id(service, course_id)
@@ -458,8 +494,8 @@ async def delete_course(
                 detail="Dossier non trouve"
             )
 
-        # Get the record ID without the "case:" prefix
-        record_id = course_id.replace("case:", "")
+        # Get the record ID without the "course:" prefix
+        record_id = course_id.replace("course:", "")
 
         # Delete the entire uploads directory for this case
         uploads_dir = settings.upload_dir / record_id
@@ -483,7 +519,7 @@ async def delete_course(
 
         # 2. Delete document chunks (embeddings)
         try:
-            # Get all documents for this case first
+            # Get all documents for this course first
             docs_result = await service.query(
                 "SELECT id FROM document WHERE course_id = $course_id",
                 {"course_id": course_id}
@@ -521,14 +557,14 @@ async def delete_course(
         except Exception as e:
             logger.warning(f"Could not delete documents: {e}")
 
-        # 4. Delete the case itself
+        # 4. Delete the course itself
         await service.delete(course_id)
-        logger.info(f"Case deleted: {course_id}")
+        logger.info(f"Course deleted: {course_id}")
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting case: {e}")
+        logger.error(f"Error deleting course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -590,7 +626,7 @@ async def summarize_course(
 
         # Save summary to database
         summary_id = str(uuid.uuid4())[:8]
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
 
         summary_data = {
             "course_id": course_id,

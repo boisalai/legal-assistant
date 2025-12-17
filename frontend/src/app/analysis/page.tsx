@@ -264,7 +264,7 @@ export default function AnalysisPage() {
                         <div className={`w-2 h-2 rounded-full ${status.color}`} />
                         <div>
                           <Link
-                            href={`/cases/${urlId}`}
+                            href={`/courses/${urlId}`}
                             className="font-medium hover:underline"
                           >
                             {caseItem.nom_dossier}
@@ -305,7 +305,7 @@ export default function AnalysisPage() {
                           </Button>
                         )}
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/cases/${urlId}`}>
+                          <Link href={`/courses/${urlId}`}>
                             <ArrowRight className="h-4 w-4" />
                           </Link>
                         </Button>

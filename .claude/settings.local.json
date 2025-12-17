@@ -34,7 +34,11 @@
       "Bash(yes:*)",
       "Bash(npx shadcn@latest add button:*)",
       "Bash(npx shadcn@latest add card:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(chmod:*)",
+      "Bash(nc:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv sync:*)"
     ],
     "deny": [],
     "ask": []

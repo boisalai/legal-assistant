@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SessionSelector } from "@/components/cases/session-selector";
-import { casesApi } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { coursesApi } from "@/lib/api";
 
 interface NewCaseModalProps {
   open: boolean;
@@ -30,11 +35,10 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Academic mode fields
-  const [academicMode, setAcademicMode] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
+  // Course fields
+  const [year, setYear] = useState<string>("");
+  const [semester, setSemester] = useState<string>("");
   const [courseCode, setCourseCode] = useState("");
-  const [courseName, setCourseName] = useState("");
   const [professor, setProfessor] = useState("");
   const [credits, setCredits] = useState("3");
   const [color, setColor] = useState("#3B82F6");
@@ -50,25 +54,23 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
         description: description || undefined,
       };
 
-      // Add academic fields if in academic mode
-      if (academicMode) {
-        if (sessionId) payload.session_id = sessionId;
-        if (courseCode) payload.course_code = courseCode;
-        if (courseName) payload.course_name = courseName;
-        if (professor) payload.professor = professor;
-        if (credits) payload.credits = parseInt(credits, 10);
-        if (color) payload.color = color;
-      }
+      // Add course fields
+      if (year) payload.year = parseInt(year, 10);
+      if (semester) payload.semester = semester;
+      if (courseCode) payload.course_code = courseCode;
+      if (professor) payload.professor = professor;
+      if (credits) payload.credits = parseInt(credits, 10);
+      if (color) payload.color = color;
 
-      const newCase = await coursesApi.upload(payload);
+      const newCase = await coursesApi.create(payload);
 
       // Reset form
       resetForm();
       onOpenChange(false);
 
-      // Navigate to the new case
-      const urlId = newCase.id.replace("case:", "");
-      router.push(`/cases/${urlId}`);
+      // Navigate to the new course
+      const urlId = newCase.id.replace("course:", "").replace("case:", "");
+      router.push(`/courses/${urlId}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la création");
@@ -80,10 +82,9 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setAcademicMode(false);
-    setSessionId("");
+    setYear("");
+    setSemester("");
     setCourseCode("");
-    setCourseName("");
     setProfessor("");
     setCredits("3");
     setColor("#3B82F6");
@@ -102,29 +103,18 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Nouveau dossier</DialogTitle>
+            <DialogTitle>Nouveau cours</DialogTitle>
             <DialogDescription>
-              Informations sur le dossier
+              Informations sur le cours
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="academic-mode"
-                checked={academicMode}
-                onCheckedChange={setAcademicMode}
-              />
-              <Label htmlFor="academic-mode" className="cursor-pointer">
-                Mode académique (cours)
-              </Label>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="title">Nom du dossier{academicMode && " / cours"}</Label>
+              <Label htmlFor="title">Nom du cours</Label>
               <Input
                 id="title"
-                placeholder={academicMode ? "Ex: Introduction au droit" : "Ex: DRT-1151G"}
+                placeholder="Ex: Introduction au droit"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -142,76 +132,88 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
               />
             </div>
 
-            {academicMode && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="session">Session</Label>
-                  <SessionSelector
-                    value={sessionId}
-                    onValueChange={setSessionId}
-                    placeholder="Sélectionner une session"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="year">Année</Label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2025">2025</SelectItem>
+                    <SelectItem value="2026">2026</SelectItem>
+                    <SelectItem value="2027">2027</SelectItem>
+                    <SelectItem value="2028">2028</SelectItem>
+                    <SelectItem value="2029">2029</SelectItem>
+                    <SelectItem value="2030">2030</SelectItem>
+                    <SelectItem value="2031">2031</SelectItem>
+                    <SelectItem value="2032">2032</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="course-code">Code du cours</Label>
-                    <Input
-                      id="course-code"
-                      placeholder="Ex: DRT-1151G"
-                      value={courseCode}
-                      onChange={(e) => setCourseCode(e.target.value)}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="semester">Session</Label>
+                <Select value={semester} onValueChange={setSemester}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Hiver">Hiver</SelectItem>
+                    <SelectItem value="Été">Été</SelectItem>
+                    <SelectItem value="Automne">Automne</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="credits">Crédits</Label>
-                    <Input
-                      id="credits"
-                      type="number"
-                      min="1"
-                      max="12"
-                      value={credits}
-                      onChange={(e) => setCredits(e.target.value)}
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="course-code">Code du cours</Label>
+                <Input
+                  id="course-code"
+                  placeholder="Ex: DRT-1151G"
+                  value={courseCode}
+                  onChange={(e) => setCourseCode(e.target.value)}
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="course-name">Nom du cours</Label>
-                  <Input
-                    id="course-name"
-                    placeholder="Ex: Introduction au droit constitutionnel"
-                    value={courseName}
-                    onChange={(e) => setCourseName(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="credits">Crédits</Label>
+                <Input
+                  id="credits"
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={credits}
+                  onChange={(e) => setCredits(e.target.value)}
+                />
+              </div>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="professor">Professeur</Label>
-                  <Input
-                    id="professor"
-                    placeholder="Ex: Prof. Dupont"
-                    value={professor}
-                    onChange={(e) => setProfessor(e.target.value)}
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="professor">Professeur</Label>
+              <Input
+                id="professor"
+                placeholder="Ex: Prof. Dupont"
+                value={professor}
+                onChange={(e) => setProfessor(e.target.value)}
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="color">Couleur</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="color"
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      className="w-20 h-10"
-                    />
-                    <span className="text-sm text-muted-foreground">{color}</span>
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="color">Couleur</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="color"
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-20 h-10"
+                />
+                <span className="text-sm text-muted-foreground">{color}</span>
+              </div>
+            </div>
 
             {error && (
               <p className="text-sm text-destructive">{error}</p>
