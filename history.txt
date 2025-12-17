@@ -15,3 +15,20 @@ SELECT id, name, source_type, created_at, updated_at FROM document WHERE source_
 DEFINE TABLE session SCHEMAFULL;
 -- Fields
 DEFINE FIELD title ON session TYPE string
+SELECT id, title, course_code, professor, credits, type_transaction, nom_dossier FROM course;
+SELECT * FROM course;
+INFO FOR DB;
+SELECT * FROM case;
+SELECT COUNT() FROM case GROUP ALL;
+SELECT * FROM document WHERE string::starts_with(string::lowercase(course_id), 'case:');
+-- Delete all records from the case table
+DELETE FROM case;
+-- Verify deletion
+SELECT COUNT() FROM case GROUP ALL;
+SELECT * FROM summary;
+SELECT * FROM analysis_result;
+-- Remove the case table completely
+REMOVE TABLE case;
+-- Verify tables
+INFO FOR DB;
+SELECT id, title, course_code, professor FROM course;

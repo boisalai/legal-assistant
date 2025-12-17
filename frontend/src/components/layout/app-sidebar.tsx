@@ -46,8 +46,8 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   {
-    titleKey: "nav.cases",
-    href: "/cases",
+    titleKey: "nav.courses",
+    href: "/courses",
     icon: FolderOpen,
   },
   {
@@ -104,7 +104,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/cases">
+              <Link href="/courses">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Scale className="size-4" />
                 </div>

@@ -91,7 +91,7 @@ export default function CourseDetailPage() {
     try {
       await coursesApi.delete(courseId);
       toast.success("Dossier supprimé avec succès");
-      router.push("/cases");
+      router.push("/courses");
     } catch (err) {
       toast.error("Erreur lors de la suppression");
       setDeleting(false);
@@ -201,12 +201,12 @@ export default function CourseDetailPage() {
       <AppShell>
         <div className="flex flex-col items-center justify-center h-full gap-4">
           <p className="text-lg text-destructive">
-            {error?.replace("Jugement", "Dossier") || "Dossier introuvable"}
+            {error || "Cours introuvable"}
           </p>
           <Button asChild>
-            <Link href="/cases">
+            <Link href="/courses">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour aux dossiers
+              Retour aux cours
             </Link>
           </Button>
         </div>

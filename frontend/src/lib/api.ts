@@ -74,6 +74,26 @@ export const coursesApi = {
     return fetchApi<Course>(`/api/courses/${encodeURIComponent(id)}`);
   },
 
+  // Create new course (without file upload)
+  async create(data: {
+    title: string;
+    description?: string;
+    keywords?: string[];
+    session_id?: string;
+    course_code?: string;
+    course_name?: string;
+    professor?: string;
+    credits?: number;
+    color?: string;
+    year?: number;
+    semester?: string;
+  }): Promise<Course> {
+    return fetchApi<Course>("/api/courses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
   // Upload new course (PDF or text)
   async upload(data: {
     file?: File;

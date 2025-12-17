@@ -215,7 +215,7 @@ export function DataTable<TData extends { id: string }, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center font-normal text-black"
                 >
-                  {t("noCases")}
+                  {t("table.noCourses")}
                 </TableCell>
               </TableRow>
             )}

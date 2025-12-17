@@ -38,11 +38,11 @@ function DashboardContent() {
       const data = await casesApi.list();
       setCases(data);
     } catch {
-      setError("Impossible de charger les dossiers");
+      setError(t("dashboard.loadError"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchCases();
@@ -115,9 +115,9 @@ function DashboardContent() {
       {/* Cases Table */}
       {cases.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
-          <p className="mb-4">Aucun dossier pour le moment.</p>
+          <p className="mb-4">Aucun cours pour le moment.</p>
           <Button onClick={() => setShowNewCaseModal(true)}>
-            + Nouveau dossier
+            + Nouveau cours
           </Button>
         </div>
       ) : (
@@ -127,7 +127,7 @@ function DashboardContent() {
           onDeleteSelected={handleDeleteSelected}
           initialFilter={searchQuery}
           onNewCase={() => setShowNewCaseModal(true)}
-          newCaseLabel={t("nav.newCase")}
+          newCaseLabel={t("nav.newCourse")}
         />
       )}
 

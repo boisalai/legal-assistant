@@ -48,10 +48,10 @@ export const createColumns = (
     cell: ({ row }) => {
       const courseCode = row.original.course_code;
       const fullId = row.original.id;
-      const urlId = fullId.replace("case:", "");
+      const urlId = fullId.replace("course:", "").replace("case:", "");
       return courseCode ? (
         <Link
-          href={`/cases/${urlId}`}
+          href={`/courses/${urlId}`}
           className="text-sm hover:underline"
         >
           {courseCode}
@@ -136,7 +136,7 @@ export const createColumns = (
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => window.location.href = `/cases/${caseItem.id.replace("case:", "")}`}
+              onClick={() => window.location.href = `/courses/${caseItem.id.replace("course:", "").replace("case:", "")}`}
             >
               {t("table.actions.open")}
             </DropdownMenuItem>
