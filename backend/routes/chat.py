@@ -418,7 +418,7 @@ Contenu des documents:"""
                 list_documents,
                 extract_entities,
                 find_entity,
-                index_document_tool,
+                index_document_tool,  # Tool name: "index_document"
                 get_index_stats
             ],
             markdown=True,
