@@ -879,6 +879,7 @@ export const settingsApi = {
 
   async getCurrent(): Promise<{
     analysis: { model_id: string; extraction_method: string; use_ocr: boolean };
+    embedding?: { provider: string; model: string };
     available_models: Record<string, LLMModel[]>;
     available_extraction_methods: Record<string, unknown>;
   }> {
@@ -889,6 +890,8 @@ export const settingsApi = {
     model_id?: string;
     extraction_method?: string;
     use_ocr?: boolean;
+    embedding_provider?: string;
+    embedding_model?: string;
   }): Promise<{ message: string; settings: unknown }> {
     return fetchApi("/api/settings/current", {
       method: "PUT",

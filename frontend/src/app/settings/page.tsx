@@ -24,6 +24,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Settings,
   FileText,
+  FileSearch,
   Palette,
   Save,
   Loader2,
@@ -50,6 +51,31 @@ interface TTSVoice {
   gender: string;
 }
 
+interface EmbeddingModelInfo {
+  id: string;
+  name: string;
+  dimensions?: number;
+  description?: string;
+  recommended?: boolean;
+  multilingual?: boolean;
+  languages?: string;
+  quality?: string;
+  speed?: string;
+  cost?: string;
+  ram?: string;
+  best_for?: string;
+}
+
+interface EmbeddingProviderInfo {
+  name: string;
+  description: string;
+  icon: string;
+  requires_api_key: boolean;
+  cost?: string;
+  models: EmbeddingModelInfo[];
+  default: string;
+}
+
 export default function SettingsPage() {
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +94,18 @@ export default function SettingsPage() {
   const [selectedVoiceFr, setSelectedVoiceFr] = useState("fr-FR-DeniseNeural");
   const [selectedVoiceEn, setSelectedVoiceEn] = useState("en-CA-ClaraNeural");
 
+  // Embedding Settings
+  const [embeddingProviders, setEmbeddingProviders] = useState<Record<string, EmbeddingProviderInfo>>({});
+  const [selectedEmbeddingProvider, setSelectedEmbeddingProvider] = useState("local");
+  const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState("BAAI/bge-m3");
+  const [embeddingMismatch, setEmbeddingMismatch] = useState<{
+    has_mismatch: boolean;
+    documents_to_reindex: number;
+    existing_models: string[];
+    current_model: string;
+  } | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+
   // Load settings from backend
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -85,12 +123,33 @@ export default function SettingsPage() {
         console.log("Could not load TTS voices", err);
       }
 
+      // Load embedding models
+      try {
+        const embeddingRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/settings/embedding-models`);
+        if (embeddingRes.ok) {
+          const embeddingData = await embeddingRes.json();
+          setEmbeddingProviders(embeddingData.providers || {});
+          if (embeddingData.current) {
+            setSelectedEmbeddingProvider(embeddingData.current.provider || "local");
+            setSelectedEmbeddingModel(embeddingData.current.model || "BAAI/bge-m3");
+          }
+        }
+      } catch (err) {
+        console.log("Could not load embedding models", err);
+      }
+
       const currentSettings = await settingsApi.getCurrent();
 
       // Set current values
       if (currentSettings.analysis) {
         setSelectedExtraction(currentSettings.analysis.extraction_method);
         setUseOcr(currentSettings.analysis.use_ocr);
+      }
+
+      // Set embedding values from settings if available
+      if (currentSettings.embedding) {
+        setSelectedEmbeddingProvider(currentSettings.embedding.provider);
+        setSelectedEmbeddingModel(currentSettings.embedding.model);
       }
 
       // Load TTS voice preferences from localStorage
@@ -127,6 +186,8 @@ export default function SettingsPage() {
       await settingsApi.update({
         extraction_method: selectedExtraction,
         use_ocr: useOcr,
+        embedding_provider: selectedEmbeddingProvider,
+        embedding_model: selectedEmbeddingModel,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -153,6 +214,52 @@ export default function SettingsPage() {
     // Save TTS voice preferences to localStorage
     localStorage.setItem("tts_voice_fr", selectedVoiceFr);
     localStorage.setItem("tts_voice_en", selectedVoiceEn);
+  };
+
+  const checkEmbeddingMismatch = useCallback(async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/settings/check-embedding-mismatch`);
+      if (response.ok) {
+        const data = await response.json();
+        setEmbeddingMismatch(data);
+      }
+    } catch (err) {
+      console.log("Could not check embedding mismatch", err);
+    }
+  }, []);
+
+  // Check embedding model mismatch on load and when model changes
+  useEffect(() => {
+    if (apiConnected && selectedEmbeddingModel) {
+      checkEmbeddingMismatch();
+    }
+  }, [apiConnected, selectedEmbeddingModel, checkEmbeddingMismatch]);
+
+  const handleReindexAll = async () => {
+    if (!confirm("⚠️ ATTENTION: Cette opération va supprimer tous les anciens embeddings et réindexer tous les documents. Cela peut prendre plusieurs minutes. Continuer ?")) {
+      return;
+    }
+
+    setReindexing(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/settings/reindex-all`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✓ Réindexation terminée avec succès!\n\n${data.documents_processed}/${data.total_documents} documents traités\n${data.chunks_created} chunks créés`);
+        // Recheck mismatch
+        await checkEmbeddingMismatch();
+      } else {
+        const error = await response.json();
+        alert(`Erreur lors de la réindexation: ${error.detail || "Erreur inconnue"}`);
+      }
+    } catch (err) {
+      alert(`Erreur lors de la réindexation: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
+    } finally {
+      setReindexing(false);
+    }
   };
 
   return (
@@ -293,6 +400,129 @@ export default function SettingsPage() {
                     onCheckedChange={toggleDarkMode}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Embedding Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileSearch className="h-5 w-5" />
+                  Modèle d'Embedding
+                </CardTitle>
+                <CardDescription>
+                  Pour l'indexation vectorielle et la recherche sémantique dans les documents
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Model Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="embedding-model">Modèle d'embedding</Label>
+                  <Select
+                    value={selectedEmbeddingModel}
+                    onValueChange={(modelId) => {
+                      setSelectedEmbeddingModel(modelId);
+                      // Trouver le provider de ce modèle
+                      for (const [providerKey, provider] of Object.entries(embeddingProviders)) {
+                        if (provider.models.some(m => m.id === modelId)) {
+                          setSelectedEmbeddingProvider(providerKey);
+                          break;
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="embedding-model">
+                      <SelectValue placeholder="Sélectionner un modèle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(embeddingProviders).flatMap(([providerKey, provider]) =>
+                        provider.models.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.name}
+                            {model.recommended && " ⭐"}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Model Info */}
+                {(() => {
+                  // Trouver le modèle sélectionné dans tous les providers
+                  let selectedModelInfo: EmbeddingModelInfo | undefined;
+                  let selectedProviderInfo: EmbeddingProviderInfo | undefined;
+
+                  for (const [providerKey, provider] of Object.entries(embeddingProviders)) {
+                    const model = provider.models.find(m => m.id === selectedEmbeddingModel);
+                    if (model) {
+                      selectedModelInfo = model;
+                      selectedProviderInfo = provider;
+                      break;
+                    }
+                  }
+
+                  if (!selectedModelInfo) return null;
+
+                  return (
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {selectedModelInfo.description && (
+                        <p>{selectedModelInfo.description}</p>
+                      )}
+                      {selectedModelInfo.languages && (
+                        <p>Langues: {selectedModelInfo.languages}</p>
+                      )}
+                      {selectedModelInfo.speed && (
+                        <p>Vitesse: {selectedModelInfo.speed}</p>
+                      )}
+                      {selectedModelInfo.ram && (
+                        <p>RAM: {selectedModelInfo.ram}</p>
+                      )}
+                      {selectedProviderInfo?.requires_api_key && (
+                        <p className="text-amber-600 dark:text-amber-400 pt-2">
+                          Nécessite une clé API OpenAI (OPENAI_API_KEY)
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Embedding Mismatch Warning */}
+                {embeddingMismatch?.has_mismatch && (
+                  <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-600 dark:text-amber-400">
+                      <p className="font-semibold mb-2">
+                        ⚠️ Réindexation requise
+                      </p>
+                      <p className="text-sm mb-2">
+                        {embeddingMismatch.documents_to_reindex} document(s) sont indexés avec un modèle différent ({embeddingMismatch.existing_models.filter(m => m !== embeddingMismatch.current_model).join(", ")}).
+                      </p>
+                      <p className="text-sm mb-3">
+                        Pour utiliser le nouveau modèle "{embeddingMismatch.current_model}", vous devez réindexer tous les documents.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReindexAll}
+                        disabled={reindexing}
+                        className="border-amber-600 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900"
+                      >
+                        {reindexing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Réindexation en cours...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Réindexer tous les documents
+                          </>
+                        )}
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 

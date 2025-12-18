@@ -138,7 +138,7 @@ export default function NewCasePage() {
                 onFilesChange={setFiles}
                 maxFiles={10}
                 maxSize={10 * 1024 * 1024}
-                disabled={uploading || analyzing}
+                disabled={uploading}
               />
             </CardContent>
           </Card>
@@ -163,8 +163,8 @@ export default function NewCasePage() {
                 Annuler
               </Button>
             </Link>
-            <Button type="submit" className="flex-1" disabled={!isValid || uploading || analyzing}>
-              {uploading ? "Téléversement..." : analyzing ? <span className="text-base">Analyse en cours...</span> : "Créer et analyser"}
+            <Button type="submit" className="flex-1" disabled={!isValid || uploading}>
+              {uploading ? "Téléversement..." : "Créer et analyser"}
             </Button>
           </div>
         </form>

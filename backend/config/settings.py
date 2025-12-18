@@ -125,6 +125,20 @@ class Settings(BaseSettings):
         description="Modele Ollama a utiliser"
     )
 
+    # ===== Embeddings pour recherche sémantique =====
+    embedding_provider: Literal["local", "openai"] = Field(
+        default="local",
+        description="Provider d'embeddings (local: gratuit, openai: payant)"
+    )
+    embedding_model: str = Field(
+        default="BAAI/bge-m3",
+        description="Modèle d'embedding à utiliser"
+    )
+    openai_api_key: str = Field(
+        default="",
+        description="Clé API OpenAI pour embeddings (si provider=openai)"
+    )
+
     # ===== Agno =====
     agno_log_level: str = Field(default="INFO", description="Niveau de log Agno")
     agno_storage_path: Path = Field(

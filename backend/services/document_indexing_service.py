@@ -15,6 +15,7 @@ from datetime import datetime
 
 from services.embedding_service import get_embedding_service, EmbeddingResult
 from services.surreal_service import get_surreal_service
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -293,25 +294,31 @@ class DocumentIndexingService:
             # Construire la requête avec calcul de similarité manuelle
             # Note: L'opérateur <|k,COSINE|> nécessite un index MTREE qui n'est pas encore configuré
             # Pour l'instant, on utilise vector::similarity::cosine() et on filtre manuellement
+            # IMPORTANT: On filtre aussi par embedding_model pour garantir la compatibilité des vecteurs
+            current_model = self.embedding_service.model
+
             if case_id:
                 query = """
                 SELECT *, vector::similarity::cosine(embedding, $query_embedding) AS similarity_score
                 FROM document_embedding
-                WHERE case_id = $case_id
+                WHERE case_id = $case_id AND embedding_model = $embedding_model
                 ORDER BY similarity_score DESC
                 """
                 params = {
                     "case_id": case_id,
-                    "query_embedding": query_embedding
+                    "query_embedding": query_embedding,
+                    "embedding_model": current_model
                 }
             else:
                 query = """
                 SELECT *, vector::similarity::cosine(embedding, $query_embedding) AS similarity_score
                 FROM document_embedding
+                WHERE embedding_model = $embedding_model
                 ORDER BY similarity_score DESC
                 """
                 params = {
-                    "query_embedding": query_embedding
+                    "query_embedding": query_embedding,
+                    "embedding_model": current_model
                 }
 
             result = await self.surreal_service.query(query, params)
@@ -437,25 +444,120 @@ class DocumentIndexingService:
                 "error": str(e)
             }
 
+    async def check_embedding_model_mismatch(self) -> dict:
+        """
+        Vérifie si des embeddings existent avec un modèle différent du modèle actuel.
+
+        Returns:
+            Dict avec:
+            - has_mismatch: bool - True si des embeddings utilisent un modèle différent
+            - current_model: str - Modèle actuellement configuré
+            - existing_models: list[str] - Liste des modèles trouvés dans la DB
+            - total_chunks: int - Nombre total de chunks avec le modèle actuel
+            - mismatched_chunks: int - Nombre de chunks avec un modèle différent
+            - documents_to_reindex: int - Nombre de documents à réindexer
+        """
+        try:
+            if not self.surreal_service.db:
+                await self.surreal_service.connect()
+
+            current_model = self.embedding_service.model
+
+            # Récupérer tous les modèles distincts dans la DB
+            query_models = """
+            SELECT embedding_model, count() AS chunk_count
+            FROM document_embedding
+            GROUP BY embedding_model
+            """
+            result_models = await self.surreal_service.query(query_models)
+
+            existing_models = []
+            mismatched_chunks = 0
+            current_model_chunks = 0
+
+            if result_models and len(result_models) > 0:
+                models_data = result_models[0]
+                if isinstance(models_data, dict) and "result" in models_data:
+                    models_data = models_data["result"] if isinstance(models_data["result"], list) else []
+                elif not isinstance(models_data, list):
+                    models_data = []
+
+                for model_info in models_data:
+                    model_name = model_info.get("embedding_model")
+                    chunk_count = model_info.get("chunk_count", 0)
+
+                    if model_name:
+                        existing_models.append(model_name)
+                        if model_name == current_model:
+                            current_model_chunks = chunk_count
+                        else:
+                            mismatched_chunks += chunk_count
+
+            # Compter les documents à réindexer (ceux sans embeddings avec le modèle actuel)
+            query_docs = """
+            SELECT count(DISTINCT document_id) AS doc_count
+            FROM document_embedding
+            WHERE embedding_model != $current_model
+            """
+            result_docs = await self.surreal_service.query(query_docs, {"current_model": current_model})
+
+            documents_to_reindex = 0
+            if result_docs and len(result_docs) > 0:
+                docs_data = result_docs[0]
+                if isinstance(docs_data, dict) and "result" in docs_data:
+                    docs_data = docs_data["result"][0] if docs_data["result"] else {}
+                elif isinstance(docs_data, list):
+                    docs_data = docs_data[0] if docs_data else {}
+
+                documents_to_reindex = docs_data.get("doc_count", 0)
+
+            has_mismatch = len(existing_models) > 1 or (len(existing_models) == 1 and existing_models[0] != current_model)
+
+            return {
+                "has_mismatch": has_mismatch,
+                "current_model": current_model,
+                "existing_models": existing_models,
+                "total_chunks": current_model_chunks,
+                "mismatched_chunks": mismatched_chunks,
+                "documents_to_reindex": documents_to_reindex
+            }
+
+        except Exception as e:
+            logger.error(f"Error checking embedding model mismatch: {e}", exc_info=True)
+            return {
+                "error": str(e),
+                "has_mismatch": False,
+                "current_model": self.embedding_service.model,
+                "existing_models": [],
+                "total_chunks": 0,
+                "mismatched_chunks": 0,
+                "documents_to_reindex": 0
+            }
+
 
 # Singleton
 _indexing_service: Optional[DocumentIndexingService] = None
 
 
 def get_document_indexing_service(
-    embedding_provider: str = "local",
-    embedding_model: str = "BAAI/bge-m3"
+    embedding_provider: Optional[str] = None,
+    embedding_model: Optional[str] = None
 ) -> DocumentIndexingService:
     """
     Obtient l'instance singleton du service d'indexation.
 
-    Par défaut utilise BAAI/bge-m3 via sentence-transformers (multilingue FR/EN, 100+ langues).
+    Utilise les settings globaux par défaut.
+    Par défaut: BAAI/bge-m3 via sentence-transformers (multilingue FR/EN, 100+ langues).
     Utilise MPS sur Apple Silicon pour accélération GPU.
+
+    Args:
+        embedding_provider: Provider override (sinon utilise settings.embedding_provider)
+        embedding_model: Modèle override (sinon utilise settings.embedding_model)
     """
     global _indexing_service
     if _indexing_service is None:
         _indexing_service = DocumentIndexingService(
-            embedding_provider=embedding_provider,
-            embedding_model=embedding_model
+            embedding_provider=embedding_provider or settings.embedding_provider,
+            embedding_model=embedding_model or settings.embedding_model
         )
     return _indexing_service
