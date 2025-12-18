@@ -66,6 +66,41 @@ interface ExtractionMethodsResponse {
   default: string
 }
 
+interface EmbeddingModelInfo {
+  id: string
+  name: string
+  dimensions?: number
+  description?: string
+  recommended?: boolean
+  multilingual?: boolean
+  languages?: string
+  quality?: string
+  speed?: string
+  cost?: string
+  ram?: string
+  best_for?: string
+}
+
+interface EmbeddingProviderInfo {
+  name: string
+  description: string
+  icon: string
+  requires_api_key: boolean
+  cost?: string
+  models: EmbeddingModelInfo[]
+  default: string
+}
+
+interface EmbeddingModelsResponse {
+  providers: Record<string, EmbeddingProviderInfo>
+  default_provider: string
+  default_model: string
+  current: {
+    provider: string
+    model: string
+  }
+}
+
 interface AdvancedSettingsProps {
   onSettingsChange?: (settings: AnalysisSettings) => void
   initialSettings?: AnalysisSettings
@@ -76,6 +111,8 @@ export interface AnalysisSettings {
   model_id: string
   extraction_method: string
   use_ocr: boolean
+  embedding_provider?: string
+  embedding_model?: string
 }
 
 // Utiliser des URLs relatives pour passer par le proxy Next.js
@@ -137,10 +174,15 @@ export function AdvancedSettings({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Données des modèles
+  // Données des modèles LLM
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({})
   const [extractionMethods, setExtractionMethods] = useState<Record<string, ExtractionMethod>>({})
   const [doclingAvailable, setDoclingAvailable] = useState(false)
+
+  // Données des modèles d'embedding
+  const [embeddingProviders, setEmbeddingProviders] = useState<Record<string, EmbeddingProviderInfo>>({})
+  const [activeEmbeddingProvider, setActiveEmbeddingProvider] = useState("local")
+  const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState("")
 
   // Settings actuels
   const [activeProvider, setActiveProvider] = useState("ollama")
@@ -152,6 +194,7 @@ export function AdvancedSettings({
   useEffect(() => {
     loadModels()
     loadExtractionMethods()
+    loadEmbeddingModels()
   }, [])
 
   // Notifier les changements
@@ -161,9 +204,11 @@ export function AdvancedSettings({
         model_id: selectedModel,
         extraction_method: extractionMethod,
         use_ocr: useOcr,
+        embedding_provider: activeEmbeddingProvider,
+        embedding_model: selectedEmbeddingModel,
       })
     }
-  }, [selectedModel, extractionMethod, useOcr, onSettingsChange])
+  }, [selectedModel, extractionMethod, useOcr, activeEmbeddingProvider, selectedEmbeddingModel, onSettingsChange])
 
   const loadModels = async () => {
     setIsLoading(true)
@@ -200,6 +245,30 @@ export function AdvancedSettings({
     }
   }
 
+  const loadEmbeddingModels = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/settings/embedding-models`)
+      if (!response.ok) throw new Error("Failed to load embedding models")
+      const data: EmbeddingModelsResponse = await response.json()
+      setEmbeddingProviders(data.providers)
+
+      // Initialiser avec les valeurs actuelles ou par défaut
+      if (data.current.provider) {
+        setActiveEmbeddingProvider(data.current.provider)
+      } else if (data.default_provider) {
+        setActiveEmbeddingProvider(data.default_provider)
+      }
+
+      if (data.current.model) {
+        setSelectedEmbeddingModel(data.current.model)
+      } else if (data.default_model) {
+        setSelectedEmbeddingModel(data.default_model)
+      }
+    } catch (err) {
+      console.error("Failed to load embedding models:", err)
+    }
+  }
+
   const handleProviderChange = (provider: string) => {
     setActiveProvider(provider)
     // Sélectionner le modèle par défaut du provider
@@ -215,12 +284,33 @@ export function AdvancedSettings({
     setSelectedModel(value)
   }
 
+  const handleEmbeddingProviderChange = (provider: string) => {
+    setActiveEmbeddingProvider(provider)
+    // Sélectionner le modèle par défaut du provider
+    const providerInfo = embeddingProviders[provider]
+    if (providerInfo?.default) {
+      setSelectedEmbeddingModel(providerInfo.default)
+    } else if (providerInfo?.models?.[0]) {
+      setSelectedEmbeddingModel(providerInfo.models[0].id)
+    }
+  }
+
+  const handleEmbeddingModelChange = (value: string) => {
+    setSelectedEmbeddingModel(value)
+  }
+
   const getSelectedModelInfo = (): ModelInfo | undefined => {
     const provider = providers[activeProvider]
     return provider?.models?.find((m) => m.id === selectedModel)
   }
 
+  const getSelectedEmbeddingModelInfo = (): EmbeddingModelInfo | undefined => {
+    const provider = embeddingProviders[activeEmbeddingProvider]
+    return provider?.models?.find((m) => m.id === selectedEmbeddingModel)
+  }
+
   const modelInfo = getSelectedModelInfo()
+  const embeddingModelInfo = getSelectedEmbeddingModelInfo()
 
   return (
     <div className={cn("w-full", className)}>
@@ -442,6 +532,120 @@ export function AdvancedSettings({
                       </code>
                     </div>
                   )}
+                </div>
+
+                {/* Separateur */}
+                <div className="border-t border-border" />
+
+                {/* Section Modèle d'Embedding */}
+                <div className="space-y-4">
+                  <h4 className="font-medium">Modèle d'Embedding</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Pour l'indexation vectorielle et la recherche sémantique dans les documents
+                  </p>
+
+                  {/* Tabs pour les providers */}
+                  <Tabs value={activeEmbeddingProvider} onValueChange={handleEmbeddingProviderChange}>
+                    <TabsList className="w-full grid grid-cols-2 gap-1">
+                      {Object.entries(embeddingProviders).map(([key, provider]) => (
+                        <TabsTrigger
+                          key={key}
+                          value={key}
+                          className="flex items-center gap-2"
+                        >
+                          {iconMap[provider.icon]}
+                          <span>{provider.name}</span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    {Object.entries(embeddingProviders).map(([key, provider]) => (
+                      <TabsContent key={key} value={key} className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          {provider.description}
+                        </p>
+
+                        {/* Avertissements */}
+                        {provider.requires_api_key && (
+                          <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950 dark:text-amber-400 p-3 rounded-md">
+                            Nécessite une clé API OpenAI (OPENAI_API_KEY)
+                          </div>
+                        )}
+
+                        {/* Select du modèle */}
+                        <div className="space-y-2">
+                          <Label>Sélectionner un modèle</Label>
+                          <Select value={selectedEmbeddingModel} onValueChange={handleEmbeddingModelChange}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner un modèle" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {provider.models?.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.name}
+                                  {model.recommended && " ⭐"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Info du modèle sélectionné */}
+                        {embeddingModelInfo && (
+                          <div className="bg-muted/50 p-4 rounded-md space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              {embeddingModelInfo.recommended && (
+                                <Badge variant="default">Recommandé</Badge>
+                              )}
+                              {embeddingModelInfo.multilingual && (
+                                <Badge variant="secondary">Multilingue</Badge>
+                              )}
+                              {embeddingModelInfo.quality && (
+                                <Badge variant="outline">
+                                  Qualité: {embeddingModelInfo.quality}
+                                </Badge>
+                              )}
+                              {embeddingModelInfo.dimensions && (
+                                <Badge variant="outline">
+                                  Dimensions: {embeddingModelInfo.dimensions}
+                                </Badge>
+                              )}
+                            </div>
+                            {embeddingModelInfo.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {embeddingModelInfo.description}
+                              </p>
+                            )}
+                            {embeddingModelInfo.languages && (
+                              <p className="text-sm text-muted-foreground">
+                                Langues supportées: {embeddingModelInfo.languages}
+                              </p>
+                            )}
+                            {embeddingModelInfo.cost && (
+                              <p className="text-sm text-muted-foreground">
+                                Coût: {embeddingModelInfo.cost}
+                              </p>
+                            )}
+                            {embeddingModelInfo.speed && (
+                              <p className="text-sm text-muted-foreground">
+                                Vitesse: {embeddingModelInfo.speed}
+                              </p>
+                            )}
+                            {embeddingModelInfo.ram && (
+                              <p className="text-sm text-muted-foreground">
+                                RAM: {embeddingModelInfo.ram}
+                              </p>
+                            )}
+                            {embeddingModelInfo.best_for && (
+                              <p className="text-sm font-medium text-primary">
+                                Recommandé pour: {embeddingModelInfo.best_for}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
                 </div>
               </>
             )}
