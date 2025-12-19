@@ -8,7 +8,6 @@ Endpoints:
 """
 
 import logging
-import hashlib
 import os
 import uuid
 import traceback
@@ -27,6 +26,7 @@ from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
 from models.document_models import DocumentResponse
 from auth.helpers import require_auth, get_current_user_id
+from utils.file_utils import calculate_file_hash, LINKABLE_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +81,10 @@ class LinkedDirectoryMetadata(BaseModel):
 # ============================================================================
 # Helper Functions
 # ============================================================================
+# Note: calculate_file_hash and LINKABLE_EXTENSIONS are imported from utils.file_utils
 
-SUPPORTED_EXTENSIONS = {".md", ".mdx", ".pdf", ".txt", ".docx", ".doc"}
+# Alias pour compatibilité avec le code existant
+SUPPORTED_EXTENSIONS = LINKABLE_EXTENSIONS
 
 
 def normalize_linked_source(linked_source) -> dict:
@@ -106,15 +108,6 @@ def normalize_linked_source(linked_source) -> dict:
     if isinstance(linked_source, dict):
         return linked_source
     return {}
-
-
-def calculate_file_hash(file_path: Path) -> str:
-    """Calcule le hash SHA-256 d'un fichier."""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
 
 
 def scan_directory(directory_path: str) -> DirectoryScanResult:

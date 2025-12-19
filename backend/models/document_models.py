@@ -17,7 +17,7 @@ class DocusaurusSource(BaseModel):
 class DocumentResponse(BaseModel):
     """Réponse pour un document unique."""
     id: str
-    case_id: str
+    course_id: str
     nom_fichier: str
     type_fichier: str
     type_mime: str
