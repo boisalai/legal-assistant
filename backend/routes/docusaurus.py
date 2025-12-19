@@ -9,7 +9,6 @@ Endpoints:
 """
 
 import logging
-import hashlib
 import os
 import shutil
 import uuid
@@ -26,6 +25,7 @@ from services.document_indexing_service import DocumentIndexingService
 from models.document_models import DocumentResponse, DocusaurusSource
 from auth.helpers import require_auth, get_current_user_id
 from utils.text_utils import remove_yaml_frontmatter
+from utils.file_utils import calculate_file_hash
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +78,7 @@ class ReindexResponse(BaseModel):
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-def calculate_file_hash(file_path: Path) -> str:
-    """Calcule le hash SHA-256 d'un fichier."""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+# Note: calculate_file_hash is imported from utils.file_utils
 
 
 def scan_docusaurus_files(base_path: str = DOCUSAURUS_BASE_PATH) -> List[DocusaurusFile]:

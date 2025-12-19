@@ -12,7 +12,6 @@ Endpoints:
 import logging
 import uuid
 import mimetypes
-import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -25,6 +24,19 @@ from config.settings import settings
 from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
 from utils.text_utils import remove_yaml_frontmatter
+from models.document_models import DocumentResponse, DocumentListResponse, RegisterDocumentRequest
+from utils.file_utils import (
+    ALLOWED_EXTENSIONS,
+    LINKABLE_EXTENSIONS,
+    MAX_FILE_SIZE,
+    MAX_LINKED_FILES,
+    calculate_file_hash,
+    get_file_extension,
+    is_allowed_file,
+    is_linkable_file,
+    scan_folder_for_files,
+    get_mime_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,62 +45,12 @@ router = APIRouter(prefix="/api/courses", tags=["Documents"])
 # Import auth helpers
 from auth.helpers import require_auth, get_current_user_id
 
-# Allowed file types
-ALLOWED_EXTENSIONS = {
-    '.pdf': 'application/pdf',
-    '.doc': 'application/msword',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.txt': 'text/plain',
-    '.md': 'text/markdown',
-    '.mdx': 'text/markdown',  # MDX (Markdown + JSX)
-    '.mp3': 'audio/mpeg',
-    '.wav': 'audio/wav',
-    '.m4a': 'audio/mp4',
-    '.ogg': 'audio/ogg',
-    '.webm': 'audio/webm',
-}
-
-# Types de fichiers supportés pour les liens (fichiers/répertoires)
-LINKABLE_EXTENSIONS = {'.md', '.mdx', '.pdf', '.txt', '.docx'}
-
-MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB - Pour supporter les enregistrements audio de 3h+
-MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un répertoire
-
 
 # ============================================================================
-# Pydantic Models
+# Pydantic Models (Local to this route)
 # ============================================================================
-
-class DocumentResponse(BaseModel):
-    id: str
-    course_id: str
-    nom_fichier: str
-    type_fichier: str
-    type_mime: str
-    taille: int
-    file_path: str
-    created_at: str
-    texte_extrait: Optional[str] = None
-    file_exists: bool = True  # Whether the file exists on disk
-    source_document_id: Optional[str] = None  # ID of parent document if this is derived
-    is_derived: Optional[bool] = None  # True if this is a derived file
-    derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
-    source_type: Optional[str] = None  # "upload", "linked", or "docusaurus"
-    linked_source: Optional[dict] = None  # Info linked directory si applicable
-    docusaurus_source: Optional[dict] = None  # Info Docusaurus si applicable
-    indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
-
-
-class DocumentListResponse(BaseModel):
-    documents: list[DocumentResponse]
-    total: int
-    missing_files: list[str] = []  # List of document IDs with missing files
-
-
-class RegisterDocumentRequest(BaseModel):
-    """Request to register a document by file path (no upload/copy)."""
-    file_path: str  # Absolute path to the file on disk
-
+# Note: DocumentResponse, DocumentListResponse, RegisterDocumentRequest
+#       are imported from models.document_models
 
 class LinkPathRequest(BaseModel):
     """Request to link a file or folder."""
@@ -104,71 +66,11 @@ class LinkPathResponse(BaseModel):
 
 
 # ============================================================================
-# Helper Functions
-# ============================================================================
-
-def calculate_file_hash(file_path: Path) -> str:
-    """Calculate SHA-256 hash of a file."""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
-
-
-def get_file_extension(filename: str) -> str:
-    """Get file extension from filename."""
-    return Path(filename).suffix.lower()
-
-
-def is_allowed_file(filename: str) -> bool:
-    """Check if file extension is allowed."""
-    ext = get_file_extension(filename)
-    return ext in ALLOWED_EXTENSIONS
-
-
-def is_linkable_file(filename: str) -> bool:
-    """Check if file can be linked (for folder linking)."""
-    ext = get_file_extension(filename)
-    return ext in LINKABLE_EXTENSIONS
-
-
-def scan_folder_for_files(folder_path: Path, max_files: int = MAX_LINKED_FILES) -> List[Path]:
-    """
-    Scan a folder for linkable files (non-recursive).
-
-    Returns list of file paths, limited to max_files.
-    Filters by LINKABLE_EXTENSIONS.
-    """
-    files = []
-
-    try:
-        for item in folder_path.iterdir():
-            if len(files) >= max_files:
-                break
-
-            # Skip hidden files and directories
-            if item.name.startswith('.'):
-                continue
-
-            # Only process files (not subdirectories)
-            if item.is_file() and is_linkable_file(item.name):
-                files.append(item)
-    except Exception as e:
-        logger.error(f"Error scanning folder {folder_path}: {e}")
-
-    return sorted(files, key=lambda p: p.name)
-
-
-def get_mime_type(filename: str) -> str:
-    """Get MIME type from filename."""
-    ext = get_file_extension(filename)
-    return ALLOWED_EXTENSIONS.get(ext, 'application/octet-stream')
-
-
-# ============================================================================
 # Endpoints
 # ============================================================================
+# Note: Helper functions (calculate_file_hash, get_file_extension, is_allowed_file,
+#       is_linkable_file, scan_folder_for_files, get_mime_type) are imported from
+#       utils.file_utils
 
 @router.get("/{course_id}/documents", response_model=DocumentListResponse)
 async def list_documents(
@@ -230,14 +132,6 @@ async def list_documents(
             elif isinstance(result, list):
                 items = result
 
-        logger.info(f"GET /documents unwrapped result: {len(items)} documents")
-        logger.info(f"Query course_id: {course_id}, legacy_course_id: {legacy_course_id}")
-        logger.info(f"Raw query result: {result}")
-        if items and len(items) > 0:
-            logger.info(f"First 3 documents from unwrapped result:")
-            for doc in items[:3]:
-                logger.info(f"  - {doc.get('nom_fichier')} (course_id: {doc.get('course_id')}, source_type: {doc.get('source_type')})")
-
         documents = []
         missing_files = []
         docs_to_remove = []
@@ -274,8 +168,6 @@ async def list_documents(
                         registered_filenames.add(item.get("nom_fichier", ""))
 
                     linked_source_data = item.get("linked_source")
-                    if linked_source_data:
-                        logger.info(f"🔍 Document {item.get('id')} HAS linked_source: {linked_source_data}")
 
                     doc_response = DocumentResponse(
                         id=str(item.get("id", "")),
@@ -296,7 +188,6 @@ async def list_documents(
                         docusaurus_source=item.get("docusaurus_source"),
                         indexed=item.get("indexed"),
                     )
-                    logger.info(f"🔍 DocumentResponse created with linked_source={doc_response.linked_source}")
                     documents.append(doc_response)
 
         # Auto-remove documents with missing files
@@ -708,8 +599,6 @@ async def link_file_or_folder(
 
                 created_doc = await service.create("document", document_data, record_id=doc_id)
                 logger.info(f"Linked file: {file_path.name} -> document:{doc_id}")
-                logger.info(f"Created document in DB: {created_doc}")
-                logger.info(f"Document course_id: {document_data['course_id']}")
 
                 # Index text content if available
                 if texte_extrait:
@@ -926,15 +815,11 @@ async def delete_document(
 
         # Get document to find file path
         clean_id = doc_id.replace("document:", "")
-        logger.info(f"Attempting to delete document with ID: {doc_id} (clean: {clean_id})")
 
         result = await service.query(
             "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
             {"doc_id": clean_id}
         )
-
-        logger.info(f"Query result type: {type(result)}, length: {len(result) if result else 0}")
-        logger.info(f"Query result content: {result}")
 
         # Parse SurrealDB response - it can have different structures
         items = []
@@ -949,8 +834,6 @@ async def delete_document(
                     items = result
             elif isinstance(first_item, list):
                 items = first_item
-
-        logger.info(f"Parsed items: {items}")
 
         # If document exists in database, handle cleanup
         if items and len(items) > 0:

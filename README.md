@@ -1,160 +1,324 @@
 # Legal Assistant
 
-Assistant d'etudes juridiques pour etudiants en droit - Resume automatique de jugements.
+Assistant d'études juridiques pour étudiants en droit avec IA conversationnelle et recherche sémantique.
 
-## Fonctionnalites
+## 🎯 Fonctionnalités principales
 
-- **Resume de jugements**: Analyse automatique de jugements pour generer des case briefs structures
-- **Multi-providers LLM**: Support Ollama, Claude, MLX, HuggingFace
-- **Persistance**: SurrealDB pour stocker jugements et resumes
-- **API REST**: FastAPI avec documentation Swagger
+### 📚 Gestion de cours
+- Organisation par cours (civil, pénal, administratif, familial, commercial, travail, constitutionnel)
+- CRUD complet via interface web
+- Suppression en cascade (documents, conversations, embeddings)
 
-## Structure du projet
+### 📄 Gestion de documents
+- **Upload de fichiers** : PDF, Word, images, audio
+- **Liaison de répertoires locaux** : Indexation automatique de dossiers entiers
+- **Import Docusaurus** : Import de documentation Markdown
+- **Tracking intelligent** : Hash SHA-256 et détection de modifications
+- Actions contextuelles selon le type de fichier
+
+### 🎤 Transcription audio
+- Whisper MLX (optimisé Apple Silicon)
+- Modèle large-v3-turbo recommandé
+- Workflow hybride : Whisper → Agent LLM (formatage) → Markdown
+
+### 💬 Agent conversationnel
+- Chat avec streaming en temps réel (SSE)
+- **Recherche sémantique intégrée** : Accès automatique aux documents du cours
+- Multi-providers : Claude, Ollama, MLX
+- Mémoire de conversation persistante
+- Citation automatique des sources
+
+### 🔍 RAG et recherche sémantique
+- Embeddings BGE-M3 (local) ou OpenAI
+- Accélération GPU : MPS (Apple Silicon) / CUDA / CPU
+- Chunking intelligent (400 mots, 50 mots overlap)
+- Support multi-modèles d'embedding
+
+### 🔊 Synthèse vocale (TTS)
+- Service edge-tts (Microsoft Edge TTS)
+- 15 voix : 13 françaises + 2 anglaises
+- Génération MP3 depuis documents Markdown
+
+### ⚡ MLX - Optimisation Apple Silicon
+- Modèles locaux 2x plus rapides qu'Ollama
+- Qwen 2.5 3B (4-bit) recommandé pour français
+- Auto-démarrage par le backend
+- RAM réduite (~2 GB)
+
+## 🏗️ Structure du projet
 
 ```
 legal-assistant/
 ├── backend/
-│   ├── config/          # Configuration (settings, models LLM)
-│   ├── models/          # Modeles Pydantic (Judgment, Summary)
-│   ├── workflows/       # Workflows Agno (summarize_judgment)
-│   ├── services/        # Services (model_factory)
-│   ├── routes/          # Endpoints API
-│   └── main.py          # Point d'entree FastAPI
-├── frontend/            # Next.js (a venir)
-├── docs/                # Documentation
-└── docker-compose.yml   # SurrealDB
+│   ├── config/              # Configuration (settings, models)
+│   ├── models/              # Modèles Pydantic (Course, Document)
+│   ├── routes/              # Endpoints API REST
+│   ├── services/            # Services métier
+│   │   ├── document_indexing_service.py
+│   │   ├── transcription_service.py
+│   │   └── tts_service.py
+│   ├── workflows/           # Workflows Agno
+│   └── main.py              # Point d'entrée FastAPI
+├── frontend/
+│   ├── src/
+│   │   ├── app/             # Next.js App Router
+│   │   ├── components/      # Composants React + shadcn/ui
+│   │   └── lib/             # Utilities
+│   └── package.json
+├── docs/                    # Documentation
+├── docker-compose.yml       # SurrealDB
+└── CLAUDE.md               # Documentation développement
 ```
 
-## Installation rapide
+## 🚀 Installation rapide
 
-### Prerequisites
+### Prérequis
 
-- Python 3.12+
-- uv (gestionnaire de packages)
-- Docker (pour SurrealDB)
-- Ollama (recommande pour dev local)
+- **Python 3.12+**
+- **uv** (gestionnaire de packages Python)
+- **Node.js 18+** et **npm**
+- **Docker** (pour SurrealDB)
+- *Optionnel* : **Ollama** pour modèles locaux
 
-### Etapes
+### Étapes
 
 ```bash
-# 1. Cloner et entrer dans le projet
+# 1. Cloner le projet
+git clone <repo-url>
 cd legal-assistant
 
-# 2. Demarrer SurrealDB
+# 2. Démarrer SurrealDB
 docker-compose up -d
 
-# 3. Installer les dependances Python
+# 3. Backend - Installer les dépendances
 cd backend
 uv sync
 
-# 4. (Optionnel) Installer Ollama et telecharger un modele
-# Voir https://ollama.ai
-ollama pull qwen2.5:7b
-
-# 5. Creer le fichier .env
+# 4. (Optionnel) Créer le fichier .env
 cp .env.example .env
-# Editer si necessaire
+# Éditer pour ajouter ANTHROPIC_API_KEY si nécessaire
 
-# 6. Lancer l'API
+# 5. Démarrer le backend
 uv run python main.py
+# Backend disponible sur http://localhost:8000
+
+# 6. Frontend - Installer les dépendances
+cd ../frontend
+npm install
+
+# 7. Démarrer le frontend
+npm run dev -- -p 3001
+# Frontend disponible sur http://localhost:3001
 ```
 
-L'API sera disponible sur http://localhost:8000
-
-- Documentation Swagger: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## Configuration LLM
-
-### Ollama (recommande pour developpement)
+### Démarrage avec 3 terminaux
 
 ```bash
-# Installer Ollama: https://ollama.ai
-ollama pull qwen2.5:7b  # Meilleur score (80%)
-ollama pull llama3.2    # Plus rapide
+# Terminal 1 - SurrealDB
+docker-compose up -d
+# ou
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+
+# Terminal 2 - Backend
+cd backend && uv run python main.py
+
+# Terminal 3 - Frontend
+cd frontend && npm run dev -- -p 3001
 ```
 
-Dans `.env`:
-```
-MODEL_ID=ollama:qwen2.5:7b
-```
+## ⚙️ Configuration
 
-### Claude (production)
+### Modèles LLM
 
-Dans `.env`:
-```
-MODEL_ID=anthropic:claude-sonnet-4-5-20250929
+Le projet supporte plusieurs providers LLM :
+
+#### Claude Sonnet 4.5 (Recommandé pour RAG)
+```bash
+# Dans .env
 ANTHROPIC_API_KEY=sk-ant-...
 ```
+- Support natif de function calling
+- Meilleur pour recherche sémantique et citation de sources
+- Nécessite API key Anthropic
 
-## Utilisation
+#### MLX (Apple Silicon uniquement)
+```bash
+# Configuration dans frontend/Settings
+Model: "MLX Qwen 2.5 3B"
+```
+- Gratuit, très rapide (~50-60 tok/s)
+- Auto-démarrage par le backend
+- Recommandé pour conversations générales
 
-### Test du workflow de resume
+#### Ollama (Cross-platform)
+```bash
+# Installer Ollama: https://ollama.ai
+ollama pull qwen2.5:7b
+```
+- Gratuit, fonctionne hors ligne
+- Bon pour conversations simples
+- Moins performant pour RAG
+
+### Modèles d'embedding
+
+Le projet supporte plusieurs modèles d'embedding :
+
+| Provider | Modèle                    | Dimensions | Coût         |
+|----------|---------------------------|------------|--------------|
+| Local    | BGE-M3 (Recommandé)       | 1024       | Gratuit      |
+| OpenAI   | text-embedding-3-small    | 1536       | ~$0.00002/1K |
+| OpenAI   | text-embedding-3-large    | 3072       | ~$0.00013/1K |
+
+Configuration dans `Settings > Paramètres avancés > Modèle d'Embedding`
+
+**Important** : Changer de modèle d'embedding nécessite de réindexer tous les documents.
+
+## 📖 Utilisation
+
+### 1. Créer un cours
+
+```
+Interface web > "Nouveau cours"
+- Titre du cours
+- Code du cours (ex: DRT-1000)
+- Professeur
+- Crédits
+- Type de droit
+```
+
+### 2. Ajouter des documents
+
+**Upload de fichiers** :
+- Glisser-déposer ou sélectionner des fichiers
+- Formats supportés : PDF, DOCX, images, audio
+
+**Lier un répertoire local** :
+- Section "Répertoires liés"
+- Sélectionner un dossier
+- Indexation automatique de tous les fichiers
+
+**Import Docusaurus** :
+- Bouton "Importer depuis Docusaurus"
+- Sélectionner les dossiers à importer
+- Indexation automatique pour RAG
+
+### 3. Poser des questions
+
+```
+Chat > Sélectionner un cours > Poser une question
+```
+
+L'agent va :
+1. Rechercher les passages pertinents dans les documents
+2. Formuler une réponse basée sur les sources
+3. Citer automatiquement les sources utilisées
+
+### 4. Transcrire un audio
+
+```
+Upload fichier audio > Action "Transcrire"
+```
+
+Workflow :
+- Extraction audio avec Whisper MLX
+- Formatage par agent LLM
+- Sauvegarde en Markdown avec lien automatique
+
+### 5. Générer une synthèse vocale
+
+```
+Document Markdown > Action "Générer audio"
+```
+
+Options :
+- 13 voix françaises + 2 anglaises
+- Configuration de la voix par défaut dans Settings
+- Format MP3
+
+## 🔧 API REST
+
+Documentation complète disponible sur :
+- **Swagger UI** : http://localhost:8000/docs
+- **ReDoc** : http://localhost:8000/redoc
+
+Principaux endpoints :
+
+```
+GET    /api/courses              # Liste des cours
+POST   /api/courses              # Créer un cours
+GET    /api/courses/{id}         # Détails d'un cours
+DELETE /api/courses/{id}         # Supprimer un cours
+
+GET    /api/documents            # Liste des documents
+POST   /api/documents/upload     # Upload de fichiers
+POST   /api/linked-directories   # Lier un répertoire local
+POST   /api/docusaurus/import    # Importer depuis Docusaurus
+
+POST   /api/transcribe           # Transcrire un audio
+POST   /api/tts                  # Générer une synthèse vocale
+
+POST   /api/chat                 # Chat avec streaming SSE
+GET    /api/conversations        # Historique des conversations
+```
+
+## 🧪 Développement
+
+### Linter et formatage
 
 ```bash
 cd backend
-uv run python workflows/summarize_judgment.py
-```
-
-### Via l'API (a venir)
-
-```bash
-# Upload un jugement
-curl -X POST http://localhost:8000/api/judgments \
-  -F "file=@jugement.pdf"
-
-# Generer un resume
-curl -X POST http://localhost:8000/api/judgments/{id}/summarize
-```
-
-## Developpement
-
-```bash
-# Lancer en mode dev (hot reload)
-uv run uvicorn main:app --reload
-
-# Linter
 uv run ruff check .
 uv run ruff format .
+```
 
-# Tests
+### Tests
+
+```bash
+cd backend
 uv run pytest
 ```
 
-## Modeles de donnees
+### Hot reload
 
-### Judgment (Jugement)
+```bash
+# Backend
+cd backend
+uv run uvicorn main:app --reload
 
-- Identification (titre, citation, tribunal, date)
-- Parties (demandeur, defendeur)
-- Classification (domaine de droit)
-- Texte original
+# Frontend
+cd frontend
+npm run dev
+```
 
-### CaseBrief (Resume)
+## 📦 Technologies
 
-- Faits pertinents
-- Questions en litige
-- Regles de droit applicables
-- Ratio decidendi
-- Obiter dicta
-- Conclusion/Dispositif
+- **Backend** : Python 3.12 + FastAPI + Agno
+- **Frontend** : Next.js 14 (App Router) + TypeScript + shadcn/ui
+- **Base de données** : SurrealDB
+- **IA** : Claude / Ollama / MLX / HuggingFace
+- **Embeddings** : sentence-transformers (BGE-M3) / OpenAI
+- **Transcription** : Whisper MLX (mlx-whisper)
+- **TTS** : edge-tts (Microsoft Edge TTS)
+- **PDF** : Docling (extraction avancée avec OCR)
 
-## Workflow de resume
+## 🌐 Ports
 
-Le workflow utilise 4 agents specialises:
+- **SurrealDB** : 8002
+- **Backend** : 8000
+- **Frontend** : 3001
+- **MLX Server** : 8080 (auto-démarré si modèle MLX sélectionné)
 
-1. **Extracteur**: Extrait les informations de base (parties, tribunal, date)
-2. **Analyseur**: Identifie les faits, questions en litige, arguments
-3. **Synthetiseur**: Extrait le ratio decidendi et la conclusion
-4. **Formateur**: Genere le case brief final structure
+## 📚 Documentation complète
 
-## Technologies
+- **CLAUDE.md** : Documentation de développement et historique des sessions
+- **ARCHITECTURE.md** : Architecture technique détaillée
+- **backend/MLX_GUIDE.md** : Guide MLX pour Apple Silicon
+- **backend/LOCAL_MODELS_GUIDE.md** : Guide des modèles locaux
 
-- **Backend**: Python 3.12 + FastAPI + Agno
-- **Base de donnees**: SurrealDB
-- **IA**: Ollama / Claude / MLX / HuggingFace
-- **Frontend**: Next.js 14+ (a venir)
+## 🤝 Contribution
 
-## License
+Ce projet est développé pour un usage personnel éducatif. Les contributions sont les bienvenues pour améliorer les fonctionnalités existantes.
+
+## 📄 License
 
 MIT

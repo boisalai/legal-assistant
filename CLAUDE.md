@@ -215,58 +215,141 @@ Ajout d'une fonctionnalité complète d'import de documentation Docusaurus :
 
 ## Prochaines étapes suggérées
 
-### Immédiat
+> **Plan consolidé 2025-12-19** - Synthèse des recommandations après analyse README.md, CLAUDE.md et Docusaurus
 
-1. **Tester la fonctionnalité répertoires liés**
-   - Lier un répertoire local
-   - Vérifier l'affichage de la section "Répertoires liés"
-   - Tester la vue arborescente
-   - Vérifier la recherche sémantique sur les fichiers liés
+### 🔴 Urgent - Incohérences et Dette Technique
 
-2. **Nettoyer les logs de debug**
-   - Retirer les `logger.info("🔍 ...")` ajoutés dans `routes/documents.py`
-   - Garder uniquement les logs essentiels
+1. **Mettre à jour README.md** (~1h)
+   - Synchroniser avec l'état actuel du projet
+   - Remplacer "Résumé de jugements" par les vraies fonctionnalités
+   - Corriger "cases/judgments" → "courses"
+   - Documenter le frontend existant
+   - Retirer mentions du workflow obsolète de 4 agents
 
-3. **Ajuster paramètres RAG si nécessaire**
-   - `top_k` : Actuellement 5, considérer 7-10
-   - `min_similarity` : Actuellement 0.5 (50%)
-   - `chunk_size` : Actuellement 400 mots
-   - `chunk_overlap` : Actuellement 50 mots
-
-### Court terme
-
-1. **Améliorer l'agent**
-   - ✅ FAIT : Recherche sémantique intégrée
-   - ✅ FAIT : Mémoire de conversation
-   - ✅ FAIT : Citation des sources obligatoire
-   - ❌ À EXPLORER : Extraction d'entités juridiques
-
-2. **UI/UX**
-   - ✅ FAIT : DataTable avec filtres
-   - ✅ FAIT : Prévisualisation markdown
-   - ✅ FAIT : Vue arborescente pour répertoires liés
-   - ❌ À EXPLORER : Progression de transcription en temps réel
-
-### Moyen terme
-
-1. **Multi-agents avec DuckDuckGo** 💡
-   - Workflow multi-agents pour documentation automatique
-   - Utiliser `agno.tools.duckduckgo` pour recherches Internet
-
-2. **Intégrations externes** 💡
-   - MCP Server pour CanLII (jurisprudence canadienne)
-   - MCP Server pour Légis Québec / LegisInfo
-
-### Refactoring
-
-1. **Consolidation modèles Pydantic**
-   - ❌ **À FAIRE** : Supprimer la duplication `DocumentResponse`
+2. **Refactoring DocumentResponse** (~2h)
+   - ❌ **À FAIRE** : Supprimer la duplication dans `routes/documents.py` (lignes 61-78)
    - Utiliser uniquement `models/document_models.py`
-   - Importer dans `routes/documents.py` au lieu de redéfinir
+   - Importer au lieu de redéfinir localement
+   - **Critique** : Cette duplication a déjà causé des bugs (session 2025-12-08)
 
-2. **Simplification routes**
-   - ❌ **À FAIRE** : `documents.py` toujours trop long (~2100 lignes)
-   - Extraire logique métier dans services dédiés
+3. **Simplification documents.py** (~4-6h)
+   - ❌ **À FAIRE** : Fichier trop long (~2100 lignes)
+   - Extraire logique métier en services dédiés :
+     - `services/document_service.py` - CRUD et gestion fichiers
+     - `services/linked_directory_service.py` - Logique répertoires liés
+     - `services/docusaurus_service.py` - Logique import Docusaurus
+   - Garder uniquement les endpoints et validations dans `routes/documents.py`
+
+4. **Nettoyer les logs de debug**
+   - Retirer les `logger.info("🔍 ...")` ajoutés temporairement
+   - Garder uniquement les logs essentiels (erreurs, warnings)
+
+### 🎯 Priorité Haute - Stabilité et Qualité
+
+5. **Tests d'intégration** (~4-6h)
+   - Tests API endpoints critiques :
+     - `/api/courses` - CRUD complet
+     - `/api/documents` - Upload, liaison, suppression
+     - `/api/chat` - Streaming SSE avec RAG
+   - Tests recherche sémantique avec différents modèles d'embedding
+   - Tests workflow transcription audio
+   - Tests upload et liaison de répertoires
+
+6. **Ajuster paramètres RAG** (~2h)
+   - Tester et optimiser :
+     - `top_k` : Actuellement 5 → considérer 7-10
+     - `min_similarity` : Actuellement 0.5 (50%)
+     - `chunk_size` : Actuellement 400 mots
+     - `chunk_overlap` : Actuellement 50 mots
+   - Benchmarker avec différentes configurations
+   - Documenter les résultats dans ARCHITECTURE.md
+
+### 🚀 Priorité Moyenne - UX et Fonctionnalités
+
+7. **Logos des providers** (~2h)
+   - Remplacer textes par logos officiels :
+     - Anthropic : `https://github.com/images/modules/marketplace/models/families/anthropic.svg`
+     - OpenAI : `https://github.com/images/modules/marketplace/models/families/openai.svg`
+     - Gemini : `https://github.com/images/modules/marketplace/models/families/gemini.svg`
+     - Ollama : `https://lobehub.com/fr/icons/ollama`
+     - HuggingFace : `https://huggingface.co/datasets/huggingface/brand-assets/resolve/main/hf-logo.svg`
+   - Afficher dans sélecteur de modèles (LLM et Embedding)
+
+8. **Épingler cours favoris** (~3h)
+   - Ajouter champ `pinned: bool` à la table `course`
+   - Icône "pin" dans la liste des cours
+   - Tri automatique : cours épinglés en premier
+   - Persistence dans SurrealDB
+
+9. **Progression temps réel** (~4h)
+   - Afficher progression transcription audio (WebSocket ou SSE)
+   - Afficher progression indexation documents
+   - Barre de progression dans l'UI
+   - Notifications de fin de traitement
+
+10. **Page de connexion et authentification** (~6-8h)
+    - Système d'authentification simple (email/password)
+    - JWT tokens avec refresh
+    - Middleware de protection des routes
+    - Page de connexion/inscription
+    - Ajuster bouton "Déconnexion"
+
+11. **OCR avancé avec Docling** (~4h)
+    - Exploiter Docling (déjà installé) pour PDF scannés
+    - Améliorer extraction tableaux et structures complexes
+    - Tester avec PDF de jurisprudence québécoise
+    - Comparer avec l'extraction actuelle
+
+### 💡 Priorité Basse - Innovation
+
+12. **Extraction d'entités juridiques** (~8-12h)
+    - Identifier automatiquement :
+      - Parties (demandeur, défendeur)
+      - Dates importantes (jugement, événements)
+      - Tribunaux et juridictions
+      - Références légales (articles, lois)
+    - Enrichir l'indexation avec ces métadonnées
+    - Créer des filtres de recherche par entité
+
+13. **Multi-agents avec DuckDuckGo** (~6-10h)
+    - Workflow multi-agents pour documentation automatique
+    - Utiliser `agno.tools.duckduckgo` pour recherches Internet
+    - Validation croisée des informations
+    - Génération de synthèses enrichies
+
+14. **Intégrations MCP externes** (~10-15h chacune)
+    - MCP Server pour CanLII (jurisprudence canadienne)
+    - MCP Server pour Légis Québec / LegisInfo
+    - SurrealMCP (déjà disponible dans Agno)
+    - Agent OS inter-communication
+
+15. **Modèles d'actes notariés** (~8-12h)
+    - Importer templates depuis https://www.transports.gouv.qc.ca
+    - Types : vente, achat, prêt hypothécaire, etc.
+    - Génération assistée par IA
+    - Remplissage automatique des champs
+
+### 📚 Idées à explorer (Backlog)
+
+- **Notar'IA** - Explorer l'intégration
+- **Lexis+ AI** - Analyse de la concurrence
+- **OCR avec modèles open-source** - HuggingFace alternatives
+- **VineVoice** - TTS avancé pour remplacer edge-tts
+- **Déploiement Render** - Production (https://render.com/pricing)
+- **Agent OS** - Communication MCP entre agents
+- **Culture partagée** - Apprentissage collectif (Agno feature)
+- **Couleurs Anthropic Interviewer** - Inspiration UI (https://www.anthropic.com/news/anthropic-interviewer)
+- **GitHub Copilot design** - S'inspirer de https://github.com/copilot/c/1a58622c-405c-4ae3-988e-9d4e8c459ab6
+
+---
+
+### 🎯 Recommandation Top 3 (Démarrage)
+
+1. **Mettre à jour README.md** (1h) - Première impression correcte du projet
+2. **Refactoring DocumentResponse** (2h) - Éliminer duplication critique
+3. **Tests d'intégration de base** (4-6h) - Assurer stabilité avant nouvelles features
+
+**Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
 
 ---
 
