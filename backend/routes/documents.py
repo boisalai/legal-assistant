@@ -172,13 +172,13 @@ async def list_documents(
                     doc_response = DocumentResponse(
                         id=str(item.get("id", "")),
                         course_id=item.get("course_id", course_id),
-                        nom_fichier=item.get("nom_fichier", ""),
-                        type_fichier=item.get("type_fichier", ""),
-                        type_mime=item.get("type_mime", ""),
-                        taille=item.get("taille", 0),
+                        filename=item.get("nom_fichier", ""),
+                        file_type=item.get("type_fichier", ""),
+                        mime_type=item.get("type_mime", ""),
+                        size=item.get("taille", 0),
                         file_path=file_path,
                         created_at=item.get("created_at", ""),
-                        texte_extrait=item.get("texte_extrait"),
+                        extracted_text=item.get("texte_extrait"),
                         file_exists=file_exists,
                         source_document_id=item.get("source_document_id"),
                         is_derived=item.get("is_derived"),
@@ -250,10 +250,10 @@ async def list_documents(
                                     documents.append(DocumentResponse(
                                         id=f"document:{doc_id}",
                                         course_id=course_id,
-                                        nom_fichier=file_path.name,
-                                        type_fichier=ext.lstrip('.'),
-                                        type_mime=get_mime_type(file_path.name),
-                                        taille=file_size,
+                                        filename=file_path.name,
+                                        file_type=ext.lstrip('.'),
+                                        mime_type=get_mime_type(file_path.name),
+                                        size=file_size,
                                         file_path=relative_path,
                                         created_at=now,
                                         file_exists=True,
@@ -317,6 +317,18 @@ async def upload_document(
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
+        # Verify course exists
+        clean_course_id = course_id.replace("course:", "")
+        course_result = await service.query(
+            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+            {"course_id": clean_course_id}
+        )
+        if not course_result or len(course_result) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cours non trouvé: {course_id}"
+            )
+
         # Generate document ID and save file
         doc_id = str(uuid.uuid4())[:8]
         ext = get_file_extension(file.filename)
@@ -352,10 +364,10 @@ async def upload_document(
         return DocumentResponse(
             id=f"document:{doc_id}",
             course_id=course_id,
-            nom_fichier=file.filename,
-            type_fichier=ext.lstrip('.'),
-            type_mime=get_mime_type(file.filename),
-            taille=len(content),
+            filename=file.filename,
+            file_type=ext.lstrip('.'),
+            mime_type=get_mime_type(file.filename),
+            size=len(content),
             file_path=file_path,
             created_at=now,
         )
@@ -451,10 +463,10 @@ async def register_document(
         return DocumentResponse(
             id=f"document:{doc_id}",
             course_id=course_id,
-            nom_fichier=filename,
-            type_fichier=ext.lstrip('.'),
-            type_mime=get_mime_type(filename),
-            taille=file_size,
+            filename=filename,
+            file_type=ext.lstrip('.'),
+            mime_type=get_mime_type(filename),
+            size=file_size,
             file_path=str(file_path.absolute()),
             created_at=now,
             file_exists=True,
@@ -488,6 +500,13 @@ async def link_file_or_folder(
     Types supportés : .md, .mdx, .pdf, .txt, .docx
     Limite : 50 fichiers maximum par répertoire
     """
+    # Validate path is not empty
+    if not request.path or not request.path.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le chemin ne peut pas être vide"
+        )
+
     path = Path(request.path)
     warnings = []
     linked_documents = []
@@ -564,8 +583,10 @@ async def link_file_or_folder(
                 # Create linked source metadata
                 linked_source = {
                     "absolute_path": str(file_path.absolute()),
+                    "original_path": str(file_path.absolute()),  # Alias for test compatibility
                     "last_sync": now,
                     "source_hash": file_hash,
+                    "file_hash": file_hash,  # Alias for test compatibility
                     "source_mtime": file_mtime,
                     "needs_reindex": False
                 }
@@ -620,14 +641,15 @@ async def link_file_or_folder(
                 linked_documents.append(DocumentResponse(
                     id=f"document:{doc_id}",
                     course_id=course_id,
-                    nom_fichier=file_path.name,
-                    type_fichier=ext.lstrip('.'),
-                    type_mime=get_mime_type(file_path.name),
-                    taille=file_size,
+                    filename=file_path.name,
+                    file_type=ext.lstrip('.'),
+                    mime_type=get_mime_type(file_path.name),
+                    size=file_size,
                     file_path=str(file_path.absolute()),
                     created_at=now,
                     source_type="linked",
-                    texte_extrait=texte_extrait[:500] + "..." if texte_extrait and len(texte_extrait) > 500 else texte_extrait,
+                    linked_source=linked_source,  # Include linked_source metadata
+                    extracted_text=texte_extrait[:500] + "..." if texte_extrait and len(texte_extrait) > 500 else texte_extrait,
                     indexed=texte_extrait is not None,
                     file_exists=True
                 ))
@@ -700,13 +722,13 @@ async def get_derived_documents(
                     derived.append(DocumentResponse(
                         id=str(item.get("id", "")),
                         course_id=item.get("course_id", course_id),
-                        nom_fichier=item.get("nom_fichier", ""),
-                        type_fichier=item.get("type_fichier", ""),
-                        type_mime=item.get("type_mime", ""),
-                        taille=item.get("taille", 0),
+                        filename=item.get("nom_fichier", ""),
+                        file_type=item.get("type_fichier", ""),
+                        mime_type=item.get("type_mime", ""),
+                        size=item.get("taille", 0),
                         file_path=file_path,
                         created_at=item.get("created_at", ""),
-                        texte_extrait=item.get("texte_extrait"),
+                        extracted_text=item.get("texte_extrait"),
                         file_exists=file_exists,
                         source_document_id=item.get("source_document_id"),
                         is_derived=item.get("is_derived"),
@@ -769,10 +791,10 @@ async def get_document(
         return DocumentResponse(
             id=str(item.get("id", doc_id)),
             course_id=item.get("course_id", course_id),
-            nom_fichier=item.get("nom_fichier", ""),
-            type_fichier=item.get("type_fichier", ""),
-            type_mime=item.get("type_mime", ""),
-            taille=item.get("taille", 0),
+            filename=item.get("nom_fichier", ""),
+            file_type=item.get("type_fichier", ""),
+            mime_type=item.get("type_mime", ""),
+            size=item.get("taille", 0),
             file_path=item.get("file_path", ""),
             created_at=item.get("created_at", ""),
         )
@@ -886,7 +908,15 @@ async def delete_document(
             await service.delete(doc_id)
             logger.info(f"Document record deleted: {doc_id}")
         else:
-            # Document not in database, but try to delete file if it exists in uploads
+            # Document not in database
+            # If no file_path or filename provided, this is a real 404 error
+            if not file_path and not filename:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Document non trouvé"
+                )
+
+            # Try to delete orphaned file if file_path or filename was provided
             logger.warning(f"Document not found in database (may have been auto-removed): {doc_id}")
 
             # Try to delete orphaned file using provided file_path or filename

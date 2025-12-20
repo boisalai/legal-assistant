@@ -18,13 +18,13 @@ class DocumentResponse(BaseModel):
     """Réponse pour un document unique."""
     id: str
     course_id: str
-    nom_fichier: str
-    type_fichier: str
-    type_mime: str
-    taille: int
+    filename: str  # Changed from nom_fichier for API consistency
+    file_type: str  # Changed from type_fichier for API consistency
+    mime_type: str  # Changed from type_mime for API consistency
+    size: int  # Changed from taille for API consistency
     file_path: str
     created_at: str
-    texte_extrait: Optional[str] = None
+    extracted_text: Optional[str] = None  # Changed from texte_extrait for API consistency
     file_exists: bool = True  # Whether the file exists on disk
     source_document_id: Optional[str] = None  # ID of parent document if this is derived
     is_derived: Optional[bool] = None  # True if this is a derived file
