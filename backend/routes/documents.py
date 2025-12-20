@@ -1260,6 +1260,18 @@ async def transcribe_document(
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
+        # Verify course exists
+        clean_course_id = course_id.replace("course:", "")
+        course_check = await service.query(
+            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+            {"course_id": clean_course_id}
+        )
+        if not course_check or len(course_check) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
         # Get document
         clean_id = doc_id.replace("document:", "")
         result = await service.query(
@@ -1282,6 +1294,14 @@ async def transcribe_document(
             )
 
         item = items[0]
+
+        # Verify document belongs to course
+        if item.get("course_id") != course_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Document does not belong to this course"
+            )
+
         file_path = item.get("file_path")
 
         if not file_path:
@@ -1410,6 +1430,18 @@ async def transcribe_document_workflow(
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
+        # Verify course exists
+        clean_course_id = course_id.replace("course:", "")
+        course_check = await service.query(
+            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+            {"course_id": clean_course_id}
+        )
+        if not course_check or len(course_check) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
         # Get document
         clean_id = doc_id.replace("document:", "")
         result = await service.query(
@@ -1432,6 +1464,14 @@ async def transcribe_document_workflow(
             )
 
         item = items[0]
+
+        # Verify document belongs to course
+        if item.get("course_id") != course_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Document does not belong to this course"
+            )
+
         file_path = item.get("file_path")
 
         if not file_path:
