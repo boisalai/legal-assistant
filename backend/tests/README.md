@@ -8,11 +8,12 @@ Les tests d'intégration utilisent maintenant un **serveur FastAPI réel** déma
 
 ## ✅ État actuel (2025-12-20)
 
-- **53 tests passent** (96%)
-- **2 tests skipped** (bugs de validation documentés)
-- **82 secondes** d'exécution (tests rapides)
-- **12% de couverture** de code (API endpoints)
+- **62 tests passent** (100% des tests non-skipped) ✅
+- **4 tests skipped** (tests ML avec données réelles)
+- **99 secondes** d'exécution
+- **14% de couverture** de code (API endpoints)
 
+**Session actuelle** : Correction des bugs de validation dans l'endpoint `/transcribe`
 **Détails complets** : Voir [`IMPLEMENTATION_SUMMARY.md`](./IMPLEMENTATION_SUMMARY.md)
 
 ## Installation des dépendances de test

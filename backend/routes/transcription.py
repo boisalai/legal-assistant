@@ -97,11 +97,25 @@ async def transcribe_document(
         if not service.db:
             await service.connect()
 
-        # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize IDs (support both case: and course: prefixes for backwards compatibility)
+        if not case_id.startswith("case:") and not case_id.startswith("course:"):
+            case_id = f"course:{case_id}"
+        if case_id.startswith("case:"):
+            case_id = case_id.replace("case:", "course:")
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
+
+        # Verify course exists
+        clean_case_id = case_id.replace("course:", "")
+        course_check = await service.query(
+            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+            {"course_id": clean_case_id}
+        )
+        if not course_check or len(course_check) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
 
         # Get document
         clean_id = doc_id.replace("document:", "")
@@ -124,6 +138,14 @@ async def transcribe_document(
             )
 
         item = items[0]
+
+        # Verify document belongs to course
+        if item.get("course_id") != case_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Document does not belong to this course"
+            )
+
         file_path = item.get("file_path")
 
         if not file_path:
@@ -224,11 +246,25 @@ async def transcribe_document_workflow(
         if not service.db:
             await service.connect()
 
-        # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize IDs (support both case: and course: prefixes for backwards compatibility)
+        if not case_id.startswith("case:") and not case_id.startswith("course:"):
+            case_id = f"course:{case_id}"
+        if case_id.startswith("case:"):
+            case_id = case_id.replace("case:", "course:")
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
+
+        # Verify course exists
+        clean_case_id = case_id.replace("course:", "")
+        course_check = await service.query(
+            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+            {"course_id": clean_case_id}
+        )
+        if not course_check or len(course_check) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
 
         # Get document
         clean_id = doc_id.replace("document:", "")
@@ -251,6 +287,14 @@ async def transcribe_document_workflow(
             )
 
         item = items[0]
+
+        # Verify document belongs to course
+        if item.get("course_id") != case_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Document does not belong to this course"
+            )
+
         file_path = item.get("file_path")
 
         if not file_path:

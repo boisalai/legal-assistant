@@ -282,7 +282,6 @@ class TestTranscriptionValidation:
     """Tests de validation pour la transcription."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="API doesn't validate course_id existence yet - see routes/documents.py:1258")
     async def test_transcribe_with_invalid_course_id(
         self, client: AsyncClient, test_course_with_audio: dict
     ):
@@ -293,11 +292,9 @@ class TestTranscriptionValidation:
             f"/api/courses/course:invalid/documents/{audio_doc['id']}/transcribe"
         )
 
-        # TODO: Should return 404 when course doesn't exist
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="API doesn't validate document belongs to course yet - see routes/documents.py:1284")
     async def test_transcribe_with_mismatched_course(
         self, client: AsyncClient, test_course_with_audio: dict
     ):
@@ -318,13 +315,8 @@ class TestTranscriptionValidation:
             f"/api/courses/{other_course['id']}/documents/{audio_doc['id']}/transcribe"
         )
 
-        # TODO: Should fail when document doesn't belong to course
-        # Should return 404/403/400
-        assert response.status_code in [
-            status.HTTP_404_NOT_FOUND,
-            status.HTTP_403_FORBIDDEN,
-            status.HTTP_400_BAD_REQUEST
-        ]
+        # Should fail when document doesn't belong to course
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
         # Cleanup
         await client.delete(f"/api/courses/{other_course['id']}")

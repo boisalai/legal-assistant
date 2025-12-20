@@ -89,11 +89,85 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ---
 
-## Dernière session (2025-12-20) - Tests d'intégration fonctionnels ✅
+## Dernière session (2025-12-20 PM) - Correction bugs validation `/transcribe` 🔐
 
 ### Objectif
 
-Exécuter et corriger les tests d'intégration créés lors de sessions précédentes pour atteindre un taux de réussite de 100%.
+Corriger les bugs de validation identifiés lors de la session précédente pour atteindre 100% de tests passants (55/55).
+
+### Résultats
+
+**État initial** : 53/55 tests passaient (96%), 2 tests skipped
+
+**État final** : ✅ **62/62 tests passent** (100% des tests non-skipped) ✅
+
+- ⏱️ **99 secondes** d'exécution
+- 📊 **14% de couverture** de code
+- 🔐 **Failles de sécurité corrigées** dans 2 endpoints
+
+### Problèmes corrigés
+
+#### 1. Validation `course_id` manquante
+**Fichiers** : `routes/documents.py`, `routes/transcription.py`
+**Problème** : Les endpoints `/transcribe` ne vérifiaient pas l'existence du `course_id`
+**Solution** :
+```python
+clean_course_id = course_id.replace("course:", "")
+course_check = await service.query(
+    "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
+    {"course_id": clean_course_id}
+)
+if not course_check or len(course_check) == 0:
+    raise HTTPException(status_code=404, detail="Course not found")
+```
+
+#### 2. Validation ownership du document
+**Fichiers** : `routes/documents.py`, `routes/transcription.py`
+**Problème** : Aucune vérification que le document appartient au cours demandé
+**Solution** :
+```python
+if item.get("course_id") != course_id:
+    raise HTTPException(status_code=403, detail="Document does not belong to this course")
+```
+
+#### 3. Duplication de routes `/transcribe`
+**Découverte** : Deux routers gèrent la même route :
+- `routes/documents.py` (nomenclature moderne : `course`)
+- `routes/transcription.py` (nomenclature obsolète : `case`)
+
+**Solution** : Corrections appliquées aux DEUX fichiers + support rétrocompatible `case:` → `course:`
+
+#### 4. Syntaxe SurrealDB incorrecte
+**Problème** : Utilisation de `WHERE id = $course_id` avec préfixe vs sans préfixe
+**Solution** : Utiliser systématiquement `type::thing('course', $clean_id)` avec ID sans préfixe
+
+### Impact sécurité
+
+Les bugs corrigés représentaient une **faille de sécurité critique** :
+- Un utilisateur pouvait transcrire n'importe quel document avec un `course_id` invalide
+- Un utilisateur pouvait accéder aux documents d'autres cours
+
+**Endpoints sécurisés** :
+- `POST /api/courses/{course_id}/documents/{doc_id}/transcribe`
+- `POST /api/courses/{course_id}/documents/{doc_id}/transcribe-workflow`
+
+### Fichiers modifiés
+
+- `backend/routes/documents.py` - Ajout validations course_id et ownership (2 endpoints)
+- `backend/routes/transcription.py` - Ajout validations + support rétrocompatible case/course (2 endpoints)
+- `backend/tests/test_transcription.py` - Retrait des `@pytest.mark.skip`
+
+### Leçon apprise
+
+**Gestion du serveur de test** : Le fixture `test_server` utilise `scope="session"`, donc le serveur ne redémarre pas entre les tests. Pour que les modifications de code soient prises en compte, il faut tuer manuellement le processus uvicorn avec `pkill -f "uvicorn main:app.*--port 8001"`.
+
+---
+
+## Session précédente (2025-12-20 AM) - Tests d'intégration fonctionnels ✅
+
+### Objectif
+
+Exécuter et corriger les tests d'intégration créés lors de sessions précédentes pour atteindre un taux de réussite initial élevé.
 
 ### Résultats
 
@@ -126,16 +200,6 @@ Exécuter et corriger les tests d'intégration créés lors de sessions précéd
 
 **Solution** : Tests marqués avec `@pytest.mark.skip` et bugs documentés avec références au code source.
 
-### Bugs identifiés dans le backend
-
-**⚠️ Faille de sécurité** - `routes/documents.py`, endpoint `/transcribe` :
-- **Ligne 1258** : `course_id` jamais vérifié dans la base de données
-- **Ligne 1284** : Document pas vérifié pour appartenance au cours
-
-**Impact** : Un utilisateur peut transcrire n'importe quel document en utilisant un `course_id` invalide ou différent.
-
-**Recommandation** : Voir `backend/tests/IMPLEMENTATION_SUMMARY.md` lignes 275-288 pour le code de correction suggéré.
-
 ### Fichiers modifiés
 
 - `backend/tests/conftest.py` - Timeout augmenté de 120s → 300s
@@ -153,11 +217,7 @@ Exécuter et corriger les tests d'intégration créés lors de sessions précéd
 2. Vérifier la **documentation de l'API** avant de modifier les tests
 3. Documenter les bugs identifiés avec références précises au code source
 
-### Prochaine étape recommandée
-
-Corriger les bugs de validation dans l'endpoint `/transcribe` pour activer les 2 tests skipped.
-
-**Commit :** À créer - "test: Fix integration test timeouts and SSE test assertions"
+**Commit :** `97955a6` - "test: Fix integration test timeouts and SSE test assertions"
 
 ---
 
