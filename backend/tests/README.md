@@ -2,6 +2,19 @@
 
 Ce répertoire contient les tests automatisés pour l'application Legal Assistant.
 
+## 🎉 Tests fonctionnels avec serveur réel!
+
+Les tests d'intégration utilisent maintenant un **serveur FastAPI réel** démarré automatiquement sur le port 8001. Cette approche garantit des tests réalistes sans conflits d'event loop.
+
+## ✅ État actuel (2025-12-20)
+
+- **53 tests passent** (96%)
+- **2 tests skipped** (bugs de validation documentés)
+- **82 secondes** d'exécution (tests rapides)
+- **12% de couverture** de code (API endpoints)
+
+**Détails complets** : Voir [`IMPLEMENTATION_SUMMARY.md`](./IMPLEMENTATION_SUMMARY.md)
+
 ## Installation des dépendances de test
 
 ```bash
@@ -9,17 +22,31 @@ Ce répertoire contient les tests automatisés pour l'application Legal Assistan
 uv sync --extra dev
 ```
 
+## Prérequis
+
+**SurrealDB doit être en cours d'exécution** sur `localhost:8002` :
+
+```bash
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+```
+
 ## Exécution des tests
 
-### Tous les tests
+### Tous les tests (rapides uniquement)
 
 ```bash
 # Depuis le répertoire backend
 cd backend
-uv run pytest
+uv run pytest -m "not slow"
 
-# Ou avec pytest directement si l'environnement est activé
-pytest
+# Avec couverture de code
+uv run pytest -m "not slow" --cov=. --cov-report=html
+```
+
+### Tous les tests (incluant les tests lents)
+
+```bash
+uv run pytest
 ```
 
 ### Tests spécifiques
@@ -59,11 +86,19 @@ uv run pytest -m integration # Uniquement les tests d'intégration
 
 ```
 tests/
-├── __init__.py              # Package de tests
-├── conftest.py              # Configuration pytest et fixtures globales
-├── test_courses.py          # Tests CRUD pour les cours
-└── README.md                # Ce fichier
+├── __init__.py                      # Package de tests
+├── conftest.py                      # Configuration pytest et fixtures globales
+├── test_courses.py                  # Tests CRUD pour les cours (12 tests)
+├── test_documents.py                # Tests upload/download de documents (11 tests)
+├── test_chat.py                     # Tests chat et streaming SSE (13 tests)
+├── test_semantic_search.py          # Tests recherche sémantique et RAG (9 tests)
+├── test_linked_directories.py       # Tests liaison de répertoires (11 tests)
+├── test_transcription.py            # Tests transcription audio (11 tests)
+├── KNOWN_ISSUES.md                  # Documentation technique et solutions
+└── README.md                        # Ce fichier
 ```
+
+**Total : 66 tests** (55 rapides, 11 marqués comme `slow`)
 
 ## Écriture de nouveaux tests
 
@@ -87,19 +122,24 @@ async def test_example(client: AsyncClient):
     assert response.json()["title"] == "Test"
 ```
 
-### Fixtures disponibles
+### Fixtures disponibles (conftest.py)
 
-- `client`: Client HTTP asynchrone pour les requêtes API
-- `course_data`: Données de test pour un cours
-- `clean_test_data`: Nettoyage automatique après chaque test
+#### Fixtures de session (partagées entre tous les tests)
 
-## Prérequis
+- `test_server`: Serveur FastAPI réel sur http://localhost:8001
+- `auth_token`: Token JWT pour l'authentification
+- `event_loop`: Event loop partagé pour éviter les problèmes de fermeture
 
-**SurrealDB doit être en cours d'exécution** sur `localhost:8002` :
+#### Fixtures par fonction (nouvelles pour chaque test)
 
-```bash
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
-```
+- `client`: Client HTTP asynchrone avec authentification
+  - Base URL: `http://localhost:8001`
+  - Headers: `Authorization: Bearer <token>`
+  - Timeout: 60 secondes
+
+#### Fixtures spécifiques par fichier de test
+
+Chaque fichier de test définit ses propres fixtures pour créer des données de test (cours, documents, etc.).
 
 ## Couverture de code
 

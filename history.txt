@@ -32,3 +32,4 @@ REMOVE TABLE case;
 -- Verify tables
 INFO FOR DB;
 SELECT id, title, course_code, professor FROM course;
+SELECT count() as total FROM embedding WHERE case_id = 'course:938c0203' GROUP ALL;

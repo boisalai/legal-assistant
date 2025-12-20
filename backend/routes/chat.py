@@ -13,7 +13,7 @@ from typing import Optional, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agno.agent import Agent
 
@@ -40,7 +40,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request body for chat endpoint."""
-    message: str
+    message: str = Field(..., min_length=1, description="Message cannot be empty")
     course_id: Optional[str] = None
     model_id: str = "ollama:qwen2.5:7b"
     history: list[ChatMessage] = []
@@ -730,7 +730,7 @@ async def get_chat_history(course_id: str, limit: int = 50, offset: int = 0):
     try:
         conv_service = get_conversation_service()
         messages = await conv_service.get_conversation_history(
-            course_id=course_id,
+            case_id=course_id,  # Service expects case_id parameter
             limit=limit,
             offset=offset
         )
@@ -762,7 +762,7 @@ async def clear_chat_history(course_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        success = await conv_service.clear_conversation(course_id=course_id)
+        success = await conv_service.clear_conversation(case_id=course_id)  # Service expects case_id parameter
 
         if success:
             return {"success": True, "message": "Historique effacé avec succès"}
@@ -795,7 +795,7 @@ async def get_chat_stats(course_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        stats = await conv_service.get_conversation_stats(course_id=course_id)
+        stats = await conv_service.get_conversation_stats(case_id=course_id)  # Service expects case_id parameter
 
         return {
             "course_id": course_id,

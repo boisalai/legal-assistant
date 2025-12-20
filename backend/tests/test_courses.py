@@ -9,25 +9,11 @@ Ce module teste:
 """
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient
 from fastapi import status
 
-from main import app
-
-
-@pytest.fixture
-async def client(auth_token):
-    """Fixture pour le client HTTP asynchrone avec authentification."""
-    headers = {}
-    if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        headers=headers
-    ) as client:
-        yield client
+# Note: client fixture is now provided by conftest.py
+# and uses a real test server instead of ASGITransport
 
 
 @pytest.fixture

@@ -38,7 +38,13 @@
       "Bash(chmod:*)",
       "Bash(nc:*)",
       "Bash(uv run pytest:*)",
-      "Bash(uv sync:*)"
+      "Bash(uv sync:*)",
+      "Bash(python -c:*)",
+      "Bash(timeout 10 uv run python:*)",
+      "Bash(timeout 5 uvicorn:*)",
+      "Bash(while ps aux)",
+      "Bash(do sleep 5)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

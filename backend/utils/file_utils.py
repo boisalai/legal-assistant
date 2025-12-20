@@ -120,7 +120,7 @@ def is_linkable_file(filename: str) -> bool:
 
 def scan_folder_for_files(folder_path: Path, max_files: int = MAX_LINKED_FILES) -> List[Path]:
     """
-    Scan a folder for linkable files (non-recursive).
+    Scan a folder for linkable files (recursive).
 
     Args:
         folder_path: Path to the folder to scan
@@ -132,19 +132,24 @@ def scan_folder_for_files(folder_path: Path, max_files: int = MAX_LINKED_FILES) 
     """
     files = []
 
-    try:
-        for item in folder_path.iterdir():
-            if len(files) >= max_files:
-                break
+    def scan_recursive(path: Path):
+        """Recursively scan directory for files."""
+        try:
+            for item in path.iterdir():
+                if len(files) >= max_files:
+                    break
 
-            # Skip hidden files and directories
-            if item.name.startswith('.'):
-                continue
+                # Skip hidden files and directories
+                if item.name.startswith('.'):
+                    continue
 
-            # Only process files (not subdirectories)
-            if item.is_file() and is_linkable_file(item.name):
-                files.append(item)
-    except Exception as e:
-        logger.error(f"Error scanning folder {folder_path}: {e}")
+                if item.is_file() and is_linkable_file(item.name):
+                    files.append(item)
+                elif item.is_dir():
+                    # Recursively scan subdirectories
+                    scan_recursive(item)
+        except Exception as e:
+            logger.error(f"Error scanning folder {path}: {e}")
 
+    scan_recursive(folder_path)
     return sorted(files, key=lambda p: p.name)
