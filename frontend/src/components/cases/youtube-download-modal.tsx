@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Youtube, Loader2, Download, Clock, User, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { documentsApi } from "@/lib/api";
 
 interface YouTubeDownloadModalProps {
@@ -42,6 +43,7 @@ export function YouTubeDownloadModal({
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadedTitle, setDownloadedTitle] = useState<string>("");
+  const [autoTranscribe, setAutoTranscribe] = useState(true); // Enabled by default
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -93,7 +95,7 @@ export function YouTubeDownloadModal({
     setError(null);
 
     try {
-      const result = await documentsApi.downloadYouTube(caseId, url);
+      const result = await documentsApi.downloadYouTube(caseId, url, autoTranscribe);
 
       if (result.success) {
         setDownloadedTitle(result.title || videoInfo?.title || "Audio");
@@ -119,6 +121,7 @@ export function YouTubeDownloadModal({
     setVideoInfo(null);
     setError(null);
     setDownloadedTitle("");
+    setAutoTranscribe(true); // Reset to default
     onClose();
   };
 
@@ -207,6 +210,28 @@ export function YouTubeDownloadModal({
             </div>
           )}
 
+          {/* Auto-transcribe option */}
+          {state === "preview" && (
+            <div className="flex items-center space-x-2 p-3 rounded-md border bg-muted/30">
+              <Checkbox
+                id="auto-transcribe"
+                checked={autoTranscribe}
+                onCheckedChange={(checked) => setAutoTranscribe(checked as boolean)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="auto-transcribe"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Transcrire automatiquement
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Lance la transcription Whisper après téléchargement
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Downloading */}
           {state === "downloading" && (
             <div className="flex flex-col items-center justify-center py-8 space-y-3">
@@ -214,7 +239,9 @@ export function YouTubeDownloadModal({
               <div className="text-center">
                 <p className="font-medium">Téléchargement en cours...</p>
                 <p className="text-sm text-muted-foreground">
-                  Extraction de l'audio et conversion en MP3
+                  {autoTranscribe
+                    ? "Extraction de l'audio et lancement de la transcription Whisper"
+                    : "Extraction de l'audio et conversion en MP3"}
                 </p>
               </div>
             </div>

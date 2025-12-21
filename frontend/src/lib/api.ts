@@ -759,13 +759,13 @@ export const documentsApi = {
     );
   },
 
-  async downloadYouTube(caseId: string, url: string): Promise<YouTubeDownloadResult> {
+  async downloadYouTube(caseId: string, url: string, autoTranscribe: boolean = false): Promise<YouTubeDownloadResult> {
     const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
     return fetchApi<YouTubeDownloadResult>(
       `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/youtube`,
       {
         method: "POST",
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, auto_transcribe: autoTranscribe }),
       }
     );
   },

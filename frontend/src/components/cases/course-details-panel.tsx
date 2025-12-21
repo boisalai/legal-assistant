@@ -20,6 +20,7 @@ import {
   Folder,
   RefreshCw,
   FileText,
+  Youtube,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -47,6 +48,7 @@ interface CaseDetailsPanelProps {
   onUploadDocuments: () => void;
   onRecordAudio: () => void;
   onLinkFile: () => void;
+  onYouTubeImport: () => void;
   onAnalyze?: () => void;
   onUpdateCase: (data: {
     description?: string;
@@ -74,6 +76,7 @@ export function CaseDetailsPanel({
   onUploadDocuments,
   onRecordAudio,
   onLinkFile,
+  onYouTubeImport,
   onUpdateCase,
   onDeleteDocument,
   onPreviewDocument,
@@ -563,6 +566,14 @@ export function CaseDetailsPanel({
           >
             <Mic className="h-4 w-4" />
             <span>Enregistrer un audio</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={onYouTubeImport}
+            className="gap-2"
+          >
+            <Youtube className="h-4 w-4" />
+            <span>YouTube</span>
           </Button>
           <Button
             size="sm"

@@ -13,6 +13,7 @@ import { DirectoryTreeView } from "@/components/cases/directory-tree-view";
 import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
+import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -36,6 +37,7 @@ export default function CourseDetailPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
+  const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
 
@@ -100,6 +102,10 @@ export default function CourseDetailPage() {
 
   const handleLinkFile = () => {
     setLinkDirectoryModalOpen(true);
+  };
+
+  const handleYouTubeImport = () => {
+    setYoutubeModalOpen(true);
   };
 
   const handleUploadComplete = async () => {
@@ -279,6 +285,7 @@ export default function CourseDetailPage() {
                   onUploadDocuments={handleUploadDocuments}
                   onRecordAudio={handleRecordAudio}
                   onLinkFile={handleLinkFile}
+                  onYouTubeImport={handleYouTubeImport}
                   onUpdateCase={handleUpdateCase}
                   onDeleteDocument={handleDeleteDocument}
                   onPreviewDocument={handlePreviewDocument}
@@ -328,6 +335,14 @@ export default function CourseDetailPage() {
           onOpenChange={setLinkDirectoryModalOpen}
           caseId={courseId}
           onLinkSuccess={handleUploadComplete}
+        />
+
+        {/* YouTube Download Modal */}
+        <YouTubeDownloadModal
+          open={youtubeModalOpen}
+          onClose={() => setYoutubeModalOpen(false)}
+          caseId={courseId}
+          onDownloadComplete={handleUploadComplete}
         />
       </div>
     </AppShell>

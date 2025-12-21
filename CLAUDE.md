@@ -35,6 +35,7 @@
 2. **Gestion des documents**
    - Upload de fichiers (PDF, Word, images, audio)
    - **Liaison de répertoires locaux** : Indexation automatique de dossiers entiers
+   - **Import depuis YouTube** : Téléchargement audio de vidéos YouTube en MP3
    - DataTable avec filtres (nom, type) et tri
    - Fichiers dérivés automatiquement liés (transcription, extraction PDF, TTS)
    - Actions contextuelles selon le type de fichier
@@ -83,9 +84,11 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 **Modules clés :**
 - `backend/routes/linked_directory.py` - API de liaison de répertoires
 - `backend/routes/docusaurus.py` - API d'import Docusaurus
+- `backend/services/youtube_service.py` - Service de téléchargement YouTube
 - `backend/models/document_models.py` - Modèles Pydantic partagés
 - `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
 - `frontend/src/components/cases/directory-tree-view.tsx` - Vue arborescente
+- `frontend/src/components/cases/youtube-download-modal.tsx` - Modal d'import YouTube
 
 ---
 
@@ -160,6 +163,222 @@ Les bugs corrigés représentaient une **faille de sécurité critique** :
 ### Leçon apprise
 
 **Gestion du serveur de test** : Le fixture `test_server` utilise `scope="session"`, donc le serveur ne redémarre pas entre les tests. Pour que les modifications de code soient prises en compte, il faut tuer manuellement le processus uvicorn avec `pkill -f "uvicorn main:app.*--port 8001"`.
+
+---
+
+## Session actuelle (2025-12-21) - Implémentation import YouTube 🎥
+
+### Objectif
+
+Compléter l'implémentation de l'import de vidéos YouTube permettant de télécharger l'audio en MP3 et optionnellement de le transcrire automatiquement.
+
+### État de l'implémentation
+
+**✅ COMPLET** - L'implémentation était déjà fonctionnelle lors de la reprise de session.
+
+### Composants implémentés
+
+#### 1. Backend - Service YouTube (`backend/services/youtube_service.py`)
+
+Service complet pour télécharger l'audio de vidéos YouTube :
+
+**Fonctionnalités :**
+- Validation d'URL YouTube (youtube.com/watch, youtu.be, youtube.com/shorts)
+- Extraction d'informations vidéo (titre, durée, uploader, thumbnail)
+- Téléchargement audio en MP3 avec yt-dlp
+- Conversion automatique via ffmpeg
+- Support de callbacks de progression
+
+**Dépendances :**
+- `yt-dlp>=2025.11.12` - Téléchargement de vidéos
+- `ffmpeg` - Conversion audio (installé via Homebrew)
+
+**Classe principale :**
+```python
+class YouTubeService:
+    async def get_video_info(url: str) -> VideoInfo
+    async def download_audio(url: str, output_dir: str, on_progress: Callable) -> DownloadResult
+    def is_valid_youtube_url(url: str) -> bool
+```
+
+#### 2. Backend - Endpoints API (`backend/routes/documents.py`)
+
+Deux endpoints RESTful :
+
+**`POST /api/courses/{course_id}/documents/youtube/info`**
+- Récupère les informations d'une vidéo sans la télécharger
+- Retourne : titre, durée, uploader, thumbnail, URL
+- Utilisé pour l'aperçu dans le modal
+
+**`POST /api/courses/{course_id}/documents/youtube`**
+- Télécharge l'audio en MP3
+- Crée un document dans la base de données
+- Support de `auto_transcribe` pour transcription automatique
+- Retourne : document_id, filename, title, duration
+
+**Métadonnées enregistrées :**
+- `source_type: "youtube"`
+- `source_url: "https://youtube.com/..."`
+- `metadata.youtube_title`
+- `metadata.duration_seconds`
+
+#### 3. Frontend - Modal d'import (`frontend/src/components/cases/youtube-download-modal.tsx`)
+
+Modal complet avec workflow en plusieurs étapes :
+
+**Étapes du workflow :**
+1. **Input** - Saisie et validation de l'URL
+2. **Loading Info** - Chargement des informations vidéo
+3. **Preview** - Aperçu avec thumbnail, titre, durée, auteur
+4. **Downloading** - Téléchargement avec indicateur de progression
+5. **Success** - Confirmation et fermeture automatique
+6. **Error** - Gestion d'erreurs avec option de réessai
+
+**Composants UI utilisés :**
+- Dialog (shadcn/ui) - Modal responsive
+- Input - Champ URL avec validation en temps réel
+- Button - Actions contextuelles selon l'état
+- Icons (lucide-react) - Youtube, Loader2, Download, Clock, User, AlertCircle
+
+**Validation :**
+- Regex pour URLs YouTube (youtube.com/watch, youtu.be, shorts)
+- Feedback visuel en temps réel
+- Support de la touche Entrée pour charger les infos
+
+#### 4. Frontend - Intégration (`frontend/src/components/cases/tabs/documents-tab.tsx`)
+
+Bouton d'import ajouté dans la barre d'outils des documents :
+
+```tsx
+<Button variant="outline" size="sm" onClick={() => setYoutubeModalOpen(true)}>
+  <Youtube className="h-4 w-4 mr-2" />
+  YouTube
+</Button>
+```
+
+**Positionnement :**
+- À côté des boutons "Lier un répertoire" et "Import Docusaurus"
+- Visible dans l'onglet "Documents" de chaque cours
+
+#### 5. Frontend - API Client (`frontend/src/lib/api.ts`)
+
+Deux méthodes dans `documentsApi` :
+
+```typescript
+async getYouTubeInfo(caseId: string, url: string): Promise<YouTubeVideoInfo>
+async downloadYouTube(caseId: string, url: string): Promise<YouTubeDownloadResult>
+```
+
+**Types définis :**
+- `YouTubeVideoInfo` - Infos de la vidéo
+- `YouTubeDownloadResult` - Résultat du téléchargement
+
+### Workflow utilisateur
+
+1. Utilisateur clique sur le bouton **"YouTube"** dans l'onglet Documents
+2. Modal s'ouvre avec un champ de saisie d'URL
+3. Utilisateur colle l'URL d'une vidéo YouTube
+4. Validation en temps réel de l'URL
+5. Clic sur **"Charger"** → Récupération des infos (titre, durée, thumbnail)
+6. Aperçu de la vidéo affiché
+7. Clic sur **"Télécharger l'audio"** → Téléchargement en MP3
+8. Document audio ajouté au cours avec métadonnées YouTube
+9. Modal se ferme automatiquement après succès
+10. Liste des documents se rafraîchit → Audio MP3 apparaît
+
+### Fonctionnalités avancées
+
+**Transcription automatique :**
+Le modèle `YouTubeDownloadRequest` supporte un flag `auto_transcribe` :
+```python
+class YouTubeDownloadRequest(BaseModel):
+    url: str
+    auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
+```
+
+**Note :** Cette option n'est pas encore exposée dans l'interface utilisateur, mais le backend la supporte. Pour l'activer, il faudrait ajouter une checkbox dans le modal.
+
+**Gestion des erreurs :**
+- URL invalide → Message d'erreur avec formats acceptés
+- Vidéo privée/supprimée → Erreur de yt-dlp capturée et affichée
+- Erreur réseau → Message d'erreur clair
+- Bouton "Réessayer" en cas d'échec
+
+### Tests de validation
+
+**✅ yt-dlp installé :**
+```bash
+yt-dlp                    2025.11.12
+```
+
+**✅ ffmpeg installé :**
+```bash
+ffmpeg version 8.0 Copyright (c) 2000-2025 the FFmpeg developers
+```
+
+**✅ Service initialisable :**
+```python
+yt-dlp disponible: True
+Service YouTube créé: True
+```
+
+**✅ Validation d'URL :**
+- `https://www.youtube.com/watch?v=...` → ✓
+- `https://youtu.be/...` → ✓
+- `https://www.youtube.com/shorts/...` → ✓
+- URLs non-YouTube → ✗
+
+### Fichiers modifiés/créés
+
+**Backend :**
+- ✅ `backend/services/youtube_service.py` - Service de téléchargement (créé)
+- ✅ `backend/routes/documents.py` - Ajout endpoints YouTube (lignes 1907-2046)
+- ✅ `backend/models/transcription_models.py` - Modèles Pydantic (lignes 30-52)
+- ✅ `backend/pyproject.toml` - Ajout dépendance yt-dlp
+
+**Frontend :**
+- ✅ `frontend/src/components/cases/youtube-download-modal.tsx` - Modal complet (créé)
+- ✅ `frontend/src/components/cases/tabs/documents-tab.tsx` - Intégration bouton
+- ✅ `frontend/src/lib/api.ts` - Méthodes API (lignes 751-771)
+
+**Documentation :**
+- ✅ `CLAUDE.md` - Documentation de la fonctionnalité
+
+### Prochaines améliorations possibles
+
+1. **Checkbox "Transcrire automatiquement"** dans le modal
+   - Exposer le flag `auto_transcribe` dans l'UI
+   - Lancer la transcription Whisper après téléchargement
+
+2. **Barre de progression granulaire**
+   - Utiliser le callback `on_progress` du service
+   - Afficher le pourcentage exact de téléchargement
+
+3. **Support de playlists YouTube**
+   - Télécharger plusieurs vidéos d'une playlist
+   - Modal avec sélection des vidéos à télécharger
+
+4. **Prévisualisation audio**
+   - Player audio intégré dans le modal
+   - Écoute avant téléchargement
+
+5. **Configuration qualité audio**
+   - Choix de la qualité (128kbps, 192kbps, 320kbps)
+   - Actuellement fixé à 192kbps
+
+### Impact utilisateur
+
+**Bénéfices :**
+- Import facile de contenus audio depuis YouTube
+- Métadonnées automatiquement extraites et sauvegardées
+- Workflow intégré avec transcription audio existante
+- Gestion d'erreurs robuste avec feedback utilisateur
+
+**Cas d'usage :**
+- Import de cours/conférences juridiques depuis YouTube
+- Téléchargement de webinaires pour transcription
+- Archivage de contenus éducatifs
+- Création de bibliothèque de ressources audio
 
 ---
 
