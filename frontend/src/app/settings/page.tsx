@@ -37,6 +37,10 @@ import {
 } from "lucide-react";
 import { settingsApi } from "@/lib/api";
 
+// Import SVG logos for embedding providers
+import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
+import OpenAILogo from "@/svg/openai.svg";
+
 const DEFAULT_EXTRACTION_METHODS = [
   { id: "pypdf", name: "PyPDF (Standard)", description: "Extraction basique, rapide", available: true },
   { id: "docling-standard", name: "Docling Standard", description: "Extraction avancée avec layout", available: false },
@@ -74,6 +78,17 @@ interface EmbeddingProviderInfo {
   cost?: string;
   models: EmbeddingModelInfo[];
   default: string;
+}
+
+// Helper function to get embedding provider logo
+function getEmbeddingProviderLogo(providerKey: string) {
+  switch (providerKey) {
+    case "openai":
+      return <OpenAILogo className="h-4 w-4 flex-shrink-0" />;
+    case "local":
+    default:
+      return <HuggingFaceLogo className="h-4 w-4 flex-shrink-0" />;
+  }
 }
 
 export default function SettingsPage() {
@@ -432,17 +447,46 @@ export default function SettingsPage() {
                     }}
                   >
                     <SelectTrigger id="embedding-model">
-                      <SelectValue placeholder="Sélectionner un modèle" />
+                      <SelectValue placeholder="Sélectionner un modèle">
+                        {(() => {
+                          // Find selected model and its provider
+                          for (const [providerKey, provider] of Object.entries(embeddingProviders)) {
+                            const model = provider.models.find(m => m.id === selectedEmbeddingModel);
+                            if (model) {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {getEmbeddingProviderLogo(providerKey)}
+                                  <span>
+                                    {model.name}
+                                    {model.recommended && " ⭐"}
+                                  </span>
+                                </div>
+                              );
+                            }
+                          }
+                          return "Sélectionner un modèle";
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(embeddingProviders).flatMap(([providerKey, provider]) =>
-                        provider.models.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.name}
-                            {model.recommended && " ⭐"}
-                          </SelectItem>
-                        ))
-                      )}
+                      {Object.entries(embeddingProviders).map(([providerKey, provider]) => (
+                        <div key={providerKey}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                            {provider.name}
+                          </div>
+                          {provider.models.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex items-center gap-2">
+                                {getEmbeddingProviderLogo(providerKey)}
+                                <span>
+                                  {model.name}
+                                  {model.recommended && " ⭐"}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

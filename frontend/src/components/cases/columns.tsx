@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import type { Course } from "@/types";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Pin, PinOff } from "lucide-react";
 
 export const createColumns = (
   onDelete: (id: string) => void,
@@ -69,10 +69,14 @@ export const createColumns = (
       const courseName = row.original.course_name;
       const title = row.getValue("title") as string;
       const displayText = courseName || title;
+      const isPinned = row.original.pinned;
       return (
-        <span className="text-sm">
-          {displayText}
-        </span>
+        <div className="flex items-center gap-2">
+          {isPinned && <Pin className="h-3 w-3 text-muted-foreground" />}
+          <span className="text-sm">
+            {displayText}
+          </span>
+        </div>
       );
     },
   },
@@ -133,6 +137,21 @@ export const createColumns = (
               onClick={() => navigator.clipboard.writeText(caseItem.id)}
             >
               {t("table.actions.copyId")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onTogglePin(caseItem.id)}
+            >
+              {caseItem.pinned ? (
+                <>
+                  <PinOff className="mr-2 h-4 w-4" />
+                  {t("table.actions.unpin")}
+                </>
+              ) : (
+                <>
+                  <Pin className="mr-2 h-4 w-4" />
+                  {t("table.actions.pin")}
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

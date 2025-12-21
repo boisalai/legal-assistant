@@ -33,7 +33,7 @@ class DocumentIndexingService:
         embedding_provider: str = "local",
         embedding_model: str = "BAAI/bge-m3",
         chunk_size: int = 400,
-        chunk_overlap: int = 50
+        chunk_overlap: int = 75  # Increased from 50 for better context continuity (18.75% overlap)
     ):
         """
         Initialise le service d'indexation.
@@ -255,7 +255,7 @@ class DocumentIndexingService:
         self,
         query_text: str,
         case_id: Optional[str] = None,
-        top_k: int = 5,
+        top_k: int = 7,  # Increased from 5 for better coverage of legal documents
         min_similarity: float = 0.5
     ) -> List[dict]:
         """

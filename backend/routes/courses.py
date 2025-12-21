@@ -58,6 +58,9 @@ class CourseResponse(BaseModel):
     credits: Optional[int] = None
     color: Optional[str] = None
 
+    # UI preferences
+    pinned: bool = False
+
 
 class CourseListResponse(BaseModel):
     """Response model for a list of courses/courses."""
@@ -166,14 +169,15 @@ async def list_courses(
             await service.connect()
 
         # Query courses for user (or all if no user)
+        # Sort by pinned first (true = 1, false = 0), then by created_at DESC
         if user_id:
             result = await service.query(
-                "SELECT * FROM course ORDER BY created_at DESC LIMIT $limit START $skip",
+                "SELECT * FROM course ORDER BY pinned DESC, created_at DESC LIMIT $limit START $skip",
                 {"limit": limit, "skip": skip}
             )
         else:
             result = await service.query(
-                "SELECT * FROM course ORDER BY created_at DESC LIMIT $limit START $skip",
+                "SELECT * FROM course ORDER BY pinned DESC, created_at DESC LIMIT $limit START $skip",
                 {"limit": limit, "skip": skip}
             )
 
@@ -207,6 +211,8 @@ async def list_courses(
                         professor=item.get("professor"),
                         credits=item.get("credits"),
                         color=item.get("color"),
+                        # UI preferences
+                        pinned=item.get("pinned", False),
                     ))
 
         return CourseListResponse(courses=courses, total=len(courses))
@@ -300,6 +306,8 @@ async def create_course(
             professor=created_case.get("professor"),
             credits=created_case.get("credits"),
             color=created_case.get("color"),
+            # UI preferences
+            pinned=created_case.get("pinned", False),
         )
 
     except HTTPException:
@@ -360,6 +368,8 @@ async def get_case(
             professor=item.get("professor"),
             credits=item.get("credits"),
             color=item.get("color"),
+            # UI preferences
+            pinned=item.get("pinned", False),
         )
 
     except HTTPException:
@@ -456,12 +466,89 @@ async def update_course(
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
             color=updated_item.get("color"),
+            # UI preferences
+            pinned=updated_item.get("pinned", False),
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating course: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.patch("/{course_id}/pin", response_model=CourseResponse)
+async def toggle_pin_course(
+    course_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Épingle ou dépingle un cours (bascule le statut pinned).
+    Les cours épinglés apparaissent en haut de la liste.
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
+
+        # Check existence
+        item = await get_course_by_id(service, course_id)
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cours non trouvé"
+            )
+
+        # Toggle pinned status
+        current_pinned = item.get("pinned", False)
+        new_pinned = not current_pinned
+
+        # Update in database
+        now = datetime.utcnow()
+        await service.merge(course_id, {"pinned": new_pinned, "updated_at": now})
+
+        # Fetch updated record
+        updated_item = await get_course_by_id(service, course_id)
+
+        logger.info(f"Course {'pinned' if new_pinned else 'unpinned'}: {course_id}")
+
+        # Convert datetime objects to ISO strings for response
+        created_at = updated_item.get("created_at", "")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+
+        updated_at = updated_item.get("updated_at")
+        if isinstance(updated_at, datetime):
+            updated_at = updated_at.isoformat()
+
+        return CourseResponse(
+            id=str(updated_item.get("id", course_id)),
+            title=updated_item.get("title", ""),
+            description=updated_item.get("description"),
+            keywords=updated_item.get("keywords", []),
+            created_at=created_at,
+            updated_at=updated_at,
+            # Academic fields
+            session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
+            course_code=updated_item.get("course_code"),
+            course_name=updated_item.get("course_name"),
+            professor=updated_item.get("professor"),
+            credits=updated_item.get("credits"),
+            color=updated_item.get("color"),
+            # UI preferences
+            pinned=updated_item.get("pinned", False),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling pin for course: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
