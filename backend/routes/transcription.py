@@ -18,12 +18,18 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from config.settings import settings
 from services.surreal_service import get_surreal_service
 from auth.helpers import require_auth
 from utils.file_utils import AUDIO_EXTENSIONS
+from models.transcription_models import (
+    TranscriptionResponse,
+    TranscribeWorkflowRequest,
+    YouTubeDownloadRequest,
+    YouTubeInfoResponse,
+    YouTubeDownloadResponse
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,48 +37,11 @@ router = APIRouter(prefix="/api/courses", tags=["Transcription"])
 
 
 # ============================================================================
-# Pydantic Models
+# Pydantic Models (imported from models.transcription_models)
 # ============================================================================
-
-class TranscriptionResponse(BaseModel):
-    """Réponse de transcription simple."""
-    success: bool
-    text: str = ""
-    language: str = ""
-    duration: float = 0.0
-    error: str = ""
-
-
-class TranscribeWorkflowRequest(BaseModel):
-    """Requête pour transcription avec workflow."""
-    language: str = "fr"
-    create_markdown: bool = True
-    raw_mode: bool = False  # Si True, pas de formatage LLM
-
-
-class YouTubeDownloadRequest(BaseModel):
-    """Requête pour télécharger l'audio d'une vidéo YouTube."""
-    url: str
-    auto_transcribe: bool = False
-
-
-class YouTubeInfoResponse(BaseModel):
-    """Informations sur une vidéo YouTube."""
-    title: str
-    duration: int
-    uploader: str
-    thumbnail: str
-    url: str
-
-
-class YouTubeDownloadResponse(BaseModel):
-    """Réponse du téléchargement YouTube."""
-    success: bool
-    document_id: str = ""
-    filename: str = ""
-    title: str = ""
-    duration: int = 0
-    error: str = ""
+# Note: TranscriptionResponse, TranscribeWorkflowRequest, YouTubeDownloadRequest,
+#       YouTubeInfoResponse, YouTubeDownloadResponse are imported from
+#       models.transcription_models
 
 
 # ============================================================================

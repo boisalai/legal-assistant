@@ -25,6 +25,15 @@ from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
 from utils.text_utils import remove_yaml_frontmatter
 from models.document_models import DocumentResponse, DocumentListResponse, RegisterDocumentRequest
+from models.transcription_models import (
+    ExtractionResponse,
+    TranscriptionResponse,
+    TranscribeWorkflowRequest,
+    YouTubeDownloadRequest,
+    YouTubeInfoResponse,
+    YouTubeDownloadResponse
+)
+from models.tts_models import TTSVoice, TTSRequest, TTSResponse
 from utils.file_utils import (
     ALLOWED_EXTENSIONS,
     LINKABLE_EXTENSIONS,
@@ -1059,13 +1068,6 @@ async def download_document(
 AUDIO_EXTENSIONS = {'.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.aac'}
 
 
-class ExtractionResponse(BaseModel):
-    success: bool
-    text: str = ""
-    method: str = ""
-    error: str = ""
-
-
 @router.post("/{course_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
 async def extract_document_text(
     course_id: str,
@@ -1228,14 +1230,6 @@ async def clear_document_text(
         )
 
 
-class TranscriptionResponse(BaseModel):
-    success: bool
-    text: str = ""
-    language: str = ""
-    duration: float = 0.0
-    error: str = ""
-
-
 @router.post("/{course_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
 async def transcribe_document(
     course_id: str,
@@ -1388,18 +1382,6 @@ async def transcribe_document(
 import json
 import asyncio
 from fastapi.responses import StreamingResponse
-
-
-class TranscribeWorkflowRequest(BaseModel):
-    language: str = "fr"
-    create_markdown: bool = True
-    raw_mode: bool = False  # Si True, pas de formatage LLM - juste la transcription Whisper brute
-
-
-class YouTubeDownloadRequest(BaseModel):
-    """Request pour télécharger l'audio d'une vidéo YouTube."""
-    url: str
-    auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
 
 
 @router.post("/{course_id}/documents/{doc_id}/transcribe-workflow")
@@ -1866,25 +1848,6 @@ async def extract_pdf_to_markdown(
 # YouTube Download
 # ============================================================================
 
-class YouTubeInfoResponse(BaseModel):
-    """Informations sur une vidéo YouTube."""
-    title: str
-    duration: int
-    uploader: str
-    thumbnail: str
-    url: str
-
-
-class YouTubeDownloadResponse(BaseModel):
-    """Réponse du téléchargement YouTube."""
-    success: bool
-    document_id: str = ""
-    filename: str = ""
-    title: str = ""
-    duration: int = 0
-    error: str = ""
-
-
 @router.post("/{course_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
 async def get_youtube_info(
     course_id: str,
@@ -2029,15 +1992,6 @@ async def download_youtube_audio(
 # TEXT-TO-SPEECH ENDPOINTS
 # ============================================================================
 
-class TTSVoice(BaseModel):
-    """Voix TTS disponible."""
-    name: str
-    locale: str
-    country: str
-    language: str
-    gender: str
-
-
 @router.get("/tts/voices", response_model=list[TTSVoice])
 async def list_tts_voices(
     user_id: Optional[str] = Depends(get_current_user_id)
@@ -2069,24 +2023,6 @@ async def list_tts_voices(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
-
-
-class TTSRequest(BaseModel):
-    """Request pour générer l'audio TTS d'un document."""
-    language: str = "fr"  # fr ou en
-    voice: Optional[str] = None  # Voix spécifique (optionnel)
-    gender: str = "female"  # female ou male
-    rate: str = "+0%"  # Vitesse de lecture (-50% à +100%)
-    volume: str = "+0%"  # Volume (-100% à +100%)
-
-
-class TTSResponse(BaseModel):
-    """Réponse de la génération TTS."""
-    success: bool
-    audio_url: str = ""
-    duration: float = 0.0
-    voice: str = ""
-    error: str = ""
 
 
 @router.post("/{course_id}/documents/{doc_id}/tts", response_model=TTSResponse)
