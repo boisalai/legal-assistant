@@ -174,6 +174,14 @@ export const coursesApi = {
     });
   },
 
+  // Toggle pinned status for a course
+  async togglePin(id: string): Promise<Course> {
+    const cleanId = id.replace("course:", "").replace("judgment:", "").replace("case:", "");
+    return fetchApi<Course>(`/api/courses/${encodeURIComponent(cleanId)}/pin`, {
+      method: "PATCH",
+    });
+  },
+
   // Delete course
   async delete(id: string): Promise<void> {
     // Remove "judgment:" prefix if present

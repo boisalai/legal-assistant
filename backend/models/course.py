@@ -29,6 +29,9 @@ class CourseBase(BaseModel):
     credits: int = Field(3, ge=1, le=12, description="Nombre de crédits (1-12)")
     color: Optional[str] = Field(None, description="Couleur pour l'UI (hex code)")
 
+    # UI preferences
+    pinned: bool = Field(False, description="Cours épinglé en haut de la liste")
+
 
 class CourseCreate(CourseBase):
     """Schema pour creer un nouveau cours."""
@@ -49,6 +52,9 @@ class CourseUpdate(BaseModel):
     professor: Optional[str] = None
     credits: Optional[int] = Field(None, ge=1, le=12)
     color: Optional[str] = None
+
+    # UI preferences (optional)
+    pinned: Optional[bool] = None
 
 
 class Course(CourseBase):

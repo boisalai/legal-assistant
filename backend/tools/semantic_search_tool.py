@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def semantic_search(
     case_id: str,
     query: str,
-    top_k: int = 5
+    top_k: int = 7  # Increased from 5 for better coverage of legal documents
 ) -> str:
     """
     Recherche sémantique dans les documents d'un cours.

@@ -13,6 +13,7 @@ Assistant d'études juridiques pour étudiants en droit avec IA conversationnell
 - **Upload de fichiers** : PDF, Word, images, audio
 - **Liaison de répertoires locaux** : Indexation automatique de dossiers entiers
 - **Import Docusaurus** : Import de documentation Markdown
+- **Import YouTube** : Téléchargement audio de vidéos YouTube en MP3
 - **Tracking intelligent** : Hash SHA-256 et détection de modifications
 - Actions contextuelles selon le type de fichier
 
@@ -202,6 +203,12 @@ Interface web > "Nouveau cours"
 - Sélectionner les dossiers à importer
 - Indexation automatique pour RAG
 
+**Import YouTube** :
+- Bouton "YouTube" dans l'onglet Documents
+- Coller l'URL d'une vidéo YouTube
+- Téléchargement automatique de l'audio en MP3
+- Métadonnées conservées (titre, durée, auteur)
+
 ### 3. Poser des questions
 
 ```
@@ -253,6 +260,8 @@ GET    /api/documents            # Liste des documents
 POST   /api/documents/upload     # Upload de fichiers
 POST   /api/linked-directories   # Lier un répertoire local
 POST   /api/docusaurus/import    # Importer depuis Docusaurus
+POST   /api/courses/{id}/documents/youtube/info    # Info vidéo YouTube
+POST   /api/courses/{id}/documents/youtube         # Télécharger audio YouTube
 
 POST   /api/transcribe           # Transcrire un audio
 POST   /api/tts                  # Générer une synthèse vocale

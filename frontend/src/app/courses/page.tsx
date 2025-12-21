@@ -72,7 +72,6 @@ export default function CasesListPage() {
 
   const handleTogglePin = async (id: string) => {
     try {
-      // @ts-ignore - TODO: Implement togglePin method in casesApi or remove this functionality
       const updatedCase = await casesApi.togglePin(id);
       setCases((prev) =>
         prev.map((c) => (c.id === id ? updatedCase : c))
