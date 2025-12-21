@@ -12,6 +12,8 @@ Endpoints:
 import logging
 import uuid
 import mimetypes
+import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -1379,10 +1381,6 @@ async def transcribe_document(
 # Transcription avec Workflow et SSE
 # ============================================================================
 
-import json
-import asyncio
-from fastapi.responses import StreamingResponse
-
 
 @router.post("/{course_id}/documents/{doc_id}/transcribe-workflow")
 async def transcribe_document_workflow(
@@ -1848,6 +1846,64 @@ async def extract_pdf_to_markdown(
 # YouTube Download
 # ============================================================================
 
+async def _auto_transcribe_youtube(
+    course_id: str,
+    doc_id: str,
+    file_path: str,
+    language: str = "fr"
+):
+    """
+    Helper function to auto-transcribe YouTube audio in background.
+    This runs asynchronously without blocking the HTTP response.
+    """
+    try:
+        from services.whisper_service import get_whisper_service, WHISPER_AVAILABLE
+        from datetime import datetime
+
+        if not WHISPER_AVAILABLE:
+            logger.error("Whisper service not available for auto-transcription")
+            return
+
+        if not Path(file_path).exists():
+            logger.error(f"Audio file not found for auto-transcription: {file_path}")
+            return
+
+        whisper_service = get_whisper_service()
+        logger.info(f"Auto-transcribing {file_path} (language={language})")
+
+        # Transcribe
+        transcription = await whisper_service.transcribe(file_path, language=language)
+
+        if not transcription.success:
+            logger.error(f"Auto-transcription failed: {transcription.error}")
+            return
+
+        # Update document with transcription
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        now = datetime.utcnow().isoformat()
+
+        await service.merge(doc_id, {
+            "texte_extrait": transcription.text,
+            "is_transcription": True,
+            "extraction_method": transcription.method,
+            "updated_at": now,
+            "metadata": {
+                "language": transcription.language,
+                "duration_seconds": transcription.duration,
+                "transcribed_at": now,
+                "auto_transcribed": True  # Flag to indicate auto-transcription
+            }
+        })
+
+        logger.info(f"Auto-transcription completed for {doc_id}: {len(transcription.text)} chars")
+
+    except Exception as e:
+        logger.error(f"Error in auto-transcription for {doc_id}: {e}", exc_info=True)
+
+
 @router.post("/{course_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
 async def get_youtube_info(
     course_id: str,
@@ -1969,6 +2025,17 @@ async def download_youtube_audio(
 
         await service.create("document", document_data, record_id=doc_id)
         logger.info(f"YouTube audio saved as document: {doc_id}")
+
+        # Auto-transcribe if requested
+        if request.auto_transcribe:
+            logger.info(f"Auto-transcribing YouTube audio: {doc_id}")
+            # Launch transcription in background (don't block the response)
+            asyncio.create_task(_auto_transcribe_youtube(
+                course_id=course_id,
+                doc_id=f"document:{doc_id}",
+                file_path=str(file_path.absolute()),
+                language="fr"  # Default to French
+            ))
 
         return YouTubeDownloadResponse(
             success=True,
