@@ -181,13 +181,11 @@ async def list_courses(
                 {"limit": limit, "skip": skip}
             )
 
-        # Parse results
+        # Parse results - SurrealDB query() returns a list of course dicts directly
         courses = []
         if result and len(result) > 0:
-            # SurrealDB query() returns a list of results directly
-            items = result
-            if isinstance(items, list):
-                for item in items:
+            # result is already a list of course dictionaries
+            for item in result:
                     # Convert datetime objects to ISO strings
                     created_at = item.get("created_at", "")
                     if isinstance(created_at, datetime):

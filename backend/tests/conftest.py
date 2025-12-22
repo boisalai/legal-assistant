@@ -12,6 +12,7 @@ import asyncio
 import pytest
 import httpx
 from typing import Generator
+from surrealdb import AsyncSurreal
 
 from services.surreal_service import init_surreal_service
 
@@ -22,6 +23,68 @@ os.environ["DATABASE_URL"] = "ws://localhost:8002"
 # Port pour le serveur de test (différent du port de développement)
 TEST_SERVER_PORT = 8001
 TEST_SERVER_URL = f"http://localhost:{TEST_SERVER_PORT}"
+
+
+# ============================================================================
+# Cleanup automatique des données de test
+# ============================================================================
+
+async def cleanup_test_data():
+    """
+    Nettoie les données de test de la base de données.
+
+    Supprime tous les cours qui ont :
+    - Un course_code commençant par "TEST"
+    - Un titre contenant "Test" ou "test"
+    - Un titre égal à "Cours minimal"
+    """
+    db = AsyncSurreal("http://localhost:8002")
+    await db.signin({"username": "root", "password": "root"})
+    await db.use("legal", "legal_db")
+
+    try:
+        # Get all courses
+        all_courses = await db.query("SELECT * FROM course")
+
+        # Filter test courses
+        test_courses = [
+            c for c in all_courses
+            if (c.get('course_code') or '').startswith('TEST')
+            or 'Test' in (c.get('title') or '')
+            or 'test' in (c.get('title') or '')
+            or c.get('title') == 'Cours minimal'
+        ]
+
+        # Delete test courses
+        for course in test_courses:
+            course_id = str(course.get('id'))
+            await db.delete(course_id)
+
+        if test_courses:
+            print(f"\n🧹 Nettoyage : {len(test_courses)} cours de test supprimés")
+
+    finally:
+        # Note: db.close() not implemented in AsyncHttpSurrealConnection
+        pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_after_tests():
+    """
+    Fixture qui nettoie automatiquement les données de test après TOUS les tests.
+
+    autouse=True : s'exécute automatiquement sans être explicitement appelée
+    scope="session" : s'exécute une fois après toute la session de tests
+    """
+    # Setup (avant les tests) - on ne fait rien
+    yield
+
+    # Teardown (après les tests) - on nettoie
+    print("\n" + "="*60)
+    print("🧹 NETTOYAGE AUTOMATIQUE DES DONNÉES DE TEST")
+    print("="*60)
+    asyncio.run(cleanup_test_data())
+    print("✅ Nettoyage terminé\n")
 
 
 # Create a session-scoped event loop to avoid "Event loop is closed" errors
