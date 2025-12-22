@@ -38,8 +38,11 @@ import {
 import { settingsApi } from "@/lib/api";
 
 // Import SVG logos for embedding providers
-import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
+import HuggingFaceLogo from "@/svg/hf-logo.svg";
 import OpenAILogo from "@/svg/openai.svg";
+import AnthropicLogo from "@/svg/anthropic.svg";
+import GeminiLogo from "@/svg/gemini.svg";
+import OllamaLogo from "@/svg/ollama.svg";
 
 const DEFAULT_EXTRACTION_METHODS = [
   { id: "pypdf", name: "PyPDF (Standard)", description: "Extraction basique, rapide", available: true },
@@ -82,9 +85,19 @@ interface EmbeddingProviderInfo {
 
 // Helper function to get embedding provider logo
 function getEmbeddingProviderLogo(providerKey: string) {
-  switch (providerKey) {
+  const normalizedProvider = providerKey.toLowerCase();
+
+  switch (normalizedProvider) {
     case "openai":
       return <OpenAILogo className="h-4 w-4 flex-shrink-0" />;
+    case "anthropic":
+    case "claude":
+      return <AnthropicLogo className="h-4 w-4 flex-shrink-0" />;
+    case "gemini":
+    case "google":
+      return <GeminiLogo className="h-4 w-4 flex-shrink-0" />;
+    case "ollama":
+      return <OllamaLogo className="h-4 w-4 flex-shrink-0" />;
     case "local":
     default:
       return <HuggingFaceLogo className="h-4 w-4 flex-shrink-0" />;
