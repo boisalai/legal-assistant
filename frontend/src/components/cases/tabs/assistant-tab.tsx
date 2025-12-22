@@ -21,6 +21,13 @@ import { TranscriptionProgress, useTranscriptionProgress } from "../transcriptio
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 import { useActivityTracker } from "@/lib/activity-tracker";
 
+// Import SVG logos for LLM providers
+import AnthropicLogo from "@/svg/anthropic.svg";
+import OpenAILogo from "@/svg/openai.svg";
+import HuggingFaceLogo from "@/svg/hf-logo.svg";
+import OllamaLogo from "@/svg/ollama.svg";
+import GeminiLogo from "@/svg/gemini.svg";
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -55,6 +62,30 @@ const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".aa
 function isAudioFile(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
   return AUDIO_EXTENSIONS.includes(ext);
+}
+
+// Helper function to get LLM provider logo
+function getLLMProviderLogo(provider?: string) {
+  if (!provider) return null;
+
+  const normalizedProvider = provider.toLowerCase();
+
+  switch (normalizedProvider) {
+    case "anthropic":
+    case "claude":
+      return <AnthropicLogo className="h-4 w-4 flex-shrink-0" />;
+    case "openai":
+      return <OpenAILogo className="h-4 w-4 flex-shrink-0" />;
+    case "ollama":
+      return <OllamaLogo className="h-4 w-4 flex-shrink-0" />;
+    case "mlx":
+      return <HuggingFaceLogo className="h-4 w-4 flex-shrink-0" />;
+    case "gemini":
+    case "google":
+      return <GeminiLogo className="h-4 w-4 flex-shrink-0" />;
+    default:
+      return null;
+  }
 }
 
 // Detect if user is asking for transcription
@@ -445,17 +476,28 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
           )}
         </div>
         <Select value={selectedModel} onValueChange={(value) => updateLLMSetting("modelId", value)}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Sélectionner un modèle" />
+          <SelectTrigger className="w-[280px]">
+            <SelectValue placeholder="Sélectionner un modèle">
+              {(() => {
+                const selectedModelData = models.find(m => m.id === selectedModel);
+                if (selectedModelData) {
+                  return (
+                    <div className="flex items-center gap-2">
+                      {getLLMProviderLogo(selectedModelData.provider)}
+                      <span>{selectedModelData.name}</span>
+                    </div>
+                  );
+                }
+                return "Sélectionner un modèle";
+              })()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {models.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 <div className="flex items-center gap-2">
+                  {getLLMProviderLogo(model.provider)}
                   <span>{model.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {model.provider}
-                  </Badge>
                 </div>
               </SelectItem>
             ))}

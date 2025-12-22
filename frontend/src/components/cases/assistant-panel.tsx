@@ -19,7 +19,7 @@ import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSo
 import { LLMSettingsModal } from "./llm-settings-modal";
 
 // Import SVG logos as React components
-import ClaudeLogo from "@/svg/claude-anthropic.svg";
+import AnthropicLogo from "@/svg/anthropic.svg";
 import OllamaLogo from "@/svg/ollama.svg";
 import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
 
@@ -217,7 +217,7 @@ export function AssistantPanel({
     if (modelId.startsWith("anthropic:")) {
       return {
         provider: "anthropic",
-        icon: <ClaudeLogo className="h-4 w-4 flex-shrink-0" />,
+        icon: <AnthropicLogo className="h-4 w-4 flex-shrink-0" />,
         label: "Claude"
       };
     } else if (modelId.startsWith("mlx:")) {

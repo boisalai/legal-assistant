@@ -11,7 +11,7 @@ import {
 import Image from "next/image";
 
 // Import SVG logos as React components
-import ClaudeLogo from "@/svg/claude-anthropic.svg";
+import AnthropicLogo from "@/svg/anthropic.svg";
 import OllamaLogo from "@/svg/ollama.svg";
 import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
 
@@ -126,7 +126,7 @@ function saveLLMConfig(config: LLMConfig): void {
 function getProviderIcon(provider: string, inDropdown: boolean = false) {
   switch (provider) {
     case "anthropic":
-      return <ClaudeLogo className="h-4 w-4 flex-shrink-0" />;
+      return <AnthropicLogo className="h-4 w-4 flex-shrink-0" />;
     case "mlx":
       return <HuggingFaceLogo className={`h-4 w-4 flex-shrink-0 ${inDropdown ? 'text-foreground' : 'text-white'}`} />;
     case "ollama":
