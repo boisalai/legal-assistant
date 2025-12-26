@@ -393,11 +393,15 @@ async def link_file_or_folder(
         )
 
     try:
+        # Get document service
+        doc_service = get_document_service()
+
+        # Get surreal service for indexing updates
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        # Normalize case ID (must match GET endpoint normalization)
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -451,9 +455,6 @@ async def link_file_or_folder(
                 file_hash = calculate_file_hash(file_path)
                 file_mtime = file_stat.st_mtime
 
-                # Generate document ID
-                doc_id = str(uuid.uuid4())[:8]
-
                 # Create linked source metadata
                 linked_source = {
                     "absolute_path": str(file_path.absolute()),
@@ -476,57 +477,39 @@ async def link_file_or_folder(
                     except Exception as e:
                         logger.warning(f"Could not read text from {file_path}: {e}")
 
-                # Create document record
-                document_data = {
-                    "course_id": course_id,
-                    "nom_fichier": file_path.name,
-                    "type_fichier": ext.lstrip('.'),
-                    "type_mime": get_mime_type(file_path.name),
-                    "taille": file_size,
-                    "file_path": str(file_path.absolute()),
-                    "user_id": user_id,
-                    "created_at": now,
-                    "source_type": "linked",
-                    "linked_source": linked_source,
-                    "texte_extrait": texte_extrait,
-                    "indexed": False  # Will be set to True after indexing
-                }
+                # Create document record using document service
+                document = await doc_service.create_document(
+                    course_id=course_id,
+                    filename=file_path.name,
+                    file_path=str(file_path.absolute()),
+                    file_size=file_size,
+                    file_type=ext.lstrip('.'),
+                    mime_type=get_mime_type(file_path.name),
+                    extracted_text=texte_extrait,
+                    source_type="linked",
+                    linked_source=linked_source
+                )
 
-                created_doc = await service.create("document", document_data, record_id=doc_id)
-                logger.info(f"Linked file: {file_path.name} -> document:{doc_id}")
+                logger.info(f"Linked file: {file_path.name} -> {document.id}")
 
                 # Index text content if available
                 if texte_extrait:
                     try:
                         indexing_service = DocumentIndexingService()
                         result = await indexing_service.index_document(
-                            document_id=f"document:{doc_id}",
+                            document_id=document.id,
                             course_id=course_id,
                             text_content=texte_extrait
                         )
 
                         if result.get("success"):
-                            await service.merge(f"document:{doc_id}", {"indexed": True})
-                            logger.info(f"Indexed document:{doc_id} with {result.get('chunks_created', 0)} chunks")
+                            await service.merge(document.id, {"indexed": True})
+                            logger.info(f"Indexed {document.id} with {result.get('chunks_created', 0)} chunks")
                     except Exception as e:
-                        logger.error(f"Error indexing document:{doc_id}: {e}")
+                        logger.error(f"Error indexing {document.id}: {e}")
 
                 # Add to response
-                linked_documents.append(DocumentResponse(
-                    id=f"document:{doc_id}",
-                    course_id=course_id,
-                    filename=file_path.name,
-                    file_type=ext.lstrip('.'),
-                    mime_type=get_mime_type(file_path.name),
-                    size=file_size,
-                    file_path=str(file_path.absolute()),
-                    created_at=now,
-                    source_type="linked",
-                    linked_source=linked_source,  # Include linked_source metadata
-                    extracted_text=texte_extrait[:500] + "..." if texte_extrait and len(texte_extrait) > 500 else texte_extrait,
-                    indexed=texte_extrait is not None,
-                    file_exists=True
-                ))
+                linked_documents.append(document)
 
             except Exception as e:
                 logger.error(f"Error linking file {file_path}: {e}")
@@ -867,54 +850,31 @@ async def extract_document_text(
     Pour les fichiers audio, utilisez l'endpoint /transcribe.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Normalize IDs
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
-
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
 
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
-        file_path = item.get("file_path")
-
-        if not file_path:
+        # Validate file exists
+        if not document.file_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Chemin du fichier non trouve"
             )
 
-        if not Path(file_path).exists():
+        if not Path(document.file_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier non trouve sur le disque"
             )
 
         # Check if it's an audio file (should use transcribe endpoint instead)
-        ext = Path(file_path).suffix.lower()
+        ext = Path(document.file_path).suffix.lower()
         if ext in AUDIO_EXTENSIONS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -925,24 +885,31 @@ async def extract_document_text(
         from services.document_extraction_service import get_extraction_service
 
         extraction_service = get_extraction_service()
-        extraction_result = await extraction_service.extract(file_path)
+        extraction_result = await extraction_service.extract(document.file_path)
 
         if not extraction_result.success:
-            logger.error(f"Extraction failed for {file_path}: {extraction_result.error}")
+            logger.error(f"Extraction failed for {document.file_path}: {extraction_result.error}")
             return ExtractionResponse(
                 success=False,
                 error=extraction_result.error or "Erreur d'extraction inconnue"
             )
 
-        # Update document with extracted text
+        # Update document with extracted text and metadata
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize document ID
+        normalized_doc_id = doc_id if doc_id.startswith("document:") else f"document:{doc_id}"
+
         now = datetime.utcnow().isoformat()
-        await service.merge(doc_id, {
+        await service.merge(normalized_doc_id, {
             "texte_extrait": extraction_result.text,
             "extraction_method": extraction_result.extraction_method,
             "updated_at": now,
         })
 
-        logger.info(f"Text extracted for document {doc_id}: {len(extraction_result.text)} chars via {extraction_result.extraction_method}")
+        logger.info(f"Text extracted for {normalized_doc_id}: {len(extraction_result.text)} chars via {extraction_result.extraction_method}")
 
         return ExtractionResponse(
             success=True,
