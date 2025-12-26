@@ -288,8 +288,10 @@ Si besoin de résultats visibles rapidement :
 - `24b5f0a` - refactor: Simplify routes/documents.py using DocumentService
 - `7e1ead2` - refactor: Simplify upload and register endpoints using DocumentService
 - `0494764` - refactor: Simplify link and extract endpoints using DocumentService
+- `811b141` - refactor: Simplify derived, download, and clear text endpoints using DocumentService
+- `ef1f086` - refactor: Simplify transcribe, extract-to-markdown, and TTS endpoints using DocumentService
 
-**Endpoints refactorisés (7/XX) :**
+**Endpoints refactorisés (13/XX) :**
 - ✅ `list_documents`: 210 → 113 lignes (~46% réduction)
 - ✅ `get_document`: 60 → 25 lignes (~58% réduction)
 - ✅ `delete_document`: Logique principale simplifiée
@@ -297,11 +299,18 @@ Si besoin de résultats visibles rapidement :
 - ✅ `register_document`: 98 → 70 lignes (~29% réduction)
 - ✅ `link_file_or_folder`: 198 → 180 lignes (~9% réduction)
 - ✅ `extract_document_text`: 103 → 87 lignes (~16% réduction)
+- ✅ `get_derived_documents`: 62 → 25 lignes (~60% réduction)
+- ✅ `download_document`: 78 → 56 lignes (~28% réduction)
+- ✅ `clear_document_text`: 55 → 49 lignes (~11% réduction)
+- ✅ `transcribe_document`: 143 → 107 lignes (~25% réduction)
+- ✅ `extract_to_markdown`: Document retrieval simplifié
+- ✅ `generate_tts`: Document retrieval simplifié
 
 **Impact réalisé :**
-- routes/documents.py: **2324 → 2076 lignes** (-248 lignes, -10.7%)
+- routes/documents.py: **2324 → 1951 lignes** (-373 lignes, -16.0%)
 - Meilleure séparation des responsabilités (HTTP vs Business logic)
 - Code plus maintenable et testable
 - Logique métier réutilisable via document_service
 - Moins de duplication de code
 - Réduction moyenne : ~25% par endpoint refactorisé
+- Pattern cohérent de récupération de documents
