@@ -26,6 +26,8 @@ from tools.transcription_tool import transcribe_audio, transcribe_audio_streamin
 from tools.document_search_tool import search_documents, list_documents
 from tools.entity_extraction_tool import extract_entities, find_entity
 from tools.semantic_search_tool import semantic_search, index_document_tool, get_index_stats
+from tools.caij_search_tool import search_caij_jurisprudence
+from tools.tutor_tools import generate_summary, generate_mindmap, generate_quiz, explain_concept
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,191 @@ class ChatResponse(BaseModel):
     model_used: str
     document_created: bool = False  # Indicates if a new document was created during the chat
     sources: list[DocumentSource] = []  # Sources consulted for RAG
+
+
+# Helper functions for tutor mode
+
+def _get_current_document_from_activities(activities: list) -> Optional[str]:
+    """
+    Parse activities to find the currently open document.
+
+    Args:
+        activities: List of activity dictionaries (newest first)
+
+    Returns:
+        document_id if a document is open, None otherwise
+    """
+    for activity in activities:
+        action_type = activity.get("action_type")
+        metadata = activity.get("metadata", {})
+
+        if action_type == "view_document":
+            # Found most recent view_document → document is open
+            return metadata.get("document_id")
+        elif action_type == "close_document":
+            # User closed a document, so no document is currently open
+            return None
+
+    return None  # No document viewing activity found
+
+
+def _parse_surreal_record(record: dict) -> Optional[dict]:
+    """
+    Parse a SurrealDB record response.
+
+    Args:
+        record: SurrealDB record response
+
+    Returns:
+        Parsed record data or None
+    """
+    if isinstance(record, dict):
+        if "result" in record and isinstance(record["result"], list) and len(record["result"]) > 0:
+            return record["result"][0]
+        elif "id" in record or "nom_fichier" in record:
+            # Direct record result
+            return record
+    elif isinstance(record, list) and len(record) > 0:
+        return record[0]
+
+    return None
+
+
+def _build_tutor_system_prompt(
+    case_data: Optional[dict],
+    documents: list,
+    activity_context: str,
+    current_document_id: Optional[str],
+    current_document: Optional[dict],
+    tools_desc: str
+) -> str:
+    """
+    Build context-aware tutor system prompt.
+
+    Args:
+        case_data: Course/case information
+        documents: List of documents in the course
+        activity_context: Recent activity context
+        current_document_id: ID of currently open document (if any)
+        current_document: Full document data (if any)
+        tools_desc: Description of available tools
+
+    Returns:
+        Complete system prompt for tutor mode
+    """
+    # Base tutor identity
+    base_prompt = """Tu es un tuteur pédagogique IA spécialisé dans l'accompagnement d'étudiants en droit.
+Ton rôle est d'aider l'étudiant à comprendre, mémoriser et maîtriser le contenu de ses cours."""
+
+    # Context-specific instructions
+    context_specific = ""
+    if current_document_id and current_document:
+        # TUTOR MODE: Document-focused
+        doc_name = current_document.get("nom_fichier", "document")
+        doc_preview = current_document.get("texte_extrait", "")[:2000]
+
+        context_specific = f"""
+
+📄 **CONTEXTE ACTUEL**: L'étudiant consulte actuellement le document "{doc_name}"
+
+**MODE TUTEUR - DOCUMENT SPÉCIFIQUE**:
+- L'étudiant étudie CE document en particulier
+- Focalise tes réponses sur le contenu de ce document
+- Utilise la méthode socratique: pose des questions pour guider sa réflexion
+- Encourage la compréhension active plutôt que la mémorisation passive
+- Propose des outils pédagogiques adaptés:
+  - 📝 Résumés (use tool: generate_summary)
+  - 🗺️ Cartes mentales (use tool: generate_mindmap)
+  - ❓ Quiz d'auto-évaluation (use tool: generate_quiz)
+  - 💡 Explications de concepts (use tool: explain_concept)
+
+**APPROCHE PÉDAGOGIQUE**:
+1. Comprendre d'abord ce que l'étudiant cherche à apprendre
+2. Évaluer son niveau de compréhension actuel par des questions
+3. Adapter ton niveau d'explication en conséquence
+4. Proposer des exemples concrets et des applications pratiques
+5. Vérifier la compréhension avant de passer au concept suivant
+
+**RÈGLES SPÉCIFIQUES**:
+- Si l'étudiant demande "résume ce document", utilise `generate_summary` avec document_id={current_document_id}
+- Si l'étudiant demande une "carte mentale", utilise `generate_mindmap` avec document_id={current_document_id}
+- Si l'étudiant veut "tester ses connaissances", utilise `generate_quiz` avec document_id={current_document_id}
+- Si l'étudiant demande "explique X", cherche TOUJOURS dans le document ouvert en priorité
+
+**CONTENU DU DOCUMENT ACTUEL** (aperçu):
+{doc_preview}...
+"""
+    else:
+        # TUTOR MODE: Course-wide
+        course_title = case_data.get("title", "ce cours") if case_data else "ce cours"
+        num_docs = len(documents)
+
+        context_specific = f"""
+
+📚 **CONTEXTE ACTUEL**: L'étudiant travaille sur le cours "{course_title}"
+Nombre de documents disponibles: {num_docs}
+
+**MODE TUTEUR - COURS COMPLET**:
+- L'étudiant étudie l'ensemble du cours
+- Aide-le à naviguer entre les différents documents
+- Propose une vue d'ensemble des concepts couverts
+- Guide-le vers les documents pertinents selon ses questions
+- Utilise les outils pédagogiques pour consolider l'apprentissage:
+  - 📝 Résumés du cours complet (use tool: generate_summary sans document_id)
+  - 🗺️ Carte mentale globale (use tool: generate_mindmap sans document_id)
+  - ❓ Quiz global (use tool: generate_quiz sans document_id)
+
+**APPROCHE PÉDAGOGIQUE**:
+1. Identifier les lacunes de connaissance
+2. Suggérer un parcours d'apprentissage logique
+3. Connecter les concepts entre différents documents
+4. Créer une vision cohérente du cours
+
+**RÈGLES SPÉCIFIQUES**:
+- Si l'étudiant demande "résume le cours", utilise `generate_summary` sans document_id
+- Suggère d'ouvrir un document spécifique si la question nécessite une lecture approfondie
+- Utilise `semantic_search` pour trouver dans quel document se trouve l'information recherchée
+"""
+
+    # Combine all parts
+    full_prompt = f"""{base_prompt}
+
+{context_specific}
+
+{activity_context}
+
+**RÈGLE ABSOLUE - RÉPONSES BASÉES UNIQUEMENT SUR LES DOCUMENTS**:
+- Tu dois TOUJOURS chercher la réponse dans les documents disponibles en utilisant `semantic_search`
+- NE JAMAIS répondre avec tes propres connaissances générales
+- Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents disponibles."
+
+**RÈGLE ABSOLUE - CITATION DES SOURCES**:
+- TOUJOURS indiquer la source de chaque information dans ta réponse
+- Format obligatoire : "Selon [nom du fichier], ..." ou "D'après [nom du fichier], ..."
+
+{tools_desc}
+
+**OUTILS DISPONIBLES**:
+- **generate_summary**: Génère un résumé pédagogique structuré
+- **generate_mindmap**: Crée une carte mentale en markdown avec emojis
+- **generate_quiz**: Génère un quiz interactif avec explications
+- **explain_concept**: Explique un concept de manière détaillée avec exemples
+- **semantic_search**: Recherche sémantique (OUTIL PRINCIPAL) - comprend le sens de la question
+- **search_documents**: Recherche par mots-clés exacts
+- **list_documents**: Liste tous les documents disponibles
+- **search_caij_jurisprudence**: Recherche de jurisprudence québécoise sur CAIJ
+
+**MÉTHODE SOCRATIQUE** (à privilégier):
+Au lieu de donner directement la réponse, pose des questions qui guident l'étudiant:
+- "Qu'est-ce que tu comprends déjà sur ce sujet?"
+- "As-tu remarqué que le document mentionne...?"
+- "Quelle est la différence entre X et Y selon toi?"
+- "Peux-tu identifier les éléments essentiels?"
+
+Sois encourageant, patient et adapte-toi au rythme de l'étudiant.
+"""
+
+    return full_prompt
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -124,62 +311,12 @@ async def chat(request: ChatRequest):
             except Exception as e:
                 logger.warning(f"Could not get activity context: {e}")
 
-        # System prompt
-        system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
-
-**RÈGLE ABSOLUE - RÉPONSES BASÉES UNIQUEMENT SUR LES DOCUMENTS**:
-- Tu dois TOUJOURS chercher la réponse dans les documents disponibles en utilisant `semantic_search`
-- NE JAMAIS répondre avec tes propres connaissances générales
-- Si la recherche sémantique ne trouve rien de pertinent, dis clairement : "Je n'ai pas trouvé d'information pertinente sur ce sujet dans les documents disponibles."
-- Même pour des questions générales (ex: "Qu'est-ce que le notariat?"), cherche TOUJOURS dans les documents d'abord
-
-**RÈGLE ABSOLUE - CITATION DES SOURCES**:
-- TOUJOURS indiquer la source de chaque information dans ta réponse
-- Format obligatoire : "Selon [nom du fichier], ..." ou "D'après [nom du fichier], ..."
-- Exemple : "Selon Carter.pdf, l'arrêt Carter c. Canada établit que..."
-- Si plusieurs sources, les citer toutes : "D'après Document1.md et Document2.pdf, ..."
-- NE JAMAIS présenter une information sans citer sa source
-
-{activity_context}
-
-Directives générales:
-- Réponds toujours en français
-- Sois concis mais complet
-- Base-toi UNIQUEMENT sur les documents disponibles
-- Adapte ton expertise au contexte (juridique, académique, technique, etc.)
-- **CITE TOUJOURS tes sources dans chaque phrase**
-
-{tools_desc}
-
-Outils disponibles pour toi:
-- **transcribe_audio**: Transcris un fichier audio en texte
-- **search_documents**: Recherche par mots-clés exacts dans tous les documents
-- **semantic_search**: Recherche sémantique (comprend le sens de la question) - OUTIL PRINCIPAL À UTILISER
-- **list_documents**: Liste tous les documents disponibles
-- **extract_entities**: Extrait des entités structurées (personnes, dates, montants, références)
-- **find_entity**: Recherche une entité spécifique et affiche tous les contextes
-- **index_document_tool**: Indexe manuellement un document pour la recherche sémantique
-- **get_index_stats**: Affiche les statistiques de l'index de recherche sémantique
-
-Quand utiliser les outils - RÈGLES IMPORTANTES:
-
-**RÈGLE #1 - TOUJOURS utiliser la recherche sémantique**:
-- Pour TOUTE question (générale ou spécifique), utilise `semantic_search` en premier
-- Exemples : "Qu'est-ce que le notariat?", "Explique-moi X", "Quel est le prix?", "Résume ce document"
-- Si `semantic_search` ne trouve rien, informe l'utilisateur que l'information n'est pas dans les documents
-
-**RÈGLE #2 - Choix de l'outil de recherche**:
-- `semantic_search`: OUTIL PAR DÉFAUT pour toute question (comprend le sens)
-- `search_documents`: Seulement si l'utilisateur demande explicitement de chercher un mot/phrase EXACT
-
-**RÈGLE #3 - Autres outils**:
-- `list_documents`: Si l'utilisateur demande "quels documents sont disponibles"
-- `transcribe_audio`: Si l'utilisateur demande de transcrire un fichier audio
-- `extract_entities`: Pour extraire des informations structurées des documents
-- `find_entity`: Pour chercher où une entité spécifique est mentionnée
-- `get_index_stats`: Pour vérifier l'état de l'indexation
-
-**En résumé**: Utilise TOUJOURS `semantic_search` pour répondre aux questions. Ne réponds JAMAIS avec tes connaissances générales."""
+        # Initialize variables for tutor mode
+        case_data = None
+        documents = []
+        current_document_id = None
+        current_document = None
+        system_content = ""  # Will be built later
 
         # If we have a course_id, try to get case context
         if request.course_id:
@@ -389,8 +526,54 @@ Contenu des documents:"""
 - Nombre de documents: 0"""
 
                         logger.info(f"Added case context for {case_name} with {len(documents)} documents")
+
+                        # NEW: Detect currently open document from activities
+                        current_document_id = None
+                        current_document = None
+
+                        if activity_context:
+                            try:
+                                # Get raw activities to parse
+                                activities_raw = await activity_service.get_recent_activities(
+                                    course_id=request.course_id,
+                                    limit=20
+                                )
+                                current_document_id = _get_current_document_from_activities(activities_raw)
+
+                                # If document is open, fetch full document data
+                                if current_document_id:
+                                    doc_result = await service.query(f"SELECT * FROM {current_document_id}")
+                                    if doc_result and len(doc_result) > 0:
+                                        current_document = _parse_surreal_record(doc_result[0])
+                                        logger.info(f"✅ Tutor mode: Document '{current_document.get('nom_fichier')}' is currently open")
+                                else:
+                                    logger.info("✅ Tutor mode: No document open, course-wide context")
+                            except Exception as e:
+                                logger.warning(f"Could not detect current document: {e}")
+
+                        # Replace system_content with tutor-aware prompt
+                        system_content = _build_tutor_system_prompt(
+                            case_data=case_data,
+                            documents=documents,
+                            activity_context=activity_context,
+                            current_document_id=current_document_id,
+                            current_document=current_document,
+                            tools_desc=tools_desc
+                        )
+
             except Exception as e:
                 logger.warning(f"Could not get case context: {e}", exc_info=True)
+        else:
+            # No course_id provided - build tutor prompt without course context
+            logger.info("No course_id provided - using tutor mode without course context")
+            system_content = _build_tutor_system_prompt(
+                case_data=None,
+                documents=[],
+                activity_context=activity_context,
+                current_document_id=None,
+                current_document=None,
+                tools_desc=tools_desc
+            )
 
         # Build the conversation prompt
         conversation_prompt = ""
@@ -412,6 +595,7 @@ Contenu des documents:"""
             model=model,
             instructions=system_content,
             tools=[
+                # Existing tools
                 transcribe_audio,
                 search_documents,
                 semantic_search,
@@ -419,7 +603,13 @@ Contenu des documents:"""
                 extract_entities,
                 find_entity,
                 index_document_tool,  # Tool name: "index_document"
-                get_index_stats
+                get_index_stats,
+                search_caij_jurisprudence,  # Recherche jurisprudence québécoise
+                # NEW: Tutor tools for pedagogical support
+                generate_summary,         # Generate pedagogical summaries
+                generate_mindmap,         # Create mind maps with emojis
+                generate_quiz,            # Generate interactive quizzes
+                explain_concept,          # Explain legal concepts in detail
             ],
             markdown=True,
         )
