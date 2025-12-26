@@ -226,9 +226,29 @@ Si besoin de résultats visibles rapidement :
 ## 📝 Notes de suivi
 
 ### 2025-12-26
-- ✅ Création de la roadmap
-- 🚀 Démarrage Phase 1
+
+#### Phase 1 Complétée ✅ (1h15)
+
+**1.1 Commits effectués :**
+- ✅ Migration 004 : Ajout du champ `pinned` à la table `course`
+- ✅ Modèles : Suppression de `course_name` dupliqué, ajout de `serialization_alias`
+- ✅ Settings UI : Paramètres LLM avancés (temperature, max_tokens, top_p)
+- ✅ Logos : Ajout de Meta, Mistral, Qwen + mise à jour Anthropic, Ollama, OpenAI
+- ✅ Roadmap : Création de `docs/ROADMAP_2025.md`
+- ✅ i18n : Mise à jour des messages EN/FR
+
+**1.2 Nettoyage effectué :**
+- ✅ Ajout de 11 patterns au `.gitignore` pour fichiers temporaires
+- ✅ Suppression de 3 fichiers de test CAIJ obsolètes
+- ✅ Suppression de tous les fichiers temporaires (logs, screenshots, debug)
+
+**Commits créés :**
+1. `6f8879c` - feat: Add course pinning, LLM advanced settings, and provider logos
+2. `57431f1` - chore: Clean up temporary development files
+
+**État du repo :**
+- Propre et à jour
+- Prêt pour la Phase 2
 
 ### À venir
-- [ ] Phase 1 complétée
-- [ ] Phase 2 démarrée
+- [ ] Phase 2 : Dette technique (Refactoring DocumentResponse + simplification documents.py)
