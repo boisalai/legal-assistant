@@ -305,7 +305,7 @@ async def chat(request: ChatRequest):
             try:
                 activity_service = get_activity_service()
                 activity_context = await activity_service.get_activity_context(
-                    course_id=request.course_id,
+                    case_id=request.course_id,
                     limit=20  # Show last 20 activities for context
                 )
             except Exception as e:
@@ -381,16 +381,23 @@ Contexte actuel:
                         if docs_result and len(docs_result) > 0:
                             # Handle different SurrealDB response formats
                             first_item = docs_result[0]
+                            logger.info(f"🔍 DEBUG: first_item type={type(first_item)}, keys={first_item.keys() if isinstance(first_item, dict) else 'N/A'}")
+
                             if isinstance(first_item, dict):
                                 if "result" in first_item:
                                     # Format: [{"result": [...]}]
                                     documents = first_item["result"] if isinstance(first_item["result"], list) else []
+                                    logger.info(f"🔍 DEBUG: Found documents in 'result' key: {len(documents)}")
                                 elif "id" in first_item or "nom_fichier" in first_item:
                                     # Format: [{doc1}, {doc2}, ...] - direct list of documents
                                     documents = docs_result
+                                    logger.info(f"🔍 DEBUG: Found documents as direct list: {len(documents)}")
                             elif isinstance(first_item, list):
                                 # Format: [[doc1, doc2, ...]]
                                 documents = first_item
+                                logger.info(f"🔍 DEBUG: Found documents as nested list: {len(documents)}")
+                        else:
+                            logger.warning(f"🔍 DEBUG: docs_result is empty or None: {docs_result}")
 
                         logger.info(f"Parsed {len(documents)} documents")
 
@@ -535,7 +542,7 @@ Contenu des documents:"""
                             try:
                                 # Get raw activities to parse
                                 activities_raw = await activity_service.get_recent_activities(
-                                    course_id=request.course_id,
+                                    case_id=request.course_id,
                                     limit=20
                                 )
                                 current_document_id = _get_current_document_from_activities(activities_raw)
@@ -636,13 +643,13 @@ Contenu des documents:"""
                 conv_service = get_conversation_service()
                 # Save user message
                 await conv_service.save_message(
-                    course_id=request.course_id,
+                    case_id=request.course_id,
                     role="user",
                     content=request.message
                 )
                 # Save assistant response
                 await conv_service.save_message(
-                    course_id=request.course_id,
+                    case_id=request.course_id,
                     role="assistant",
                     content=assistant_message,
                     model_id=request.model_id,
@@ -756,7 +763,7 @@ async def _handle_transcription_stream(request: ChatRequest) -> AsyncGenerator[s
     try:
         # Run the transcription
         result = await transcribe_audio_streaming(
-            course_id=request.course_id,
+            case_id=request.course_id,
             audio_filename=audio_filename,
             language="fr"
         )
