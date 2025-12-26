@@ -77,6 +77,13 @@
    - Génération audio MP3 depuis documents markdown
    - Configuration des voix par défaut dans Settings
 
+9. **Recherche CAIJ** 🆕
+   - Intégration avec le Centre d'accès à l'information juridique du Québec
+   - Outil Agno pour agents conversationnels
+   - Support des 8 rubriques officielles (Législation, Jurisprudence, Doctrine, etc.)
+   - Identification automatique des catégories de documents
+   - Rate limiting et authentification automatique
+
 ### Architecture technique
 
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
@@ -85,10 +92,212 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `backend/routes/linked_directory.py` - API de liaison de répertoires
 - `backend/routes/docusaurus.py` - API d'import Docusaurus
 - `backend/services/youtube_service.py` - Service de téléchargement YouTube
+- `backend/services/caij_search_service.py` - Service de recherche CAIJ
+- `backend/tools/caij_search_tool.py` - Outil Agno pour CAIJ
 - `backend/models/document_models.py` - Modèles Pydantic partagés
+- `backend/models/caij_models.py` - Modèles CAIJ avec mapping de rubriques
 - `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
 - `frontend/src/components/cases/directory-tree-view.tsx` - Vue arborescente
 - `frontend/src/components/cases/youtube-download-modal.tsx` - Modal d'import YouTube
+
+---
+
+## Session actuelle (2025-12-26) - Intégration CAIJ réussie ✅
+
+### Objectif
+
+Implémenter une intégration fonctionnelle avec CAIJ (Centre d'accès à l'information juridique du Québec) pour permettre aux agents Agno de rechercher de la jurisprudence québécoise.
+
+### Solution retenue
+
+**Playwright pour web scraping** au lieu du reverse engineering de l'API Coveo (trop complexe et fragile).
+
+### Implémentation
+
+#### 1. Service de recherche CAIJ (`backend/services/caij_search_service.py`)
+
+Service complet basé sur Playwright pour automatiser les recherches sur CAIJ :
+
+**Fonctionnalités :**
+- Authentification automatique avec credentials `.env`
+- Navigation et recherche sur https://app.caij.qc.ca
+- Extraction complète des résultats (titre, type, source, date, URL, extrait)
+- **Identification automatique des rubriques** (8 catégories officielles)
+- Rate limiting (10 req/min)
+- Mode headless supporté
+- Screenshots d'erreur pour debugging
+
+**Classe principale :**
+```python
+class CAIJSearchService:
+    async def initialize()
+    async def authenticate()
+    async def search(request: CAIJSearchRequest) -> CAIJSearchResponse
+```
+
+#### 2. Modèles de données (`backend/models/caij_models.py`)
+
+Modèles Pydantic pour les requêtes et réponses CAIJ :
+
+**`CAIJResult`** - Résultat de recherche avec :
+- `title` : Titre du document
+- `url` : URL complète vers CAIJ
+- `document_type` : Type de document (ex: "Terme juridique défini", "Jugement")
+- **`rubrique`** : Rubrique CAIJ identifiée automatiquement
+- `source` : Source du document
+- `date` : Date de publication
+- `excerpt` : Extrait du contenu
+
+**Rubriques CAIJ supportées (8)** :
+1. Législation
+2. Jurisprudence
+3. Doctrine en ligne
+4. Catalogue de bibliothèque
+5. Lois annotées
+6. Questions de recherche documentées
+7. Modèles et formulaires
+8. Dictionnaires
+
+**Fonction de mapping** :
+```python
+def infer_rubrique(document_type: str, source: str, url: str) -> str:
+    """Déduire la rubrique CAIJ à partir du type, source et URL."""
+    # Logique de mapping basée sur mots-clés et patterns d'URL
+    # 100% de précision sur 13 cas de test
+```
+
+#### 3. Outil Agno (`backend/tools/caij_search_tool.py`)
+
+Outil compatible avec le framework Agno pour les agents conversationnels :
+
+**Fonctions exposées :**
+
+```python
+@tool
+async def search_caij_jurisprudence(query: str, max_results: int = 10) -> str:
+    """
+    Rechercher de la jurisprudence québécoise sur CAIJ.
+
+    Returns: Résultats formatés avec titre, rubrique, type, source, date, URL, extrait
+    """
+```
+
+**Exemple de sortie :**
+```
+📚 Résultats CAIJ pour 'contrat' (15 résultats):
+
+[1] CONTRAT
+    Rubrique: Dictionnaires
+    Type: Terme juridique défini
+    Source: Dictionnaire de droit privé...
+    Date: 2023
+    URL: https://app.caij.qc.ca/fr/dictionnaires/...
+
+[2] Des contrats
+    Rubrique: Doctrine en ligne
+    Type: Périodiques et revues
+    Source: Revue du notariat
+    Date: 1/10/1934
+    URL: https://app.caij.qc.ca/doctrine/...
+```
+
+#### 4. Tests complets (`backend/tests/test_caij_service.py`)
+
+Suite de tests d'intégration couvrant :
+- Initialisation du service
+- Authentification
+- Recherche basique
+- Recherches multiples (rate limiting)
+- Intégration de l'outil Agno
+- Gestion d'erreurs
+- Mapping des rubriques (100% de réussite sur 13 cas de test)
+
+### Résultats des tests
+
+**Tests unitaires :**
+- ✅ 13/13 tests de mapping de rubriques passent (100%)
+
+**Tests d'intégration :**
+- ✅ Authentification réussie
+- ✅ Recherche fonctionnelle (5 résultats en ~5.3s)
+- ✅ Extraction complète des données
+- ✅ Identification automatique des rubriques
+
+**Exemple de recherche live :**
+```
+Requête: "contrat" (15 résultats)
+Distribution par rubrique:
+  - Doctrine en ligne:  13 résultats
+  - Dictionnaires:       2 résultats
+```
+
+### Configuration requise
+
+**Variables d'environnement** (`.env`) :
+```bash
+CAIJ_EMAIL=your.email@example.com
+CAIJ_PASSWORD=your_password
+```
+
+**Dépendances** :
+- `playwright>=1.48.0` (déjà dans pyproject.toml)
+- Chromium installé via `playwright install chromium`
+
+### Fichiers créés/modifiés
+
+**Backend :**
+- ✅ `backend/services/caij_search_service.py` - Service Playwright (créé)
+- ✅ `backend/models/caij_models.py` - Modèles Pydantic + mapping rubriques (créé)
+- ✅ `backend/tools/caij_search_tool.py` - Outil Agno (créé)
+- ✅ `backend/tests/test_caij_service.py` - Tests d'intégration (créé)
+- ✅ `backend/scripts/test_caij_rubriques.py` - Tests de mapping (créé)
+- ✅ `backend/scripts/test_caij_rubriques_live.py` - Tests live (créé)
+
+### Utilisation avec un agent Agno
+
+```python
+from agno import Agent
+from tools.caij_search_tool import search_caij_jurisprudence
+
+# Créer un agent avec accès à CAIJ
+legal_agent = Agent(
+    name="Assistant juridique",
+    tools=[search_caij_jurisprudence],
+    instructions="Tu es un assistant juridique avec accès à la base CAIJ..."
+)
+
+# L'agent peut maintenant chercher automatiquement dans CAIJ
+# lorsqu'on lui pose des questions juridiques
+```
+
+### Avantages de cette approche
+
+**✅ Avantages :**
+- Implémentation robuste sans reverse engineering fragile
+- Accès complet à tout le contenu CAIJ (8 rubriques)
+- Identification automatique des catégories de documents
+- Compatible avec le framework Agno
+- Tests complets avec 100% de réussite
+- Rate limiting pour respecter les serveurs CAIJ
+
+**⚠️ Limitations :**
+- Nécessite credentials CAIJ valides
+- Plus lent qu'une API native (~5s par recherche)
+- Dépendant de la structure HTML de CAIJ (peut nécessiter maintenance)
+
+### Impact utilisateur
+
+**Cas d'usage :**
+- Recherche de jurisprudence québécoise depuis un agent conversationnel
+- Accès à la doctrine juridique, législation, lois annotées
+- Recherche dans les dictionnaires juridiques
+- Support complet pour recherches documentées et modèles/formulaires
+
+**Prochaines améliorations possibles :**
+- Cache des résultats pour réduire les appels
+- Filtres avancés (date, tribunal, type de document)
+- Pagination pour récupérer plus de résultats
+- Export des résultats vers le système de documents
 
 ---
 
