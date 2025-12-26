@@ -941,12 +941,12 @@ Ajout d'une fonctionnalité complète d'import de documentation Docusaurus :
 
 ### 🔴 Urgent - Incohérences et Dette Technique
 
-1. **Mettre à jour README.md** (~1h)
-   - Synchroniser avec l'état actuel du projet
-   - Remplacer "Résumé de jugements" par les vraies fonctionnalités
-   - Corriger "cases/judgments" → "courses"
-   - Documenter le frontend existant
-   - Retirer mentions du workflow obsolète de 4 agents
+1. **Mettre à jour README.md** (~1h) ✅ **FAIT** (2025-12-26)
+   - ✅ Synchronisé avec l'état actuel du projet
+   - ✅ Ajouté section Tuteur IA pédagogique
+   - ✅ Mis à jour structure du projet avec nouveaux fichiers
+   - ✅ Ajouté documentation complète dans section Utilisation
+   - ✅ Mis à jour liste des technologies
 
 2. **Refactoring DocumentResponse** (~2h)
    - ❌ **À FAIRE** : Supprimer la duplication dans `routes/documents.py` (lignes 61-78)
@@ -1067,11 +1067,14 @@ Ajout d'une fonctionnalité complète d'import de documentation Docusaurus :
 
 ### 🎯 Recommandation Top 3 (Démarrage)
 
-1. **Mettre à jour README.md** (1h) - Première impression correcte du projet
+1. ~~**Mettre à jour README.md** (1h)~~ ✅ **COMPLÉTÉ**
 2. **Refactoring DocumentResponse** (2h) - Éliminer duplication critique
 3. **Tests d'intégration de base** (4-6h) - Assurer stabilité avant nouvelles features
 
 **Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
+
+**Nouvelles fonctionnalités complétées** :
+- ✅ **Tuteur IA pédagogique** (2025-12-26) - Résumés, mind maps, quiz, explications
 
 ---
 
