@@ -36,6 +36,13 @@ import {
   Volume2,
 } from "lucide-react";
 import { settingsApi } from "@/lib/api";
+import { Slider } from "@/components/ui/slider";
+import {
+  LLMConfig,
+  loadLLMConfig,
+  saveLLMConfig,
+  getModelDisplayName,
+} from "@/lib/llm-models";
 
 // Import SVG logos for embedding providers
 import HuggingFaceLogo from "@/svg/hf-logo.svg";
@@ -122,6 +129,14 @@ export default function SettingsPage() {
   const [selectedVoiceFr, setSelectedVoiceFr] = useState("fr-FR-DeniseNeural");
   const [selectedVoiceEn, setSelectedVoiceEn] = useState("en-CA-ClaraNeural");
 
+  // LLM Advanced Settings
+  const [llmConfig, setLlmConfig] = useState<LLMConfig>({
+    model: "ollama:qwen2.5:7b",
+    temperature: 0.7,
+    maxTokens: 2000,
+    topP: 0.9,
+  });
+
   // Embedding Settings
   const [embeddingProviders, setEmbeddingProviders] = useState<Record<string, EmbeddingProviderInfo>>({});
   const [selectedEmbeddingProvider, setSelectedEmbeddingProvider] = useState("local");
@@ -186,6 +201,10 @@ export default function SettingsPage() {
       if (savedVoiceFr) setSelectedVoiceFr(savedVoiceFr);
       if (savedVoiceEn) setSelectedVoiceEn(savedVoiceEn);
 
+      // Load LLM config from localStorage
+      const savedLlmConfig = loadLLMConfig();
+      setLlmConfig(savedLlmConfig);
+
       setApiConnected(true);
     } catch (err) {
       console.log("Settings API not available", err);
@@ -242,6 +261,13 @@ export default function SettingsPage() {
     // Save TTS voice preferences to localStorage
     localStorage.setItem("tts_voice_fr", selectedVoiceFr);
     localStorage.setItem("tts_voice_en", selectedVoiceEn);
+  };
+
+  const saveLLMSettings = () => {
+    // Save LLM config to localStorage and dispatch event
+    saveLLMConfig(llmConfig);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const checkEmbeddingMismatch = useCallback(async () => {
@@ -428,6 +454,106 @@ export default function SettingsPage() {
                     onCheckedChange={toggleDarkMode}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* LLM Advanced Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Paramètres LLM avancés
+                </CardTitle>
+                <CardDescription>
+                  Ajustez les paramètres de génération du modèle de langage
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Current Model (read-only) */}
+                <div className="space-y-2">
+                  <Label>Modèle actuel</Label>
+                  <div className="flex items-center h-10 px-3 py-2 text-sm rounded-md border border-input bg-muted">
+                    {getModelDisplayName(llmConfig.model)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Changez de modèle via le sélecteur dans le header
+                  </p>
+                </div>
+
+                {/* Temperature */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="llm-temperature">Température</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {llmConfig.temperature.toFixed(1)}
+                    </span>
+                  </div>
+                  <Slider
+                    id="llm-temperature"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={[llmConfig.temperature]}
+                    onValueChange={(value) =>
+                      setLlmConfig({ ...llmConfig, temperature: value[0] })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Plus élevé = plus créatif, plus bas = plus déterministe
+                  </p>
+                </div>
+
+                {/* Max Tokens */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="llm-maxTokens">Max tokens</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {llmConfig.maxTokens}
+                    </span>
+                  </div>
+                  <Slider
+                    id="llm-maxTokens"
+                    min={100}
+                    max={4000}
+                    step={100}
+                    value={[llmConfig.maxTokens]}
+                    onValueChange={(value) =>
+                      setLlmConfig({ ...llmConfig, maxTokens: value[0] })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Longueur maximale de la réponse
+                  </p>
+                </div>
+
+                {/* Top P */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="llm-topP">Top P</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {llmConfig.topP.toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    id="llm-topP"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={[llmConfig.topP]}
+                    onValueChange={(value) =>
+                      setLlmConfig({ ...llmConfig, topP: value[0] })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Diversité des tokens considérés
+                  </p>
+                </div>
+
+                {/* Save LLM Settings Button */}
+                <Button onClick={saveLLMSettings} variant="outline" className="w-full">
+                  <Save className="h-4 w-4 mr-2" />
+                  Sauvegarder les paramètres LLM
+                </Button>
               </CardContent>
             </Card>
 
