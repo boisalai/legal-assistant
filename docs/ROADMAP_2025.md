@@ -287,17 +287,21 @@ Si besoin de résultats visibles rapidement :
 - `fcebf74` - feat: Create DocumentService to extract business logic from routes
 - `24b5f0a` - refactor: Simplify routes/documents.py using DocumentService
 - `7e1ead2` - refactor: Simplify upload and register endpoints using DocumentService
+- `0494764` - refactor: Simplify link and extract endpoints using DocumentService
 
-**Endpoints refactorisés :**
+**Endpoints refactorisés (7/XX) :**
 - ✅ `list_documents`: 210 → 113 lignes (~46% réduction)
 - ✅ `get_document`: 60 → 25 lignes (~58% réduction)
 - ✅ `delete_document`: Logique principale simplifiée
 - ✅ `upload_document`: 102 → 82 lignes (~20% réduction)
 - ✅ `register_document`: 98 → 70 lignes (~29% réduction)
+- ✅ `link_file_or_folder`: 198 → 180 lignes (~9% réduction)
+- ✅ `extract_document_text`: 103 → 87 lignes (~16% réduction)
 
 **Impact réalisé :**
-- routes/documents.py: **2324 → 2109 lignes** (-215 lignes, -9.3%)
+- routes/documents.py: **2324 → 2076 lignes** (-248 lignes, -10.7%)
 - Meilleure séparation des responsabilités (HTTP vs Business logic)
 - Code plus maintenable et testable
 - Logique métier réutilisable via document_service
 - Moins de duplication de code
+- Réduction moyenne : ~25% par endpoint refactorisé
