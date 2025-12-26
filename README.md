@@ -53,18 +53,33 @@ Assistant d'études juridiques pour étudiants en droit avec IA conversationnell
 - Identification automatique des catégories de documents
 - Authentification et rate limiting
 
+### 🎓 Tuteur IA pédagogique
+- **Détection automatique du document ouvert** via activity tracking
+- **Génération de résumés structurés** avec objectifs d'apprentissage
+- **Création de cartes mentales** thématiques avec emojis
+- **Quiz interactifs** avec explications détaillées
+- **Explications de concepts** juridiques avec méthode socratique
+- Mode adaptatif : document spécifique vs cours complet
+- 4 outils Agno dédiés à l'apprentissage
+
 ## 🏗️ Structure du projet
 
 ```
 legal-assistant/
 ├── backend/
 │   ├── config/              # Configuration (settings, models)
-│   ├── models/              # Modèles Pydantic (Course, Document)
+│   ├── models/              # Modèles Pydantic (Course, Document, CAIJ)
 │   ├── routes/              # Endpoints API REST
 │   ├── services/            # Services métier
 │   │   ├── document_indexing_service.py
 │   │   ├── transcription_service.py
-│   │   └── tts_service.py
+│   │   ├── tts_service.py
+│   │   ├── caij_search_service.py
+│   │   └── tutor_service.py
+│   ├── tools/               # Outils Agno
+│   │   ├── tutor_tools.py
+│   │   ├── caij_search_tool.py
+│   │   └── semantic_search_tool.py
 │   ├── workflows/           # Workflows Agno
 │   └── main.py              # Point d'entrée FastAPI
 ├── frontend/
@@ -249,6 +264,36 @@ Options :
 - Configuration de la voix par défaut dans Settings
 - Format MP3
 
+### 6. Utiliser le Tuteur IA pédagogique
+
+Le tuteur IA détecte automatiquement le document que vous consultez et adapte son comportement :
+
+**Mode document spécifique** (document ouvert dans le visualiseur) :
+```
+"Résume ce document"              → Résumé structuré avec objectifs d'apprentissage
+"Fais une carte mentale"          → Mind map thématique avec emojis
+"Génère un quiz"                  → Quiz interactif de 5 questions
+"Explique-moi [concept]"          → Explication détaillée avec sources
+"Qu'est-ce que [concept] ?"       → Questions socratiques guidées
+```
+
+**Mode cours complet** (aucun document ouvert) :
+```
+"Résume le cours"                 → Vue d'ensemble du cours
+"Fais une carte mentale du cours" → Mind map global
+"Quiz sur le cours"               → Quiz couvrant tous les documents
+```
+
+**Méthode socratique** :
+- Le tuteur pose des questions pour guider votre réflexion
+- Pour obtenir une explication directe : "Explique-moi directement"
+
+**Avantages** :
+- Toutes les réponses ancrées dans vos documents (anti-hallucination)
+- Citations des sources automatiques
+- Format optimisé pour l'apprentissage
+- Zéro configuration requise
+
 ## 🔧 API REST
 
 Documentation complète disponible sur :
@@ -344,6 +389,7 @@ npm run dev
 - **TTS** : edge-tts (Microsoft Edge TTS)
 - **PDF** : Docling (extraction avancée avec OCR)
 - **Recherche juridique** : Playwright (web scraping CAIJ)
+- **Tuteur IA** : Agno framework avec 4 outils pédagogiques
 
 ## 🌐 Ports
 
@@ -358,6 +404,7 @@ npm run dev
 - **ARCHITECTURE.md** : Architecture technique détaillée
 - **backend/MLX_GUIDE.md** : Guide MLX pour Apple Silicon
 - **backend/LOCAL_MODELS_GUIDE.md** : Guide des modèles locaux
+- **backend/TUTEUR_IA_IMPLEMENTATION.md** : Implémentation du tuteur IA pédagogique
 
 ## 🤝 Contribution
 
