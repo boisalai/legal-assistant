@@ -77,3 +77,16 @@ out/
 # mypy
 .mypy_cache/
 backup_pre_migration.surql
+
+# Temporary development files
+backend/logs*.txt
+backend/screenshot_*.png
+backend/caij_*.png
+backend/test_chat_debug.py
+backend/tests/test_tts.py
+backend/scripts/caij_*.png
+backend/scripts/caij_*.py
+backend/scripts/test_*.py
+backend/scripts/.env.example
+backend/scripts/CAIJ_POC_RESULTS.md
+backend/scripts/caij_api_endpoints.json
