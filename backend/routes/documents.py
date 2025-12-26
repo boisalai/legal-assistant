@@ -1061,79 +1061,51 @@ async def transcribe_document_workflow(
     - error: {message}
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize IDs
+        # Normalize course ID for validation
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
 
-        # Verify course exists
-        clean_course_id = course_id.replace("course:", "")
-        course_check = await service.query(
-            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
-            {"course_id": clean_course_id}
-        )
-        if not course_check or len(course_check) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Course not found"
-            )
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
-
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
 
         # Verify document belongs to course
-        if item.get("course_id") != course_id:
+        if document.course_id != course_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Document does not belong to this course"
             )
 
-        file_path = item.get("file_path")
-
-        if not file_path:
+        if not document.file_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Chemin du fichier non trouve"
             )
 
         # Check if it's an audio file
-        ext = Path(file_path).suffix.lower()
+        ext = Path(document.file_path).suffix.lower()
         if ext not in AUDIO_EXTENSIONS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ce n'est pas un fichier audio. Extensions supportees: {', '.join(AUDIO_EXTENSIONS)}"
             )
 
-        if not Path(file_path).exists():
+        if not Path(document.file_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier audio non trouve sur le disque"
             )
+
+        # Get surreal service for later updates
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
 
         # Create SSE generator
         async def event_generator():
@@ -1170,12 +1142,12 @@ async def transcribe_document_workflow(
             async def run_workflow():
                 try:
                     result = await workflow.run(
-                        audio_path=file_path,
+                        audio_path=document.file_path,
                         course_id=course_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
                         raw_mode=request.raw_mode,
-                        source_document_id=doc_id  # Link transcription to source audio
+                        source_document_id=document.id  # Link transcription to source audio
                     )
                     await progress_queue.put({
                         "type": "complete",
@@ -1891,53 +1863,32 @@ async def diagnose_documents(
     - Les enregistrements en base sans fichier physique (orphelins)
     - Les fichiers physiques sans enregistrement en base (manquants)
     """
-    service = get_surreal_service()
-    if not service.db:
-        await service.connect()
-
-    # Normaliser course_id
-    if not course_id.startswith("course:"):
-        course_id = f"course:{course_id}"
-
-    # Récupérer tous les documents de la base de données
-    docs_result = await service.query(
-        "SELECT * FROM document WHERE course_id = $course_id",
-        {"course_id": course_id}
+    # Get all documents using document service (without auto-removal)
+    doc_service = get_document_service()
+    documents = await doc_service.list_documents(
+        course_id=course_id,
+        verify_files=False,  # Don't auto-remove missing files
+        auto_remove_missing=False
     )
-
-    documents = []
-    if docs_result and len(docs_result) > 0:
-        first_item = docs_result[0]
-        if isinstance(first_item, dict):
-            if "result" in first_item:
-                documents = first_item["result"] if isinstance(first_item["result"], list) else []
-            elif "id" in first_item:
-                documents = docs_result
-        elif isinstance(first_item, list):
-            documents = first_item
 
     missing_files = []
     ok_count = 0
 
-    # Vérifier chaque document
+    # Verify each document
     for doc in documents:
-        doc_id = doc.get("id", "unknown")
-        doc_name = doc.get("nom_fichier", "unknown")
-        file_path = doc.get("file_path", "")
-
-        if not file_path:
+        if not doc.file_path:
             missing_files.append({
-                "id": doc_id,
-                "filename": doc_name,
+                "id": doc.id,
+                "filename": doc.filename,
                 "reason": "Aucun chemin de fichier enregistré"
             })
             continue
 
-        if not Path(file_path).exists():
+        if not Path(doc.file_path).exists():
             missing_files.append({
-                "id": doc_id,
-                "filename": doc_name,
-                "path": file_path,
+                "id": doc.id,
+                "filename": doc.filename,
+                "path": doc.file_path,
                 "reason": "Fichier physique manquant"
             })
         else:
