@@ -551,46 +551,9 @@ async def get_derived_documents(
     créés à partir du document spécifié.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize IDs
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
-
-        # Query derived documents
-        result = await service.query(
-            "SELECT * FROM document WHERE source_document_id = $doc_id ORDER BY created_at DESC",
-            {"doc_id": doc_id}
-        )
-
-        derived = []
-        if result and len(result) > 0:
-            # SurrealDB query() returns a list of results directly
-            items = result
-            if isinstance(items, list):
-                for item in items:
-                    file_path = item.get("file_path", "")
-                    file_exists = Path(file_path).exists() if file_path else False
-
-                    derived.append(DocumentResponse(
-                        id=str(item.get("id", "")),
-                        course_id=item.get("course_id", course_id),
-                        filename=item.get("nom_fichier", ""),
-                        file_type=item.get("type_fichier", ""),
-                        mime_type=item.get("type_mime", ""),
-                        size=item.get("taille", 0),
-                        file_path=file_path,
-                        created_at=item.get("created_at", ""),
-                        extracted_text=item.get("texte_extrait"),
-                        file_exists=file_exists,
-                        source_document_id=item.get("source_document_id"),
-                        is_derived=item.get("is_derived"),
-                        derivation_type=item.get("derivation_type"),
-                    ))
+        # Get derived documents using document service
+        doc_service = get_document_service()
+        derived = await doc_service.get_derived_documents(doc_id)
 
         return {"derived": derived, "total": len(derived)}
 
@@ -769,58 +732,36 @@ async def download_document(
                 Si False, force le telechargement
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Normalize ID
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
-
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
 
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
-        file_path = item.get("file_path")
-
-        if not file_path or not Path(file_path).exists():
+        if not document.file_path or not Path(document.file_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier non trouve sur le disque"
             )
 
-        media_type = item.get("type_mime", "application/octet-stream")
+        media_type = document.mime_type or "application/octet-stream"
 
         if inline:
             # For inline display (iframe/preview), don't set filename
             # This results in Content-Disposition: inline
             return FileResponse(
-                path=file_path,
+                path=document.file_path,
                 media_type=media_type,
             )
         else:
             # For download, set filename which triggers attachment disposition
             return FileResponse(
-                path=file_path,
-                filename=item.get("nom_fichier", "document"),
+                path=document.file_path,
+                filename=document.filename or "document",
                 media_type=media_type,
             )
 
@@ -939,38 +880,32 @@ async def clear_document_text(
     Supprime le champ texte_extrait du document dans la base de données.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+        # Verify document exists using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Normalize IDs
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
-
-        # Get document to verify it exists
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouvé"
             )
 
         # Clear texte_extrait
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize document ID
+        normalized_doc_id = doc_id if doc_id.startswith("document:") else f"document:{doc_id}"
+
         now = datetime.utcnow().isoformat()
-        await service.merge(doc_id, {
+        await service.merge(normalized_doc_id, {
             "texte_extrait": None,
             "extraction_method": None,
             "updated_at": now,
         })
 
-        logger.info(f"Cleared texte_extrait for document {doc_id}")
+        logger.info(f"Cleared texte_extrait for {normalized_doc_id}")
 
         return {"success": True, "message": "Texte extrait supprimé"}
 
