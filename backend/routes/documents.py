@@ -933,75 +933,42 @@ async def transcribe_document(
     Le texte transcrit est enregistré dans le document.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize IDs
+        # Normalize course ID for validation
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
 
-        # Verify course exists
-        clean_course_id = course_id.replace("course:", "")
-        course_check = await service.query(
-            "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
-            {"course_id": clean_course_id}
-        )
-        if not course_check or len(course_check) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Course not found"
-            )
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
-
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
 
         # Verify document belongs to course
-        if item.get("course_id") != course_id:
+        if document.course_id != course_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Document does not belong to this course"
             )
 
-        file_path = item.get("file_path")
-
-        if not file_path:
+        if not document.file_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Chemin du fichier non trouve"
             )
 
         # Check if it's an audio file
-        ext = Path(file_path).suffix.lower()
+        ext = Path(document.file_path).suffix.lower()
         if ext not in AUDIO_EXTENSIONS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ce n'est pas un fichier audio. Extensions supportees: {', '.join(AUDIO_EXTENSIONS)}"
             )
 
-        if not Path(file_path).exists():
+        if not Path(document.file_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier audio non trouve sur le disque"
@@ -1017,10 +984,10 @@ async def transcribe_document(
             )
 
         whisper_service = get_whisper_service()
-        logger.info(f"Starting transcription for {file_path} (language={language})")
+        logger.info(f"Starting transcription for {document.file_path} (language={language})")
 
         # Transcribe
-        transcription = await whisper_service.transcribe(file_path, language=language)
+        transcription = await whisper_service.transcribe(document.file_path, language=language)
 
         if not transcription.success:
             logger.error(f"Transcription failed: {transcription.error}")
@@ -1033,7 +1000,14 @@ async def transcribe_document(
         from datetime import datetime
         now = datetime.utcnow().isoformat()
 
-        await service.merge(doc_id, {
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normalize document ID
+        normalized_doc_id = doc_id if doc_id.startswith("document:") else f"document:{doc_id}"
+
+        await service.merge(normalized_doc_id, {
             "texte_extrait": transcription.text,
             "is_transcription": True,
             "extraction_method": transcription.method,
@@ -1045,7 +1019,7 @@ async def transcribe_document(
             }
         })
 
-        logger.info(f"Transcription saved for document {doc_id}: {len(transcription.text)} chars")
+        logger.info(f"Transcription saved for document {normalized_doc_id}: {len(transcription.text)} chars")
 
         return TranscriptionResponse(
             success=True,
@@ -1279,59 +1253,44 @@ async def extract_pdf_to_markdown(
     - error: {message}
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize IDs
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
 
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
 
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
-        file_path = item.get("file_path")
-
-        if not file_path:
+        if not document.file_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Chemin du fichier non trouve"
             )
 
         # Check if it's a PDF file
-        ext = Path(file_path).suffix.lower()
+        ext = Path(document.file_path).suffix.lower()
         if ext != '.pdf':
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ce n'est pas un fichier PDF. Extension: {ext}"
             )
 
-        if not Path(file_path).exists():
+        if not Path(document.file_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier PDF non trouve sur le disque"
             )
+
+        # Get surreal service for later queries
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
 
         # Create SSE generator
         async def event_generator():
@@ -1342,7 +1301,7 @@ async def extract_pdf_to_markdown(
             async def run_extraction():
                 try:
                     # Check if a markdown already exists for this PDF
-                    original_filename = item.get("nom_fichier", "document.pdf")
+                    original_filename = document.filename or "document.pdf"
                     markdown_filename = Path(original_filename).stem + ".md"
 
                     # Get judgment directory
@@ -1392,7 +1351,7 @@ async def extract_pdf_to_markdown(
                     extraction_service = get_extraction_service()
 
                     extraction_result = await extraction_service.extract(
-                        file_path=file_path,
+                        file_path=document.file_path,
                         content_type="application/pdf"
                     )
 
@@ -1801,41 +1760,22 @@ async def generate_tts(
                 detail="Service TTS non disponible. Installer edge-tts: uv add edge-tts"
             )
 
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize IDs
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
 
-        # Get document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
+        # Get document using document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouvé"
             )
-
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouvé"
-            )
-
-        item = items[0]
 
         # Get extracted text
-        text_content = item.get("texte_extrait")
+        text_content = document.extracted_text
         if not text_content:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1850,11 +1790,11 @@ async def generate_tts(
         judgment_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate filename based on document name
-        original_filename = item.get("nom_fichier", "document")
+        original_filename = document.filename or "document"
         audio_filename = f"{Path(original_filename).stem}_tts.mp3"
         audio_path = judgment_dir / audio_filename
 
-        logger.info(f"Generating TTS for document {doc_id}: {len(text_content)} chars")
+        logger.info(f"Generating TTS for document {document.id}: {len(text_content)} chars")
 
         # Generate audio
         tts_result = await tts_service.text_to_speech(
