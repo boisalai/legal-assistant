@@ -227,15 +227,15 @@ async def upload_document(
         )
 
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
-        # Normalize case ID
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
         # Verify course exists
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
         clean_course_id = course_id.replace("course:", "")
         course_result = await service.query(
             "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
@@ -247,48 +247,31 @@ async def upload_document(
                 detail=f"Cours non trouvé: {course_id}"
             )
 
-        # Generate document ID and save file
+        # Save file to disk
         doc_id = str(uuid.uuid4())[:8]
         ext = get_file_extension(file.filename)
 
-        # Create upload directory
         upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save file
         file_path = str(upload_dir / f"{doc_id}{ext}")
         with open(file_path, "wb") as f:
             f.write(content)
 
         logger.info(f"Document saved: {file_path}")
 
-        # Create document record in database
-        now = datetime.utcnow().isoformat()
-        document_data = {
-            "course_id": course_id,
-            "nom_fichier": file.filename,
-            "type_fichier": ext.lstrip('.'),
-            "type_mime": get_mime_type(file.filename),
-            "taille": len(content),
-            "file_path": file_path,
-            "user_id": user_id,
-            "created_at": now,
-            "source_type": "upload",
-        }
-
-        await service.create("document", document_data, record_id=doc_id)
-        logger.info(f"Document record created: {doc_id}")
-
-        return DocumentResponse(
-            id=f"document:{doc_id}",
+        # Create document record using service
+        doc_service = get_document_service()
+        document = await doc_service.create_document(
             course_id=course_id,
             filename=file.filename,
-            file_type=ext.lstrip('.'),
-            mime_type=get_mime_type(file.filename),
-            size=len(content),
             file_path=file_path,
-            created_at=now,
+            file_size=len(content),
+            source_type="upload"
         )
+
+        logger.info(f"Document created: {document.id}")
+        return document
 
     except HTTPException:
         raise
@@ -336,59 +319,32 @@ async def register_document(
             detail=f"Type de fichier non supporte. Extensions acceptees: {', '.join(ALLOWED_EXTENSIONS.keys())}"
         )
 
-    try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+    # Check file size
+    file_size = file_path.stat().st_size
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
+        )
 
-        # Normalize case ID
+    try:
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
-        # Get file info
-        file_size = file_path.stat().st_size
-        ext = get_file_extension(filename)
-
-        # Check file size
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
-            )
-
-        # Generate document ID
-        doc_id = str(uuid.uuid4())[:8]
-
-        # NOTE: No automatic text extraction on file registration
-        # User must explicitly trigger extraction/transcription via the UI or assistant
-
-        # Create document record in database (no file copy!)
-        now = datetime.utcnow().isoformat()
-        document_data = {
-            "course_id": course_id,
-            "nom_fichier": filename,
-            "type_fichier": ext.lstrip('.'),
-            "type_mime": get_mime_type(filename),
-            "taille": file_size,
-            "file_path": str(file_path.absolute()),  # Store absolute path
-            "user_id": user_id,
-            "created_at": now,
-        }
-
-        await service.create("document", document_data, record_id=doc_id)
-        logger.info(f"Document registered (no copy): {doc_id} -> {file_path}")
-
-        return DocumentResponse(
-            id=f"document:{doc_id}",
+        # Create document record using service (no file copy!)
+        # NOTE: No automatic text extraction - user must trigger via UI/assistant
+        doc_service = get_document_service()
+        document = await doc_service.create_document(
             course_id=course_id,
             filename=filename,
-            file_type=ext.lstrip('.'),
-            mime_type=get_mime_type(filename),
-            size=file_size,
-            file_path=str(file_path.absolute()),
-            created_at=now,
-            file_exists=True,
+            file_path=str(file_path.absolute()),  # Store absolute path
+            file_size=file_size,
+            source_type="upload"  # Could be "register" but keeping "upload" for consistency
         )
+
+        logger.info(f"Document registered (no copy): {document.id} -> {file_path}")
+        return document
 
     except HTTPException:
         raise
