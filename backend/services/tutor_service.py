@@ -181,7 +181,7 @@ Veuillez vérifier que:
         focus_topic: Optional[str] = None
     ) -> str:
         """
-        Generate a mind map in markdown format with emojis.
+        Generate a visual mind map with colors, symbols, and non-linear structure.
 
         Args:
             case_id: Course ID
@@ -189,7 +189,7 @@ Veuillez vérifier que:
             focus_topic: Specific topic to focus on
 
         Returns:
-            Formatted markdown mind map
+            Formatted HTML/markdown mind map with visual elements
         """
         logger.info(f"Generating mind map for case_id={case_id}, document_id={document_id}, topic={focus_topic}")
 
@@ -217,50 +217,21 @@ Veuillez vérifier que:
                 top_k=8
             )
 
-            # Build mind map
-            mindmap = f"# 🗺️ Carte Mentale: {title}\n\n"
-
             if not main_results or all(r.get("similarity", 0) < 0.3 for r in main_results):
-                mindmap += """*Aucun contenu trouvé. Le document pourrait ne pas être indexé.*
+                return f"""# 🗺️ Carte Mentale: {title}
+
+*Aucun contenu trouvé. Le document pourrait ne pas être indexé.*
 
 **Suggestions :**
 - Vérifiez que le document est indexé
 - Essayez de spécifier un sujet précis avec l'outil
 """
-                return mindmap
 
             # Extract and organize concepts
-            # We'll create sections based on keywords and content
             sections = self._organize_mindmap_sections(main_results)
 
-            # Build the hierarchical structure
-            for section_title, items in sections.items():
-                mindmap += f"## {section_title}\n"
-
-                for item in items[:5]:  # Max 5 items per section
-                    content = item.get("content", "")
-                    if len(content) > 100:
-                        # Extract first sentence or key phrase
-                        sentences = content.split('.')
-                        first_sentence = sentences[0].strip()
-                        if len(first_sentence) > 80:
-                            first_sentence = first_sentence[:80] + "..."
-                        mindmap += f"  - {first_sentence}\n"
-
-                        # Add sub-details if available
-                        if len(sentences) > 1:
-                            second_sentence = sentences[1].strip()
-                            if second_sentence and len(second_sentence) < 80:
-                                mindmap += f"    - {second_sentence}\n"
-                    else:
-                        mindmap += f"  - {content.strip()}\n"
-
-                mindmap += "\n"
-
-            # Add footer
-            mindmap += "---\n\n"
-            mindmap += f"**📊 Carte générée à partir de {len(main_results)} passages pertinents**\n\n"
-            mindmap += "💡 **Astuce :** Utilisez `explain_concept` pour approfondir un concept spécifique\n"
+            # Build visual mind map with HTML and colors
+            mindmap = self._build_visual_mindmap(title, sections)
 
             return mindmap
 
@@ -272,6 +243,144 @@ Une erreur est survenue: {str(e)}
 
 Veuillez vérifier que le document est indexé.
 """
+
+    def _build_visual_mindmap(self, title: str, sections: Dict[str, List[Dict]]) -> str:
+        """
+        Build a visually rich mind map with colors, symbols, and hierarchical structure.
+
+        Args:
+            title: Central concept
+            sections: Organized sections with items
+
+        Returns:
+            HTML/markdown formatted mind map
+        """
+        # Color schemes for different sections
+        section_colors = {
+            "📖 Définitions et Concepts": {
+                "bg": "#E8F4FD",
+                "border": "#2196F3",
+                "icon": "📖",
+                "symbols": ["◆", "◇", "⬥"]
+            },
+            "⚖️ Principes et Règles": {
+                "bg": "#FFF9E6",
+                "border": "#FFC107",
+                "icon": "⚖️",
+                "symbols": ["▸", "▹", "►"]
+            },
+            "✅ Conditions et Éléments": {
+                "bg": "#E8F5E9",
+                "border": "#4CAF50",
+                "icon": "✅",
+                "symbols": ["✓", "✔", "☑"]
+            },
+            "⚠️ Exceptions et Cas Particuliers": {
+                "bg": "#FFF3E0",
+                "border": "#FF9800",
+                "icon": "⚠️",
+                "symbols": ["⚡", "⚠", "⊗"]
+            },
+            "💡 Exemples et Applications": {
+                "bg": "#F3E5F5",
+                "border": "#9C27B0",
+                "icon": "💡",
+                "symbols": ["★", "☆", "✦"]
+            },
+            "📚 Contenu Principal": {
+                "bg": "#FAFAFA",
+                "border": "#607D8B",
+                "icon": "📚",
+                "symbols": ["●", "○", "◉"]
+            }
+        }
+
+        # Start with central concept
+        mindmap = f"""<div style="text-align: center; margin: 30px 0;">
+  <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 40px; border-radius: 50px; font-size: 24px; font-weight: bold; box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+    🗺️ {title}
+  </div>
+</div>
+
+---
+
+"""
+
+        # Add each section as a colored branch
+        for section_title, items in sections.items():
+            # Get color scheme for this section
+            colors = section_colors.get(section_title, section_colors["📚 Contenu Principal"])
+
+            # Section header with colored box
+            mindmap += f"""<div style="background: {colors['bg']}; border-left: 5px solid {colors['border']}; padding: 15px 20px; margin: 20px 0; border-radius: 8px;">
+
+### {colors['icon']} {section_title.split(' ', 1)[1] if ' ' in section_title else section_title}
+
+"""
+
+            # Add items with hierarchical indentation and symbols
+            for idx, item in enumerate(items[:5]):  # Max 5 items per section
+                content = item.get("content", "")
+                symbol = colors['symbols'][idx % len(colors['symbols'])]
+
+                if len(content) > 100:
+                    # Extract sentences
+                    sentences = [s.strip() for s in content.split('.') if s.strip()]
+
+                    if sentences:
+                        first_sentence = sentences[0]
+                        if len(first_sentence) > 80:
+                            first_sentence = first_sentence[:80] + "..."
+
+                        # Main point
+                        mindmap += f"<div style='margin-left: 20px; margin-bottom: 12px;'>\n"
+                        mindmap += f"  <strong style='color: {colors['border']};'>{symbol}</strong> {first_sentence}\n"
+
+                        # Sub-points with deeper indentation
+                        if len(sentences) > 1:
+                            second_sentence = sentences[1].strip()
+                            if second_sentence and len(second_sentence) < 100:
+                                sub_symbol = colors['symbols'][(idx + 1) % len(colors['symbols'])]
+                                mindmap += f"<div style='margin-left: 40px; font-size: 0.95em; color: #555; margin-top: 5px;'>\n"
+                                mindmap += f"    <span style='color: {colors['border']};'>{sub_symbol}</span> {second_sentence}\n"
+                                mindmap += f"  </div>\n"
+
+                        mindmap += "</div>\n\n"
+                else:
+                    mindmap += f"<div style='margin-left: 20px; margin-bottom: 12px;'>\n"
+                    mindmap += f"  <strong style='color: {colors['border']};'>{symbol}</strong> {content.strip()}\n"
+                    mindmap += "</div>\n\n"
+
+            mindmap += "</div>\n\n"
+
+        # Add footer with statistics and suggestions
+        mindmap += f"""---
+
+<div style="background: linear-gradient(to right, #f8f9fa, #e9ecef); padding: 20px; border-radius: 8px; margin-top: 30px;">
+
+### 📊 Informations sur cette Carte Mentale
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+  <div style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <strong>📈 Branches explorées:</strong> {len(sections)}
+  </div>
+  <div style="background: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <strong>📝 Concepts identifiés:</strong> {sum(len(items) for items in sections.values())}
+  </div>
+</div>
+
+### 💡 Pour Approfondir
+
+<div style="margin-top: 15px; line-height: 2;">
+  🔍 <strong>Explorez un concept:</strong> Utilisez <code>explain_concept</code> pour une explication détaillée<br>
+  📝 <strong>Testez vos connaissances:</strong> Générez un quiz avec <code>generate_quiz</code><br>
+  📖 <strong>Résumé structuré:</strong> Obtenez un résumé pédagogique avec <code>generate_summary</code>
+</div>
+
+</div>
+"""
+
+        return mindmap
 
     def _organize_mindmap_sections(self, results: List[Dict]) -> Dict[str, List[Dict]]:
         """
