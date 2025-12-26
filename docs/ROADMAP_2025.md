@@ -252,3 +252,48 @@ Si besoin de résultats visibles rapidement :
 
 ### À venir
 - [ ] Phase 2 : Dette technique (Refactoring DocumentResponse + simplification documents.py)
+
+#### Phase 2 En cours ⏳ (~2h sur 1-2 jours)
+
+**2.1 Refactoring DocumentResponse - COMPLÉTÉ ✅**
+- ✅ Analyse : Duplication déjà corrigée (importé depuis models/document_models.py)
+- ✅ Aucune action nécessaire
+
+**2.2 Extraction de la logique métier - EN COURS 🚧**
+
+**Créé : `services/document_service.py` (478 lignes) ✅**
+- ✅ `list_documents()` - Liste avec filtrage et vérification
+- ✅ `get_document()` - Récupération par ID
+- ✅ `create_document()` - Création de documents
+- ✅ `delete_document()` - Suppression documents + fichiers
+- ✅ `get_derived_documents()` - Documents dérivés
+- ✅ `update_document_text()` - Mise à jour texte extrait
+- ✅ Singleton pattern
+
+**Services existants identifiés :**
+- ✅ `youtube_service.py` - Gestion YouTube
+- ✅ `tts_service.py` - Synthèse vocale
+- ✅ `document_extraction_service.py` - Extraction texte
+- ✅ `whisper_service.py` - Transcription audio
+
+**Prochaines étapes Phase 2 :**
+1. [x] ~~Créer `transcription_service.py`~~ → Pas nécessaire (architecture déjà bien organisée)
+2. [x] Refactorer `routes/documents.py` pour utiliser les services
+3. [ ] Continuer refactoring endpoints restants (upload, register, etc.)
+4. [ ] Réduire routes/documents.py de 2324 → <1500 lignes (objectif révisé)
+5. [ ] Tests d'intégration
+
+**Commits créés :**
+- `fcebf74` - feat: Create DocumentService to extract business logic from routes
+- `24b5f0a` - refactor: Simplify routes/documents.py using DocumentService
+
+**Endpoints refactorisés :**
+- ✅ `list_documents`: 210 → 113 lignes (~46% réduction)
+- ✅ `get_document`: 60 → 25 lignes (~58% réduction)
+- ✅ `delete_document`: Logique principale simplifiée
+
+**Impact réalisé :**
+- routes/documents.py: **2324 → 2153 lignes** (-171 lignes, -7.4%)
+- Meilleure séparation des responsabilités
+- Code plus maintenable et testable
+- Logique métier réutilisable
