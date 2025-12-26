@@ -717,8 +717,8 @@ Veuillez vérifier que:
 
             # Use the indexing service for semantic search
             results = await self.indexing_service.search_similar(
+                query_text=query,
                 case_id=case_id,
-                query=query,
                 top_k=top_k
             )
 
