@@ -46,6 +46,13 @@ Assistant d'études juridiques pour étudiants en droit avec IA conversationnell
 - Auto-démarrage par le backend
 - RAM réduite (~2 GB)
 
+### ⚖️ Recherche juridique CAIJ
+- Intégration avec le Centre d'accès à l'information juridique du Québec
+- Outil Agno pour agents conversationnels
+- Support de 8 rubriques (Législation, Jurisprudence, Doctrine, Dictionnaires, etc.)
+- Identification automatique des catégories de documents
+- Authentification et rate limiting
+
 ## 🏗️ Structure du projet
 
 ```
@@ -268,6 +275,33 @@ POST   /api/tts                  # Générer une synthèse vocale
 
 POST   /api/chat                 # Chat avec streaming SSE
 GET    /api/conversations        # Historique des conversations
+
+# Recherche juridique CAIJ (via outil Agno)
+# Utilisation dans les agents conversationnels uniquement
+```
+
+### Outil CAIJ pour agents Agno
+
+L'intégration CAIJ est disponible comme outil pour les agents conversationnels :
+
+```python
+from agno import Agent
+from tools.caij_search_tool import search_caij_jurisprudence
+
+# Créer un agent avec accès à CAIJ
+legal_agent = Agent(
+    name="Assistant juridique",
+    tools=[search_caij_jurisprudence],
+    instructions="Tu es un assistant juridique québécois..."
+)
+```
+
+**Configuration** : Ajouter `CAIJ_EMAIL` et `CAIJ_PASSWORD` dans `.env`
+
+```bash
+# Dans .env
+CAIJ_EMAIL=your.email@example.com
+CAIJ_PASSWORD=your_password
 ```
 
 ## 🧪 Développement
@@ -309,6 +343,7 @@ npm run dev
 - **Transcription** : Whisper MLX (mlx-whisper)
 - **TTS** : edge-tts (Microsoft Edge TTS)
 - **PDF** : Docling (extraction avancée avec OCR)
+- **Recherche juridique** : Playwright (web scraping CAIJ)
 
 ## 🌐 Ports
 
