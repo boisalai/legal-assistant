@@ -1,7 +1,7 @@
 """Modèles Pydantic pour les documents."""
 
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DocusaurusSource(BaseModel):
@@ -15,24 +15,31 @@ class DocusaurusSource(BaseModel):
 
 
 class DocumentResponse(BaseModel):
-    """Réponse pour un document unique."""
+    """Réponse pour un document unique.
+
+    Note: Uses serialization_alias to maintain backwards compatibility with French field names
+    in the API response while using English names internally.
+    """
     id: str
     course_id: str
-    filename: str  # Changed from nom_fichier for API consistency
-    file_type: str  # Changed from type_fichier for API consistency
-    mime_type: str  # Changed from type_mime for API consistency
-    size: int  # Changed from taille for API consistency
+    filename: str = Field(serialization_alias="nom_fichier")
+    file_type: str = Field(serialization_alias="type_fichier")
+    mime_type: str = Field(serialization_alias="type_mime")
+    size: int = Field(serialization_alias="taille")
     file_path: str
     created_at: str
-    extracted_text: Optional[str] = None  # Changed from texte_extrait for API consistency
-    file_exists: bool = True  # Whether the file exists on disk
-    source_document_id: Optional[str] = None  # ID of parent document if this is derived
-    is_derived: Optional[bool] = None  # True if this is a derived file
-    derivation_type: Optional[str] = None  # transcription, pdf_extraction, tts
-    source_type: Optional[str] = None  # "upload", "linked", or "docusaurus"
-    linked_source: Optional[Dict[str, Any]] = None  # Info linked directory si applicable
-    docusaurus_source: Optional[DocusaurusSource] = None  # Info Docusaurus si applicable
-    indexed: Optional[bool] = None  # True si le document a été indexé pour RAG
+    extracted_text: Optional[str] = Field(default=None, serialization_alias="texte_extrait")
+    file_exists: bool = True
+    source_document_id: Optional[str] = None
+    is_derived: Optional[bool] = None
+    derivation_type: Optional[str] = None
+    source_type: Optional[str] = None
+    linked_source: Optional[Dict[str, Any]] = None
+    docusaurus_source: Optional[DocusaurusSource] = None
+    indexed: Optional[bool] = None
+
+    class Config:
+        populate_by_name = True  # Allow populating by both alias and field name
 
 
 class DocumentListResponse(BaseModel):

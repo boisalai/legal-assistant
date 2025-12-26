@@ -53,7 +53,6 @@ class CourseResponse(BaseModel):
     # Academic fields
     session_id: Optional[str] = None
     course_code: Optional[str] = None
-    course_name: Optional[str] = None
     professor: Optional[str] = None
     credits: Optional[int] = None
     color: Optional[str] = None
@@ -205,7 +204,6 @@ async def list_courses(
                         # Academic fields
                         session_id=str(item.get("session_id")) if item.get("session_id") else None,
                         course_code=item.get("course_code"),
-                        course_name=item.get("course_name"),
                         professor=item.get("professor"),
                         credits=item.get("credits"),
                         color=item.get("color"),
@@ -300,7 +298,6 @@ async def create_course(
             # Academic fields
             session_id=str(created_case.get("session_id")) if created_case.get("session_id") else None,
             course_code=created_case.get("course_code"),
-            course_name=created_case.get("course_name"),
             professor=created_case.get("professor"),
             credits=created_case.get("credits"),
             color=created_case.get("color"),
@@ -362,7 +359,6 @@ async def get_case(
             # Academic fields
             session_id=str(item.get("session_id")) if item.get("session_id") else None,
             course_code=item.get("course_code"),
-            course_name=item.get("course_name"),
             professor=item.get("professor"),
             credits=item.get("credits"),
             color=item.get("color"),
@@ -460,7 +456,6 @@ async def update_course(
             # Academic fields
             session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
             course_code=updated_item.get("course_code"),
-            course_name=updated_item.get("course_name"),
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
             color=updated_item.get("color"),
@@ -535,7 +530,6 @@ async def toggle_pin_course(
             # Academic fields
             session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
             course_code=updated_item.get("course_code"),
-            course_name=updated_item.get("course_name"),
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
             color=updated_item.get("color"),
