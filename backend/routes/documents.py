@@ -27,6 +27,7 @@ from services.surreal_service import get_surreal_service
 from services.document_indexing_service import DocumentIndexingService
 from utils.text_utils import remove_yaml_frontmatter
 from models.document_models import DocumentResponse, DocumentListResponse, RegisterDocumentRequest
+from services.document_service import get_document_service
 from models.transcription_models import (
     ExtractionResponse,
     TranscriptionResponse,
@@ -103,175 +104,81 @@ async def list_documents(
         include_derived: Si True, inclut les fichiers dérivés (transcriptions, extractions, TTS). Par défaut False.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+        # Use document service for main listing logic
+        doc_service = get_document_service()
+        documents = await doc_service.list_documents(
+            course_id=course_id,
+            verify_files=verify_files,
+            auto_remove_missing=auto_remove_missing,
+            include_derived=include_derived
+        )
 
-        # Normalize case ID
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
+        missing_files = []  # Track missing files (already handled by service if auto_remove_missing=True)
 
-        # Query documents for this case
-        # TEMPORARY: Support both "course:" and "course:" formats during migration
-        legacy_course_id = course_id.replace("course:", "course:")
-
-        if include_derived:
-            # Include all documents
-            result = await service.query(
-                "SELECT * FROM document WHERE course_id IN [$course_id, $legacy_course_id] ORDER BY created_at DESC",
-                {"course_id": course_id, "legacy_course_id": legacy_course_id}
-            )
-        else:
-            # Exclude derived documents (only show source documents)
-            # Use "!= true" instead of "= false OR IS NULL" for SurrealDB compatibility
-            result = await service.query(
-                "SELECT * FROM document WHERE course_id IN [$course_id, $legacy_course_id] AND is_derived != true ORDER BY created_at DESC",
-                {"course_id": course_id, "legacy_course_id": legacy_course_id}
-            )
-
-        # Unwrap SurrealDB query result
-        # SurrealDB query() can return results in different formats:
-        # 1. Direct list of documents: [doc1, doc2, doc3]
-        # 2. Wrapped format: [{result: [doc1, doc2, doc3]}]
-        items = []
-        if result and len(result) > 0:
-            first_result = result[0]
-            # Check if it's the wrapped format with "result" key
-            if isinstance(first_result, dict) and "result" in first_result:
-                items = first_result["result"]
-            # Otherwise, assume it's already a direct list of documents
-            elif isinstance(result, list):
-                items = result
-
-        documents = []
-        missing_files = []
-        docs_to_remove = []
-        registered_files = set()  # Track files already in database (by absolute path)
-        registered_filenames = set()  # Track filenames already in database (fallback check)
-
-        if items and len(items) > 0:
-            if isinstance(items, list):
-                for item in items:
-                    file_path = item.get("file_path", "")
-                    file_exists = True
-
-                    # Check if file exists on disk
-                    if verify_files and file_path:
-                        file_exists = Path(file_path).exists()
-                        if not file_exists:
-                            doc_id = str(item.get("id", ""))
-                            missing_files.append(doc_id)
-                            if auto_remove_missing:
-                                docs_to_remove.append(doc_id)
-                                continue  # Skip adding to response
-
-                    # Track this file as registered (both by absolute path and filename)
-                    if file_path:
-                        # Try to resolve to absolute path, handle both relative and absolute paths
-                        try:
-                            abs_path = Path(file_path).resolve()
-                            registered_files.add(abs_path)
-                        except Exception:
-                            # If path resolution fails, just add as-is
-                            registered_files.add(Path(file_path))
-
-                        # Also track by filename as a fallback
-                        registered_filenames.add(item.get("nom_fichier", ""))
-
-                    linked_source_data = item.get("linked_source")
-
-                    doc_response = DocumentResponse(
-                        id=str(item.get("id", "")),
-                        course_id=item.get("course_id", course_id),
-                        filename=item.get("nom_fichier", ""),
-                        file_type=item.get("type_fichier", ""),
-                        mime_type=item.get("type_mime", ""),
-                        size=item.get("taille", 0),
-                        file_path=file_path,
-                        created_at=item.get("created_at", ""),
-                        extracted_text=item.get("texte_extrait"),
-                        file_exists=file_exists,
-                        source_document_id=item.get("source_document_id"),
-                        is_derived=item.get("is_derived"),
-                        derivation_type=item.get("derivation_type"),
-                        source_type=item.get("source_type"),
-                        linked_source=linked_source_data,
-                        docusaurus_source=item.get("docusaurus_source"),
-                        indexed=item.get("indexed"),
-                    )
-                    documents.append(doc_response)
-
-        # Auto-remove documents with missing files
-        if docs_to_remove:
-            for doc_id in docs_to_remove:
-                try:
-                    await service.delete(doc_id)
-                    logger.info(f"Auto-removed document with missing file: {doc_id}")
-                except Exception as e:
-                    logger.warning(f"Could not auto-remove document {doc_id}: {e}")
-
-        # Auto-discover orphaned files in uploads directory
+        # Auto-discover orphaned files in uploads directory (if requested)
         if auto_discover:
+            # Normalize course ID
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
+
+            # Track registered files to avoid duplicates
+            registered_files = set()
+            registered_filenames = set()
+            for doc in documents:
+                if doc.file_path:
+                    try:
+                        abs_path = Path(doc.file_path).resolve()
+                        registered_files.add(abs_path)
+                    except Exception:
+                        registered_files.add(Path(doc.file_path))
+                    registered_filenames.add(doc.filename)
+
+            # Scan upload directory for orphaned files
             upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
             if upload_dir.exists() and upload_dir.is_dir():
+                surreal_service = get_surreal_service()
+                if not surreal_service.db:
+                    await surreal_service.connect()
+
                 for file_path in upload_dir.iterdir():
                     if file_path.is_file():
-                        # Check if this file is already registered (by path OR by filename)
+                        # Check if already registered
                         is_registered = (
                             file_path.resolve() in registered_files or
                             file_path.name in registered_filenames
                         )
+
                         if not is_registered:
-                            # Skip markdown files - they are always derived files (transcriptions/extractions)
-                            # and should be created by the transcription/extraction workflows
+                            # Skip markdown files (derived files)
                             ext = get_file_extension(file_path.name).lower()
                             if ext in ['.md', '.markdown']:
-                                logger.debug(f"Skipping auto-discovery of markdown file (derived file): {file_path.name}")
+                                logger.debug(f"Skipping auto-discovery of markdown file: {file_path.name}")
                                 continue
 
-                            # Check if file type is allowed
+                            # Auto-register if allowed file type
                             if is_allowed_file(file_path.name):
                                 try:
-                                    # Auto-register this orphaned file
+                                    # Use document service to create
                                     doc_id = str(uuid.uuid4())[:8]
                                     ext = get_file_extension(file_path.name)
                                     file_size = file_path.stat().st_size
-                                    now = datetime.utcnow().isoformat()
-
-                                    # Use relative path (consistent with upload endpoint)
                                     relative_path = f"data/uploads/{course_id.replace('course:', '')}/{file_path.name}"
 
-                                    document_data = {
-                                        "course_id": course_id,
-                                        "nom_fichier": file_path.name,
-                                        "type_fichier": ext.lstrip('.'),
-                                        "type_mime": get_mime_type(file_path.name),
-                                        "taille": file_size,
-                                        "file_path": relative_path,
-                                        "user_id": user_id or "system",
-                                        "created_at": now,
-                                        "auto_discovered": True,  # Flag to indicate this was auto-discovered
-                                        "is_derived": False,  # Source documents are not derived
-                                    }
-
-                                    await service.create("document", document_data, record_id=doc_id)
-                                    logger.info(f"Auto-discovered and registered file: {file_path.name}")
-
-                                    # Add to response
-                                    documents.append(DocumentResponse(
-                                        id=f"document:{doc_id}",
+                                    # Create via service
+                                    new_doc = await doc_service.create_document(
                                         course_id=course_id,
                                         filename=file_path.name,
+                                        file_path=relative_path,
+                                        file_size=file_size,
                                         file_type=ext.lstrip('.'),
                                         mime_type=get_mime_type(file_path.name),
-                                        size=file_size,
-                                        file_path=relative_path,
-                                        created_at=now,
-                                        file_exists=True,
-                                        source_document_id=None,
-                                        is_derived=False,
-                                        derivation_type=None,
-                                    ))
+                                        source_type="upload",
+                                        is_derived=False
+                                    )
+
+                                    logger.info(f"Auto-discovered and registered file: {file_path.name}")
+                                    documents.append(new_doc)
+
                                 except Exception as e:
                                     logger.warning(f"Could not auto-register file {file_path.name}: {e}")
 
@@ -766,49 +673,17 @@ async def get_document(
     Recupere les details d'un document.
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
+        # Use document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        # Normalize IDs
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
-        if not doc_id.startswith("document:"):
-            doc_id = f"document:{doc_id}"
-
-        # Query document
-        clean_id = doc_id.replace("document:", "")
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
-
-        if not result or len(result) == 0:
+        if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document non trouve"
             )
 
-        # SurrealDB query() returns a list of results directly
-        items = result
-        if not items or len(items) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document non trouve"
-            )
-
-        item = items[0]
-
-        return DocumentResponse(
-            id=str(item.get("id", doc_id)),
-            course_id=item.get("course_id", course_id),
-            filename=item.get("nom_fichier", ""),
-            file_type=item.get("type_fichier", ""),
-            mime_type=item.get("type_mime", ""),
-            size=item.get("taille", 0),
-            file_path=item.get("file_path", ""),
-            created_at=item.get("created_at", ""),
-        )
+        return document
 
     except HTTPException:
         raise
@@ -836,88 +711,42 @@ async def delete_document(
         file_path: Optional - chemin complet du fichier à supprimer (utilisé si le document n'est pas en base)
     """
     try:
-        service = get_surreal_service()
-        if not service.db:
-            await service.connect()
-
         # Normalize IDs
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
-        # Get document to find file path
-        clean_id = doc_id.replace("document:", "")
+        # Get document service
+        doc_service = get_document_service()
+        document = await doc_service.get_document(doc_id)
 
-        result = await service.query(
-            "SELECT * FROM document WHERE id = type::thing('document', $doc_id)",
-            {"doc_id": clean_id}
-        )
+        # If document exists in database, handle deletion
+        if document:
+            logger.info(f"Found document to delete: {document.filename}")
 
-        # Parse SurrealDB response - it can have different structures
-        items = []
-        if result and len(result) > 0:
-            first_item = result[0]
-            if isinstance(first_item, dict):
-                # Check if it's wrapped in a "result" key
-                if "result" in first_item:
-                    items = first_item["result"] if isinstance(first_item["result"], list) else [first_item["result"]]
-                # Check if it has an "id" field directly (it's the document)
-                elif "id" in first_item:
-                    items = result
-            elif isinstance(first_item, list):
-                items = first_item
+            # Special handling for transcription documents
+            if document.source_document_id and document.derivation_type == "transcription":
+                # Clear texte_extrait from the source audio document
+                service = get_surreal_service()
+                if not service.db:
+                    await service.connect()
 
-        # If document exists in database, handle cleanup
-        if items and len(items) > 0:
-            item = items[0]
-            logger.info(f"Found document to delete: {item.get('nom_fichier', 'unknown')}")
+                try:
+                    await service.merge(document.source_document_id, {"texte_extrait": None})
+                    logger.info(f"Cleared texte_extrait from source document: {document.source_document_id}")
+                except Exception as e:
+                    logger.warning(f"Could not clear texte_extrait from source: {e}")
 
-            # If this is a transcription document, clear texte_extrait from the source audio
-            if item.get("is_transcription") and item.get("source_audio"):
-                source_audio_filename = item.get("source_audio")
-                course_id_for_query = item.get("course_id", course_id)
-                if not course_id_for_query.startswith("course:"):
-                    course_id_for_query = f"course:{course_id_for_query}"
+            # Delete using service (handles file, DB, and embeddings)
+            # Only delete file if it's in uploads directory (not linked files)
+            delete_file = (
+                document.file_path and
+                ("data/uploads/" in document.file_path or str(settings.upload_dir) in document.file_path)
+            )
 
-                # Find the source audio document
-                audio_result = await service.query(
-                    "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
-                    {"course_id": course_id_for_query, "filename": source_audio_filename}
-                )
-
-                if audio_result and len(audio_result) > 0:
-                    # SurrealDB query() returns a list of results directly
-                    audio_items = audio_result
-                    if isinstance(audio_items, list) and len(audio_items) > 0:
-                        audio_doc = audio_items[0]
-                        audio_doc_id = str(audio_doc.get("id", ""))
-                        if audio_doc_id:
-                            # Clear texte_extrait from the audio document
-                            await service.merge(audio_doc_id, {"texte_extrait": None})
-                            logger.info(f"Cleared texte_extrait from source audio document: {audio_doc_id}")
-
-            # Delete file from disk if it's in data/uploads/ (uploaded files)
-            # But keep linked files (external file_path)
-            file_path = item.get("file_path")
-            if file_path:
-                file_path_obj = Path(file_path)
-                # Check if file is in uploads directory
-                if "data/uploads/" in str(file_path_obj) or str(settings.upload_dir) in str(file_path_obj):
-                    if file_path_obj.exists():
-                        try:
-                            file_path_obj.unlink()
-                            logger.info(f"Deleted uploaded file from disk: {file_path}")
-                        except Exception as e:
-                            logger.warning(f"Could not delete file from disk: {e}")
-                    else:
-                        logger.warning(f"File does not exist on disk: {file_path}")
-                else:
-                    logger.info(f"Linked file kept on disk (external path): {file_path}")
-
-            # Delete from database
-            await service.delete(doc_id)
-            logger.info(f"Document record deleted: {doc_id}")
+            await doc_service.delete_document(doc_id, delete_file=delete_file)
+            logger.info(f"Document deleted: {doc_id}")
         else:
             # Document not in database
             # If no file_path or filename provided, this is a real 404 error
