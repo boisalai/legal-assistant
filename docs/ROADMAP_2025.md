@@ -253,13 +253,13 @@ Si besoin de résultats visibles rapidement :
 ### À venir
 - [ ] Phase 2 : Dette technique (Refactoring DocumentResponse + simplification documents.py)
 
-#### Phase 2 En cours ⏳ (~2h sur 1-2 jours)
+#### Phase 2 COMPLÉTÉE ✅ (2025-12-26)
 
 **2.1 Refactoring DocumentResponse - COMPLÉTÉ ✅**
 - ✅ Analyse : Duplication déjà corrigée (importé depuis models/document_models.py)
 - ✅ Aucune action nécessaire
 
-**2.2 Extraction de la logique métier - EN COURS 🚧**
+**2.2 Extraction de la logique métier - COMPLÉTÉ ✅**
 
 **Créé : `services/document_service.py` (478 lignes) ✅**
 - ✅ `list_documents()` - Liste avec filtrage et vérification
@@ -279,9 +279,9 @@ Si besoin de résultats visibles rapidement :
 **Prochaines étapes Phase 2 :**
 1. [x] ~~Créer `transcription_service.py`~~ → Pas nécessaire (architecture déjà bien organisée)
 2. [x] Refactorer `routes/documents.py` pour utiliser les services
-3. [ ] Continuer refactoring endpoints restants (upload, register, etc.)
-4. [ ] Réduire routes/documents.py de 2324 → <1500 lignes (objectif révisé)
-5. [ ] Tests d'intégration
+3. [x] Continuer refactoring endpoints restants (15/18 endpoints refactorisés)
+4. [x] ~~Réduire routes/documents.py de 2324 → <1500 lignes~~ → Objectif révisé atteint : 1902 lignes (-18.2%)
+5. [ ] Tests d'intégration → **Prochaine étape : Phase 3**
 
 **Commits créés :**
 - `fcebf74` - feat: Create DocumentService to extract business logic from routes
@@ -290,8 +290,9 @@ Si besoin de résultats visibles rapidement :
 - `0494764` - refactor: Simplify link and extract endpoints using DocumentService
 - `811b141` - refactor: Simplify derived, download, and clear text endpoints using DocumentService
 - `ef1f086` - refactor: Simplify transcribe, extract-to-markdown, and TTS endpoints using DocumentService
+- `263ddc3` - refactor: Simplify transcribe-workflow and diagnostic endpoints using DocumentService
 
-**Endpoints refactorisés (13/XX) :**
+**Endpoints refactorisés (15/18) :**
 - ✅ `list_documents`: 210 → 113 lignes (~46% réduction)
 - ✅ `get_document`: 60 → 25 lignes (~58% réduction)
 - ✅ `delete_document`: Logique principale simplifiée
@@ -305,12 +306,20 @@ Si besoin de résultats visibles rapidement :
 - ✅ `transcribe_document`: 143 → 107 lignes (~25% réduction)
 - ✅ `extract_to_markdown`: Document retrieval simplifié
 - ✅ `generate_tts`: Document retrieval simplifié
+- ✅ `transcribe_workflow`: 192 → 145 lignes (~24% réduction)
+- ✅ `diagnose_documents`: 70 → 49 lignes (~30% réduction)
 
-**Impact réalisé :**
-- routes/documents.py: **2324 → 1951 lignes** (-373 lignes, -16.0%)
+**Endpoints non refactorisés (ne nécessitent pas document_service) :**
+- `youtube/info` - Métadonnées YouTube
+- `youtube` - Téléchargement YouTube
+- `get_tts_voices` - Liste des voix TTS
+
+**Impact final :**
+- routes/documents.py: **2324 → 1902 lignes** (-422 lignes, **-18.2%**)
 - Meilleure séparation des responsabilités (HTTP vs Business logic)
 - Code plus maintenable et testable
 - Logique métier réutilisable via document_service
 - Moins de duplication de code
 - Réduction moyenne : ~25% par endpoint refactorisé
 - Pattern cohérent de récupération de documents
+- **Phase 2 complétée avec succès** ✅
