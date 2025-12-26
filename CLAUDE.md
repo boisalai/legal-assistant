@@ -84,6 +84,15 @@
    - Identification automatique des catégories de documents
    - Rate limiting et authentification automatique
 
+10. **Tuteur IA pédagogique** ✨
+   - Mode tuteur automatique détectant le document ouvert
+   - Génération de résumés structurés avec objectifs d'apprentissage
+   - Création de cartes mentales (mind maps) thématiques
+   - Quiz interactifs avec explications détaillées
+   - Explications de concepts juridiques avec méthode socratique
+   - Détection automatique du contexte via activity tracking
+   - 4 outils Agno dédiés : `generate_summary`, `generate_mindmap`, `generate_quiz`, `explain_concept`
+
 ### Architecture technique
 
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
@@ -93,7 +102,9 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `backend/routes/docusaurus.py` - API d'import Docusaurus
 - `backend/services/youtube_service.py` - Service de téléchargement YouTube
 - `backend/services/caij_search_service.py` - Service de recherche CAIJ
+- `backend/services/tutor_service.py` - Service de génération de contenu pédagogique
 - `backend/tools/caij_search_tool.py` - Outil Agno pour CAIJ
+- `backend/tools/tutor_tools.py` - Outils Agno pour le tuteur IA
 - `backend/models/document_models.py` - Modèles Pydantic partagés
 - `backend/models/caij_models.py` - Modèles CAIJ avec mapping de rubriques
 - `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
@@ -102,7 +113,158 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ---
 
-## Session actuelle (2025-12-26) - Intégration CAIJ réussie ✅
+## Session actuelle (2025-12-26) - Implémentation Tuteur IA pédagogique ✨
+
+### Objectif
+
+Transformer le chat existant en tuteur IA pédagogique qui détecte automatiquement le document ouvert et fournit des outils d'apprentissage : résumés, mind maps, quiz, et explications avec méthode socratique.
+
+### Approche retenue
+
+**Détection automatique du contexte** via activity tracking (zéro changement frontend) + **4 outils Agno** pour la pédagogie.
+
+### Implémentation
+
+#### 1. Service de tuteur (`backend/services/tutor_service.py`)
+
+Service complet pour la génération de contenu pédagogique :
+
+**Fonctionnalités :**
+- Génération de résumés structurés avec objectifs d'apprentissage
+- Création de cartes mentales thématiques avec emojis
+- Génération de quiz interactifs avec explications détaillées
+- Explications de concepts juridiques approfondies
+- Utilise `semantic_search` pour ancrer le contenu (anti-hallucination)
+- Support mode document spécifique ou cours complet
+
+**Méthodes principales :**
+```python
+class TutorService:
+    async def generate_summary_content(case_id, document_id, summary_type) -> str
+    async def generate_mindmap_content(case_id, document_id, focus_topic) -> str
+    async def generate_quiz_content(case_id, document_id, num_questions, difficulty) -> str
+    async def generate_concept_explanation(case_id, concept, document_id, detail_level) -> str
+```
+
+#### 2. Outils Agno (`backend/tools/tutor_tools.py`)
+
+4 outils exposés au framework Agno :
+
+**`@tool generate_summary`**
+- Résumés pédagogiques avec structure d'apprentissage
+- Sections : Objectifs, Points clés, Concepts importants, Points d'attention
+- Citations des sources
+
+**`@tool generate_mindmap`**
+- Cartes mentales markdown avec emojis
+- Organisation thématique automatique (définitions, principes, conditions, exceptions, exemples)
+- Structure hiérarchique à 3-4 niveaux
+
+**`@tool generate_quiz`**
+- Quiz interactifs avec format `<details>` collapsible
+- 3 niveaux de difficulté (⭐ facile, ⭐⭐ moyen, ⭐⭐⭐ difficile)
+- Explications détaillées avec sources
+
+**`@tool explain_concept`**
+- Explications structurées (Définition, Conditions, Exemples, Sources, Concepts liés)
+- 3 niveaux de détail (simple, standard, avancé)
+
+#### 3. Détection automatique du contexte (`backend/routes/chat.py`)
+
+Intégration dans le système de chat existant :
+
+**Fonctions helper ajoutées :**
+```python
+def _get_current_document_from_activities(activities) -> Optional[str]
+    # Parse les 20 dernières activités pour trouver le document ouvert
+    # view_document → document ouvert
+    # close_document → aucun document ouvert
+
+def _build_tutor_system_prompt(case_data, documents, current_document_id, ...) -> str
+    # Adapte le prompt selon le contexte :
+    # - Document ouvert → Mode tuteur document spécifique
+    # - Aucun document → Mode tuteur cours complet
+    # - Inclut instructions méthode socratique
+```
+
+**Intégration des outils :**
+- Les 4 outils tuteur ajoutés à la liste des tools de l'agent Agno
+- Détection automatique lors de chaque requête chat
+- Logs informatifs : "Document X is currently open" ou "No document open"
+
+#### 4. Documentation complète
+
+**`backend/TUTEUR_IA_IMPLEMENTATION.md`** créé avec :
+- Architecture détaillée
+- Exemples de sortie pour chaque outil
+- Scénarios d'utilisation
+- Workflow utilisateur
+- Décisions d'architecture justifiées
+
+### Tests réalisés
+
+**✅ Backend démarré avec succès :**
+```bash
+✅ SurrealDB connected successfully
+✅ Routes configured: /api/chat
+✅ 4 tutor tools loaded
+```
+
+**✅ Test de l'endpoint chat :**
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Bonjour", "model_id": "ollama:qwen2.5:7b"}'
+```
+
+**Réponse reçue :**
+- Ton pédagogique confirmé
+- Mode tuteur activé (logs: "using tutor mode without course context")
+- Aucune erreur de syntaxe ou d'intégration
+
+### Fichiers créés/modifiés
+
+**Backend :**
+- ✅ `backend/services/tutor_service.py` - Service de génération pédagogique (créé, 660 lignes)
+- ✅ `backend/tools/tutor_tools.py` - 4 outils Agno (créé, 135 lignes)
+- ✅ `backend/routes/chat.py` - Détection contexte + prompt adaptatif (modifié, +250 lignes)
+- ✅ `backend/TUTEUR_IA_IMPLEMENTATION.md` - Documentation complète (créé)
+
+**Frontend :**
+- ✅ Aucune modification requise (détection via activity tracking existant)
+
+### Utilisation
+
+**Commandes naturelles en français :**
+- "Résume ce document" → Génère un résumé structuré
+- "Fais une carte mentale" → Crée une mind map thématique
+- "Génère un quiz" → Quiz interactif 5 questions
+- "Explique-moi la prescription acquisitive" → Explication détaillée
+
+**Méthode socratique :**
+- "C'est quoi la prescription acquisitive?" → Questions guidées avant explication
+- Escape hatch : "Explique-moi directement" pour sauter les questions
+
+### Avantages de cette approche
+
+✅ **Zéro changement frontend** - Utilise activity tracking existant
+✅ **Interface familière** - Chat reste identique
+✅ **Contexte automatique** - Détecte le document ouvert
+✅ **Anti-hallucination** - Toutes les réponses ancrées dans semantic_search
+✅ **Citations sources** - Chaque information référencée
+✅ **Pédagogiquement structuré** - Format optimisé pour l'apprentissage
+
+### Prochaines améliorations possibles
+
+1. **Frontend UI hints** - Badge "Tuteur actif" visible
+2. **Quiz interactif dynamique** - Validation des réponses en temps réel
+3. **Tracking de progression** - Statistiques d'apprentissage
+4. **Distracteurs intelligents** - Fausses réponses plausibles générées par LLM
+5. **Export PDF** - Résumés/mind maps exportables
+
+---
+
+## Session précédente (2025-12-26 AM) - Intégration CAIJ réussie ✅
 
 ### Objectif
 
