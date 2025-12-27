@@ -15,7 +15,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 import mimetypes
 
-from utils.text_utils import remove_yaml_frontmatter
+from utils.text_utils import remove_yaml_frontmatter, sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +314,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=True,
-                text=result.text_content,
+                text=sanitize_text(result.text_content),
                 metadata={
                     "source": str(file_path),
                     "title": getattr(result, "title", None),
@@ -346,7 +346,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=True,
-                text=full_text,
+                text=sanitize_text(full_text),
                 metadata={
                     "num_pages": len(reader.pages),
                     "has_text": bool(full_text.strip()),
@@ -375,7 +375,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=result.success,
-                text=result.text,
+                text=sanitize_text(result.text) if result.text else "",
                 metadata=result.metadata,
                 error=result.error,
                 extraction_method=result.extraction_method
@@ -423,7 +423,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=True,
-                text=full_text,
+                text=sanitize_text(full_text),
                 metadata={
                     "num_paragraphs": len(doc.paragraphs),
                     "num_tables": len(doc.tables),
@@ -463,7 +463,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=True,
-                text=text,
+                text=sanitize_text(text),
                 metadata={
                     "encoding": used_encoding,
                     "size_chars": len(text),
@@ -483,7 +483,7 @@ class DocumentExtractionService:
         result = await self._extract_text(file_path)
         if result.success and result.text:
             # Remove YAML frontmatter (Docusaurus metadata, etc.)
-            result.text = remove_yaml_frontmatter(result.text)
+            result.text = sanitize_text(remove_yaml_frontmatter(result.text))
             result.extraction_method = "markdown"
         return result
 
@@ -538,7 +538,7 @@ class DocumentExtractionService:
 
             return ExtractionResult(
                 success=True,
-                text=result["text"],
+                text=sanitize_text(result["text"]),
                 metadata={
                     "language": result.get("language", language),
                     "duration_seconds": result.get("duration", 0),

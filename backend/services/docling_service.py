@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 
+from utils.text_utils import sanitize_text
+
 logger = logging.getLogger(__name__)
 
 # Flag pour vérifier si Docling est disponible
@@ -150,8 +152,8 @@ class DoclingService:
 
             return DoclingExtractionResult(
                 success=True,
-                markdown=markdown,
-                text=markdown,  # Fallback
+                markdown=sanitize_text(markdown),
+                text=sanitize_text(markdown),  # Fallback
                 tables=tables,
                 metadata=metadata,
                 extraction_method=f"docling-{'vlm' if self.use_vlm else 'standard'}"

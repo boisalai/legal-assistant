@@ -5,6 +5,37 @@ Fonctions partagées pour le nettoyage et la manipulation de texte.
 """
 
 
+def sanitize_text(text: str) -> str:
+    """
+    Nettoie le texte en retirant les caractères problématiques.
+
+    Retire notamment les null bytes (\x00) qui causent des erreurs
+    de sérialisation dans SurrealDB.
+
+    Args:
+        text: Texte à nettoyer
+
+    Returns:
+        Texte nettoyé, sans caractères null
+
+    Examples:
+        >>> sanitize_text("Hello\x00World")
+        'HelloWorld'
+        >>> sanitize_text("Normal text")
+        'Normal text'
+    """
+    if not text:
+        return text
+
+    # Remove null bytes (causes SurrealDB serialization errors)
+    cleaned = text.replace("\x00", "")
+
+    # Optionally remove other problematic control characters (except newlines/tabs)
+    # cleaned = ''.join(char for char in cleaned if char.isprintable() or char in '\n\r\t')
+
+    return cleaned
+
+
 def remove_yaml_frontmatter(content: str) -> str:
     """
     Retire le frontmatter YAML du contenu Markdown.
