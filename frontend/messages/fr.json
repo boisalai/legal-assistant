@@ -29,6 +29,7 @@
   "nav": {
     "dashboard": "Tableau de bord",
     "courses": "Cours",
+    "sessions": "Sessions",
     "newCourse": "Nouveau cours",
     "analysis": "Analyse",
     "assistant": "Assistant IA",

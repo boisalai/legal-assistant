@@ -14,6 +14,7 @@ import {
   User,
   ChevronUp,
   Scale,
+  Calendar,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,6 +50,11 @@ const mainNavItems: NavItem[] = [
     titleKey: "nav.courses",
     href: "/courses",
     icon: FolderOpen,
+  },
+  {
+    titleKey: "nav.sessions",
+    href: "/sessions",
+    icon: Calendar,
   },
   {
     titleKey: "nav.assistant",

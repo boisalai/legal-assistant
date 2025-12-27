@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus } from "lucide-react";
 import { sessionsApi } from "@/lib/api";
 import type { Session } from "@/types";
+import { CreateSessionModal } from "@/components/sessions/create-session-modal";
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   useEffect(() => {
     loadSessions();
@@ -39,7 +41,7 @@ export default function SessionsPage() {
             Gérez vos sessions académiques (semestres, années)
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setCreateModalOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle Session
         </Button>
@@ -93,6 +95,13 @@ export default function SessionsPage() {
           ))}
         </div>
       )}
+
+      {/* Create Session Modal */}
+      <CreateSessionModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSessionCreated={loadSessions}
+      />
     </div>
   );
 }
