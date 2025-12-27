@@ -243,12 +243,12 @@ class DocumentService:
             if not mime_type:
                 mime_type = get_mime_type(filename)
 
-            # Generate document ID
-            doc_id = f"document:{uuid.uuid4()}"
+            # Generate document ID (remove hyphens for SurrealDB compatibility)
+            doc_id = f"document:{uuid.uuid4().hex[:16]}"
 
             # Prepare document data
+            # Note: Don't include "id" in doc_data - it's specified in the CREATE statement
             doc_data = {
-                "id": doc_id,
                 "course_id": course_id,
                 "nom_fichier": filename,
                 "type_fichier": file_type,

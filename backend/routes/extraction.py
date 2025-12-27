@@ -371,7 +371,8 @@ async def extract_pdf_to_markdown(
                         "data": {"step": "save", "message": "Enregistrement dans la base de données...", "percentage": 85}
                     })
 
-                    new_doc_id = str(uuid.uuid4())
+                    # Generate document ID (remove hyphens for SurrealDB compatibility)
+                    new_doc_id = uuid.uuid4().hex[:16]
                     doc_record = {
                         "case_id": case_id,
                         "nom_fichier": markdown_filename,
