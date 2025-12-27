@@ -303,10 +303,12 @@ export function CaseDetailsPanel({
   };
 
   // Handle PDF extraction to markdown
-  const handleExtractPDF = async (doc: Document) => {
+  const handleExtractPDF = async (doc: Document, forceReextract: boolean = false) => {
     setExtractingPDFDocId(doc.id);
     try {
-      const result = await documentsApi.extractPDFToMarkdown(caseData.id, doc.id);
+      const result = await documentsApi.extractPDFToMarkdown(caseData.id, doc.id, {
+        forceReextract,
+      });
 
       // Only refresh and show success if extraction actually succeeded
       if (result.success) {
@@ -319,7 +321,23 @@ export function CaseDetailsPanel({
         toast.error(result.error || "Erreur lors de l'extraction");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de l'extraction");
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de l'extraction";
+
+      // Check if error is about existing markdown file
+      if (errorMessage.includes("existe déjà")) {
+        // Ask user if they want to force re-extract
+        const confirmed = window.confirm(
+          `${errorMessage}\n\nVoulez-vous supprimer et réextraire le fichier ?`
+        );
+
+        if (confirmed) {
+          // Retry with forceReextract=true
+          await handleExtractPDF(doc, true);
+          return;
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       setExtractingPDFDocId(null);
     }
