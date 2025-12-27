@@ -546,6 +546,7 @@ export const documentsApi = {
     caseId: string,
     documentId: string,
     options: {
+      forceReextract?: boolean;
       onProgress?: (progress: PDFExtractionProgress) => void;
       onStepStart?: (step: string) => void;
       onStepComplete?: (step: string, success: boolean) => void;
@@ -556,15 +557,20 @@ export const documentsApi = {
 
     const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract-to-markdown`,
-      {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      }
+    // Build URL with force_reextract parameter if needed
+    const url = new URL(
+      `${API_BASE_URL}/api/courses/${encodeURIComponent(cleanCaseId)}/documents/${encodeURIComponent(cleanDocId)}/extract-to-markdown`
     );
+    if (options.forceReextract) {
+      url.searchParams.set("force_reextract", "true");
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "PDF extraction failed" }));
