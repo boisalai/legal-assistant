@@ -25,7 +25,7 @@ class CourseBase(BaseModel):
     session_id: Optional[str] = Field(None, description="ID de la session académique")
     course_code: Optional[str] = Field(None, description="Code du cours (ex: 'DRT-1151G')")
     professor: Optional[str] = Field(None, description="Nom du professeur")
-    credits: int = Field(3, ge=1, le=12, description="Nombre de crédits (1-12)")
+    credits: int = Field(3, ge=0, le=6, description="Nombre de crédits (0-6)")
     color: Optional[str] = Field(None, description="Couleur pour l'UI (hex code)")
 
     # UI preferences
@@ -48,7 +48,7 @@ class CourseUpdate(BaseModel):
     session_id: Optional[str] = None
     course_code: Optional[str] = None
     professor: Optional[str] = None
-    credits: Optional[int] = Field(None, ge=1, le=12)
+    credits: Optional[int] = Field(None, ge=0, le=6)
     color: Optional[str] = None
 
     # UI preferences (optional)

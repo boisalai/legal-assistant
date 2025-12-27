@@ -183,8 +183,8 @@ export function NewCaseModal({ open, onOpenChange }: NewCaseModalProps) {
                 <Input
                   id="credits"
                   type="number"
-                  min="1"
-                  max="12"
+                  min="0"
+                  max="6"
                   value={credits}
                   onChange={(e) => setCredits(e.target.value)}
                 />
