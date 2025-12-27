@@ -1,24 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { DataTable } from "@/components/cases/data-table";
+import { createSessionColumns } from "@/components/sessions/columns";
+import { AppShell } from "@/components/layout";
+import { CreateSessionModal } from "@/components/sessions/create-session-modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { sessionsApi } from "@/lib/api";
 import type { Session } from "@/types";
-import { CreateSessionModal } from "@/components/sessions/create-session-modal";
+import { Loader2, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SessionsPage() {
+  const t = useTranslations();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  const loadSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -30,78 +42,159 @@ export default function SessionsPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  const handleEdit = (id: string) => {
+    // TODO: Implement edit modal
+    toast.info("Modification de session - à implémenter");
   };
 
+  const handleDelete = (id: string) => {
+    setSessionToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!sessionToDelete) return;
+
+    try {
+      await sessionsApi.delete(sessionToDelete);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionToDelete));
+      toast.success("Session supprimée avec succès");
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la suppression"
+      );
+    } finally {
+      setSessionToDelete(null);
+    }
+  };
+
+  const handleDeleteSelected = async (ids: string[]) => {
+    try {
+      // Delete sessions one by one
+      await Promise.all(ids.map((id) => sessionsApi.delete(id)));
+      setSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+      toast.success(`${ids.length} session(s) supprimée(s)`);
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const columns = createSessionColumns(handleEdit, handleDelete, (key: string) =>
+    t(key)
+  );
+
+  // Sort sessions by year and semester
+  const sortedSessions = [...sessions].sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    const semesterOrder: Record<string, number> = {
+      Hiver: 1,
+      Été: 2,
+      Automne: 3,
+    };
+    return (semesterOrder[a.semester] || 0) - (semesterOrder[b.semester] || 0);
+  });
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <p className="text-destructive">{error}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchSessions();
+            }}
+          >
+            Réessayer
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Sessions Académiques</h1>
-          <p className="text-muted-foreground mt-2">
-            Gérez vos sessions académiques (semestres, années)
-          </p>
-        </div>
-        <Button onClick={() => setCreateModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvelle Session
-        </Button>
-      </div>
-
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="p-6">
-            <p className="text-destructive">Erreur : {error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {loading ? (
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground">Chargement des sessions...</p>
-          </CardContent>
-        </Card>
-      ) : sessions.length === 0 ? (
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-muted-foreground">
-              Aucune session académique. Créez-en une pour commencer.
+    <AppShell>
+      <div className="space-y-6">
+        {/* Sessions Table */}
+        {sessions.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground border rounded-lg bg-card">
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <p className="mb-4">Aucune session académique</p>
+            <p className="text-sm mb-6">
+              Créez une session pour organiser vos cours par semestre
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-lg">{session.title}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {session.semester} {session.year}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Début : </span>
-                    <span>{new Date(session.start_date).toLocaleDateString("fr-FR")}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin : </span>
-                    <span>{new Date(session.end_date).toLocaleDateString("fr-FR")}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+            <Button onClick={() => setCreateModalOpen(true)}>
+              + Nouvelle Session
+            </Button>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={sortedSessions}
+            onDeleteSelected={handleDeleteSelected}
+            onNewCase={() => setCreateModalOpen(true)}
+            newCaseLabel="Nouvelle Session"
+          />
+        )}
 
-      {/* Create Session Modal */}
-      <CreateSessionModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        onSessionCreated={loadSessions}
-      />
-    </div>
+        {/* Create Session Modal */}
+        <CreateSessionModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          onSessionCreated={fetchSessions}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          open={!!sessionToDelete}
+          onOpenChange={(open) => !open && setSessionToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer cette session ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irréversible. La session sera définitivement
+                supprimée.
+                {sessions.find((s) => s.id === sessionToDelete) && (
+                  <div className="mt-2 font-semibold">
+                    {sessions.find((s) => s.id === sessionToDelete)?.title}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </AppShell>
   );
 }
