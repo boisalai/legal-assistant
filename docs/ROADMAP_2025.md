@@ -69,20 +69,33 @@ backend/services/
 
 ---
 
-## 🟢 **Phase 3 : Qualité et stabilité** (2-3 jours)
+## 🟢 **Phase 3 : Qualité et stabilité** (2-3 jours) - EN COURS ⏳
 
-### 3.1 Tests d'intégration complets (~6-8h)
-**Priorité** : Couvrir les endpoints critiques
+### 3.1 Tests d'intégration complets (~6-8h) - EN COURS 🚧
+**Priorité** : Couvrir les endpoints refactorisés
 
+**Fichiers de test créés** :
 ```python
-backend/tests/integration/
-├── test_courses_api.py        # CRUD complet
-├── test_documents_api.py      # Upload, liaison, suppression
-├── test_chat_api.py           # Streaming SSE avec RAG
-├── test_tutor_api.py          # Outils pédagogiques
-├── test_caij_search.py        # Recherche CAIJ
-└── test_rag_pipeline.py       # Indexation et recherche
+backend/tests/
+├── conftest.py                      # Fixtures globales (✅ existant)
+├── test_courses.py                  # Tests CRUD courses (✅ existant)
+├── test_documents.py                # Tests CRUD documents de base (✅ existant)
+├── test_documents_refactored.py     # Tests endpoints refactorisés (🆕 créé)
+├── test_chat.py                     # Streaming SSE avec RAG (✅ existant)
+├── test_caij_service.py             # Recherche CAIJ (✅ existant)
+├── test_semantic_search.py          # RAG pipeline (✅ existant)
+├── test_transcription.py            # Transcription audio (✅ existant)
+└── test_linked_directories.py       # Répertoires liés (✅ existant)
 ```
+
+**Tests pour endpoints refactorisés (2025-12-26)** :
+- ✅ `test_documents_refactored.py` créé (17 tests)
+  - Tests CRUD avec document_service
+  - Tests documents dérivés
+  - Tests extraction et nettoyage de texte
+  - Tests liaison de fichiers/dossiers
+  - Tests diagnostic
+  - Test workflow complet intégré
 
 ### 3.2 Benchmarking et optimisation RAG (~3-4h)
 **Objectif** : Trouver les meilleurs paramètres
@@ -323,3 +336,40 @@ Si besoin de résultats visibles rapidement :
 - Réduction moyenne : ~25% par endpoint refactorisé
 - Pattern cohérent de récupération de documents
 - **Phase 2 complétée avec succès** ✅
+
+#### Phase 3 EN COURS ⏳ (2025-12-26)
+
+**3.1 Tests d'intégration - DÉMARRÉ ✅**
+
+**Bugs critiques découverts et corrigés :**
+1. ✅ **UUID avec tirets incompatible SurrealDB**
+   - Erreur: `Parse error: Unexpected token '-'` lors de CREATE
+   - Cause: UUIDs format `6adadd6f-c1ae-4f69-8051` avec tirets
+   - Fix: Utiliser `uuid.uuid4().hex[:16]` → `6adadd6fc1ae4f69`
+   - Fichiers corrigés: `services/document_service.py`, `routes/documents.py`, `routes/extraction.py`
+
+2. ✅ **ID dupliqué dans CREATE statement**
+   - Erreur: Conflit entre `CREATE document:xyz` et `{"id": "document:xyz"}` dans CONTENT
+   - Fix: Retirer `"id"` de `doc_data` dans `document_service.py`
+
+**Tests créés (2025-12-26) :**
+- ✅ `tests/test_documents_refactored.py` (443 lignes, 17 tests)
+  - Tests pour les 15 endpoints refactorisés
+  - **Résultats actuels : 8/13 tests passent** (62% ✅)
+  - 5 tests échouent (problèmes mineurs de field names, pas liés aux UUID)
+
+**Classes de tests :**
+- `TestDerivedDocuments` (2 tests) - Documents dérivés
+- `TestDocumentTextOperations` (4 tests) - Opérations sur le texte
+- `TestDocumentRegistration` (2 tests) - Enregistrement de documents
+- `TestLinkFileOrFolder` (2 tests) - Liaison de fichiers/dossiers
+- `TestDiagnostic` (2 tests) - Diagnostic de cohérence
+- `TestRefactoredEndpointsIntegration` (1 test) - Workflow complet
+
+**Prochaines étapes Phase 3 :**
+1. [ ] Corriger les 5 tests restants (field names et auth)
+2. [ ] Atteindre 100% de passage (17/17 tests)
+3. [ ] Continuer Phase 3.2 : Benchmarking RAG
+
+**Commits créés :**
+- `e6f0f8f` - fix: Use hex UUID format for SurrealDB compatibility + add Phase 3 integration tests
