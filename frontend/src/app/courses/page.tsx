@@ -7,6 +7,7 @@ import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
 import { NewCaseModal } from "@/components/cases/new-course-modal";
+import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ export default function CasesListPage() {
   const [error, setError] = useState<string | null>(null);
   const [showNewCaseModal, setShowNewCaseModal] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<string | null>(null);
+  const [caseToEdit, setCaseToEdit] = useState<Case | null>(null);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -46,6 +48,10 @@ export default function CasesListPage() {
 
   const handleDelete = (id: string) => {
     setCaseToDelete(id);
+  };
+
+  const handleEdit = (course: Case) => {
+    setCaseToEdit(course);
   };
 
   const confirmDelete = async () => {
@@ -81,7 +87,7 @@ export default function CasesListPage() {
     }
   };
 
-  const columns = createColumns(handleDelete, handleTogglePin, (key: string) => t(key));
+  const columns = createColumns(handleDelete, handleTogglePin, handleEdit, (key: string) => t(key));
 
   // Sort cases: pinned first, then by updated_at descending
   const sortedCases = [...cases].sort((a, b) => {
@@ -141,6 +147,13 @@ export default function CasesListPage() {
         )}
 
         <NewCaseModal open={showNewCaseModal} onOpenChange={setShowNewCaseModal} />
+
+        <EditCourseModal
+          open={!!caseToEdit}
+          onOpenChange={(open) => !open && setCaseToEdit(null)}
+          course={caseToEdit}
+          onSuccess={fetchCases}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!caseToDelete} onOpenChange={(open) => !open && setCaseToDelete(null)}>

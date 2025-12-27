@@ -164,6 +164,8 @@ export const coursesApi = {
       professor?: string;
       credits?: number;
       color?: string;
+      year?: number;
+      semester?: string;
     }
   ): Promise<Course> {
     // Remove "course:", "judgment:", or "case:" prefix if present
@@ -1125,90 +1127,6 @@ export const linkedDirectoryApi = {
 };
 
 // ============================================
-// Sessions API (Academic)
-// ============================================
-
-import type { Session } from "@/types";
-
-export interface SessionListResponse {
-  items: Session[];
-  total: number;
-  page: number;
-  page_size: number;
-  has_more: boolean;
-}
-
-export interface SessionCoursesResponse {
-  courses: Course[];
-  total: number;
-}
-
-export const sessionsApi = {
-  // List all sessions
-  async list(page: number = 1, pageSize: number = 20, year?: number): Promise<SessionListResponse> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      page_size: pageSize.toString(),
-    });
-    if (year) {
-      params.append("year", year.toString());
-    }
-    return fetchApi<SessionListResponse>(`/api/sessions?${params}`);
-  },
-
-  // Get single session by ID
-  async get(id: string): Promise<Session> {
-    return fetchApi<Session>(`/api/sessions/${encodeURIComponent(id)}`);
-  },
-
-  // Create new session
-  async create(data: {
-    title: string;
-    semester: string;
-    year: number;
-    start_date: string;
-    end_date: string;
-  }): Promise<Session> {
-    return fetchApi<Session>("/api/sessions", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  },
-
-  // Update session
-  async update(
-    id: string,
-    data: Partial<{
-      title: string;
-      semester: string;
-      year: number;
-      start_date: string;
-      end_date: string;
-    }>
-  ): Promise<Session> {
-    return fetchApi<Session>(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-  },
-
-  // Delete session
-  async delete(id: string): Promise<void> {
-    await fetchApi<void>(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-  },
-
-  // Get all courses in a session
-  async getCourses(id: string): Promise<Course[]> {
-    const response = await fetchApi<SessionCoursesResponse>(
-      `/api/sessions/${encodeURIComponent(id)}/courses`
-    );
-    return response.courses;
-  },
-};
-
-// ============================================
 // Export all APIs
 // ============================================
 
@@ -1223,7 +1141,6 @@ export const api = {
   health: healthApi,
   docusaurus: docusaurusApi,
   linkedDirectory: linkedDirectoryApi,
-  sessions: sessionsApi,
   // Backward compatibility
   cases: coursesApi,
 };

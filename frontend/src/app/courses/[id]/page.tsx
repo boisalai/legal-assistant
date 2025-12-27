@@ -15,6 +15,7 @@ import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
+import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -40,6 +41,7 @@ export default function CourseDetailPage() {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
 
@@ -108,6 +110,10 @@ export default function CourseDetailPage() {
 
   const handleYouTubeImport = () => {
     setYoutubeModalOpen(true);
+  };
+
+  const handleEdit = () => {
+    setEditModalOpen(true);
   };
 
   const handleUploadComplete = async () => {
@@ -288,6 +294,7 @@ export default function CourseDetailPage() {
                   onRecordAudio={handleRecordAudio}
                   onLinkFile={handleLinkFile}
                   onYouTubeImport={handleYouTubeImport}
+                  onEdit={handleEdit}
                   onUpdateCase={handleUpdateCase}
                   onDeleteDocument={handleDeleteDocument}
                   onPreviewDocument={handlePreviewDocument}
@@ -345,6 +352,14 @@ export default function CourseDetailPage() {
           onClose={() => setYoutubeModalOpen(false)}
           caseId={courseId}
           onDownloadComplete={handleUploadComplete}
+        />
+
+        {/* Edit Course Modal */}
+        <EditCourseModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          course={courseData}
+          onSuccess={fetchCaseDetails}
         />
       </div>
     </AppShell>

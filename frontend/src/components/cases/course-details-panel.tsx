@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SessionSelector } from "@/components/cases/session-selector";
 import {
   FileUp,
   Mic,
@@ -51,10 +50,10 @@ interface CaseDetailsPanelProps {
   onLinkFile: () => void;
   onYouTubeImport: () => void;
   onAnalyze?: () => void;
+  onEdit?: () => void;
   onUpdateCase: (data: {
     description?: string;
     type_transaction?: string;
-    session_id?: string;
     course_code?: string;
     professor?: string;
     credits?: number;
@@ -77,6 +76,7 @@ export function CaseDetailsPanel({
   onRecordAudio,
   onLinkFile,
   onYouTubeImport,
+  onEdit,
   onUpdateCase,
   onDeleteDocument,
   onPreviewDocument,
@@ -92,7 +92,6 @@ export function CaseDetailsPanel({
   const [isSaving, setIsSaving] = useState(false);
 
   // Academic fields for editing
-  const [editSessionId, setEditSessionId] = useState(caseData.session_id || "");
   const [editCourseCode, setEditCourseCode] = useState(caseData.course_code || "");
   const [editProfessor, setEditProfessor] = useState(caseData.professor || "");
   const [editCredits, setEditCredits] = useState(caseData.credits?.toString() || "3");
@@ -370,7 +369,6 @@ export function CaseDetailsPanel({
       };
 
       // Add academic fields if they have values
-      if (editSessionId) updateData.session_id = editSessionId;
       if (editCourseCode) updateData.course_code = editCourseCode;
       if (editProfessor) updateData.professor = editProfessor;
       if (editCredits) updateData.credits = parseInt(editCredits, 10);
@@ -385,7 +383,6 @@ export function CaseDetailsPanel({
 
   const handleCancelEdit = () => {
     setEditDescription(caseData.description || "");
-    setEditSessionId(caseData.session_id || "");
     setEditCourseCode(caseData.course_code || "");
     setEditProfessor(caseData.professor || "");
     setEditCredits(caseData.credits?.toString() || "3");
@@ -416,16 +413,6 @@ export function CaseDetailsPanel({
             {/* Academic fields */}
             <div className="space-y-4">
               <h4 className="font-medium text-sm text-muted-foreground">{t("courses.academicInfo")}</h4>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-session">{t("courses.session")}</Label>
-                <SessionSelector
-                  value={editSessionId}
-                  onValueChange={setEditSessionId}
-                  disabled={isSaving}
-                  placeholder={t("courses.selectSession")}
-                />
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -522,7 +509,7 @@ export function CaseDetailsPanel({
         <div className="flex items-center py-2 gap-2 flex-wrap">
           <Button
             size="sm"
-            onClick={() => setIsEditing(true)}
+            onClick={() => onEdit ? onEdit() : setIsEditing(true)}
             disabled={isEditing}
             className="gap-2"
           >

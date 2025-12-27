@@ -18,6 +18,7 @@ import { MoreHorizontal, Pin, PinOff } from "lucide-react";
 export const createColumns = (
   onDelete: (id: string) => void,
   onTogglePin: (id: string) => void,
+  onEdit: (course: Course) => void,
   t: (key: string) => string
 ): ColumnDef<Course>[] => [
   {
@@ -134,6 +135,11 @@ export const createColumns = (
               onClick={() => navigator.clipboard.writeText(caseItem.id)}
             >
               {t("table.actions.copyId")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onEdit(caseItem)}
+            >
+              {t("table.actions.edit")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onTogglePin(caseItem.id)}
