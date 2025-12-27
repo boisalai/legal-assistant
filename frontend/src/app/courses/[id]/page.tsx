@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import type { Course, Checklist, Document } from "@/types";
 export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations();
 
   // Use the raw ID - the API will handle the judgment: prefix
   const rawId = params.id as string;
@@ -218,7 +220,7 @@ export default function CourseDetailPage() {
                   {/* Header - matching AssistantPanel style */}
                   <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
                     <div className="flex flex-col gap-1 flex-1 min-w-0">
-                      <h2 className="text-xl font-bold">Contenu du répertoire lié</h2>
+                      <h2 className="text-xl font-bold">{t("courses.directoryContent")}</h2>
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Folder className="h-4 w-4 flex-shrink-0" />
                         <span className="truncate">

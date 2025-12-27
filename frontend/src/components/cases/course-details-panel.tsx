@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,7 +56,6 @@ interface CaseDetailsPanelProps {
     type_transaction?: string;
     session_id?: string;
     course_code?: string;
-    course_name?: string;
     professor?: string;
     credits?: number;
     color?: string;
@@ -86,6 +86,7 @@ export function CaseDetailsPanel({
   deleting,
   isAnalyzing,
 }: CaseDetailsPanelProps) {
+  const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState(caseData.description || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -93,7 +94,6 @@ export function CaseDetailsPanel({
   // Academic fields for editing
   const [editSessionId, setEditSessionId] = useState(caseData.session_id || "");
   const [editCourseCode, setEditCourseCode] = useState(caseData.course_code || "");
-  const [editCourseName, setEditCourseName] = useState(caseData.course_name || "");
   const [editProfessor, setEditProfessor] = useState(caseData.professor || "");
   const [editCredits, setEditCredits] = useState(caseData.credits?.toString() || "3");
   const [editColor, setEditColor] = useState(caseData.color || "#3B82F6");
@@ -372,7 +372,6 @@ export function CaseDetailsPanel({
       // Add academic fields if they have values
       if (editSessionId) updateData.session_id = editSessionId;
       if (editCourseCode) updateData.course_code = editCourseCode;
-      if (editCourseName) updateData.course_name = editCourseName;
       if (editProfessor) updateData.professor = editProfessor;
       if (editCredits) updateData.credits = parseInt(editCredits, 10);
       if (editColor) updateData.color = editColor;
@@ -388,7 +387,6 @@ export function CaseDetailsPanel({
     setEditDescription(caseData.description || "");
     setEditSessionId(caseData.session_id || "");
     setEditCourseCode(caseData.course_code || "");
-    setEditCourseName(caseData.course_name || "");
     setEditProfessor(caseData.professor || "");
     setEditCredits(caseData.credits?.toString() || "3");
     setEditColor(caseData.color || "#3B82F6");
@@ -400,12 +398,11 @@ export function CaseDetailsPanel({
       {/* Case Header */}
       <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold">{caseData.title || "Sans titre"}</h2>
-          {caseData.course_name && (
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <span>{caseData.course_name}</span>
-            </div>
-          )}
+          <h2 className="text-xl font-bold">
+            {caseData.course_code
+              ? `${caseData.course_code} ${caseData.title || "Sans titre"}`
+              : caseData.title || "Sans titre"}
+          </h2>
         </div>
       </div>
 
@@ -414,25 +411,25 @@ export function CaseDetailsPanel({
         {/* Mode édition */}
         {isEditing && (
           <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-            <h3 className="font-semibold text-sm">Modifier le dossier</h3>
+            <h3 className="font-semibold text-sm">{t("courses.editCourse")}</h3>
 
             {/* Academic fields */}
             <div className="space-y-4">
-              <h4 className="font-medium text-sm text-muted-foreground">Informations académiques</h4>
+              <h4 className="font-medium text-sm text-muted-foreground">{t("courses.academicInfo")}</h4>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-session">Session</Label>
+                <Label htmlFor="edit-session">{t("courses.session")}</Label>
                 <SessionSelector
                   value={editSessionId}
                   onValueChange={setEditSessionId}
                   disabled={isSaving}
-                  placeholder="Sélectionner une session"
+                  placeholder={t("courses.selectSession")}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-course-code">Code du cours</Label>
+                  <Label htmlFor="edit-course-code">{t("courses.courseCode")}</Label>
                   <Input
                     id="edit-course-code"
                     value={editCourseCode}
@@ -443,7 +440,7 @@ export function CaseDetailsPanel({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-credits">Crédits</Label>
+                  <Label htmlFor="edit-credits">{t("courses.credits")}</Label>
                   <Input
                     id="edit-credits"
                     type="number"
@@ -457,30 +454,19 @@ export function CaseDetailsPanel({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-course-name">Titre du cours</Label>
-                <Input
-                  id="edit-course-name"
-                  value={editCourseName}
-                  onChange={(e) => setEditCourseName(e.target.value)}
-                  placeholder="Ex: Introduction au droit constitutionnel"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
+                <Label htmlFor="edit-description">{t("courses.description")}</Label>
                 <Textarea
                   id="edit-description"
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Description du dossier"
+                  placeholder={t("courses.descriptionPlaceholder")}
                   disabled={isSaving}
                   className="text-sm min-h-[80px]"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-professor">Professeur</Label>
+                <Label htmlFor="edit-professor">{t("courses.professor")}</Label>
                 <Input
                   id="edit-professor"
                   value={editProfessor}
@@ -491,7 +477,7 @@ export function CaseDetailsPanel({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-color">Couleur</Label>
+                <Label htmlFor="edit-color">{t("courses.color")}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="edit-color"
@@ -517,7 +503,7 @@ export function CaseDetailsPanel({
                 ) : (
                   <Check className="h-4 w-4" />
                 )}
-                Enregistrer
+                {t("common.save")}
               </Button>
               <Button
                 size="sm"
@@ -526,7 +512,7 @@ export function CaseDetailsPanel({
                 disabled={isSaving}
               >
                 <X className="h-4 w-4" />
-                Annuler
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -541,7 +527,7 @@ export function CaseDetailsPanel({
             className="gap-2"
           >
             <Edit2 className="h-4 w-4" />
-            <span>Modifier</span>
+            <span>{t("common.edit")}</span>
           </Button>
           <Button
             size="sm"
@@ -549,7 +535,7 @@ export function CaseDetailsPanel({
             className="gap-2"
           >
             <Folder className="h-4 w-4" />
-            <span>Lier un répertoire</span>
+            <span>{t("courses.linkDirectory")}</span>
           </Button>
           <Button
             size="sm"
@@ -557,7 +543,7 @@ export function CaseDetailsPanel({
             className="gap-2"
           >
             <FileUp className="h-4 w-4" />
-            <span>Ajouter des documents</span>
+            <span>{t("documents.addDocuments")}</span>
           </Button>
           <Button
             size="sm"
@@ -565,7 +551,7 @@ export function CaseDetailsPanel({
             className="gap-2"
           >
             <Mic className="h-4 w-4" />
-            <span>Enregistrer un audio</span>
+            <span>{t("courses.recordAudio")}</span>
           </Button>
           <Button
             size="sm"
@@ -573,7 +559,7 @@ export function CaseDetailsPanel({
             className="gap-2"
           >
             <Youtube className="h-4 w-4" />
-            <span>YouTube</span>
+            <span>{t("courses.youtube")}</span>
           </Button>
           <Button
             size="sm"
@@ -586,7 +572,7 @@ export function CaseDetailsPanel({
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            <span>Synchroniser</span>
+            <span>{t("courses.synchronize")}</span>
           </Button>
         </div>
 
@@ -632,7 +618,7 @@ export function CaseDetailsPanel({
       <div className="space-y-2">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <FileText className="h-4 w-4" />
-          Documents ({documents.filter((doc) => doc.source_type !== "linked").length})
+          {t("documents.title")} ({documents.filter((doc) => doc.source_type !== "linked").length})
         </h3>
 
         {/* DataTable with filters */}
@@ -705,21 +691,20 @@ export function CaseDetailsPanel({
           <AlertDialogTrigger asChild>
             <Button disabled={deleting}>
               <Trash2 className="h-4 w-4 mr-2" />
-              Supprimer
+              {t("common.delete")}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+              <AlertDialogTitle>{t("table.confirmDeletion")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Êtes-vous sûr de vouloir supprimer ce dossier ? Cette action
-                est irréversible.
+                {t("courses.deleteWarning")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction onClick={onDelete}>
-                Supprimer
+                {t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

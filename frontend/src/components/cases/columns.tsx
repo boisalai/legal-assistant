@@ -65,16 +65,13 @@ export const createColumns = (
     accessorKey: "title",
     header: t("table.columns.title"),
     cell: ({ row }) => {
-      // Display course_name for academic courses, otherwise display title
-      const courseName = row.original.course_name;
       const title = row.getValue("title") as string;
-      const displayText = courseName || title;
       const isPinned = row.original.pinned;
       return (
         <div className="flex items-center gap-2">
           {isPinned && <Pin className="h-3 w-3 text-muted-foreground" />}
           <span className="text-sm">
-            {displayText}
+            {title}
           </span>
         </div>
       );

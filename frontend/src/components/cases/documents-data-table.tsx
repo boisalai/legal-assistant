@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -82,6 +83,7 @@ export function DocumentsDataTable({
   isPDFFile,
   isAudioFile,
 }: DocumentsDataTableProps) {
+  const t = useTranslations();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -95,7 +97,7 @@ export function DocumentsDataTable({
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Nom du fichier
+            {t("documents.fileName")}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
@@ -107,7 +109,7 @@ export function DocumentsDataTable({
           <div className="flex items-center gap-2">
             <span className="font-normal">{doc.nom_fichier}</span>
             {doc.texte_extrait && (
-              <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label="Indexé" />
+              <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label={t("documents.indexed")} />
             )}
           </div>
         );
@@ -121,7 +123,7 @@ export function DocumentsDataTable({
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Type
+            {t("documents.fileType")}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
@@ -131,16 +133,16 @@ export function DocumentsDataTable({
 
         if (doc.is_derived) {
           const labels: Record<string, string> = {
-            transcription: "Transcription",
-            pdf_extraction: "Extraction PDF",
-            tts: "Audio TTS",
+            transcription: t("documents.transcription"),
+            pdf_extraction: t("documents.pdfExtraction"),
+            tts: t("documents.audioTts"),
           };
-          const label = labels[doc.derivation_type || ""] || "Dérivé";
+          const label = labels[doc.derivation_type || ""] || t("documents.derived");
 
           return <span className="text-sm">{label}</span>;
         }
 
-        return <span className="text-sm">Source</span>;
+        return <span className="text-sm">{t("documents.source")}</span>;
       },
       filterFn: (row, _id, value) => {
         if (value === "all") return true;
@@ -159,7 +161,7 @@ export function DocumentsDataTable({
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Date
+            {t("documents.date")}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
@@ -190,7 +192,7 @@ export function DocumentsDataTable({
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={() => onPreview(doc.id)}>
                 <Eye className="h-4 w-4 mr-2" />
-                Visualiser
+                {t("documents.view")}
               </DropdownMenuItem>
 
               {/* INDEXATION (RAG) */}
@@ -207,7 +209,7 @@ export function DocumentsDataTable({
                       ) : (
                         <Database className="h-4 w-4 mr-2" />
                       )}
-                      Indexer dans la base de données
+                      {t("documents.indexInDb")}
                     </DropdownMenuItem>
                   )}
                   {doc.texte_extrait && (
@@ -218,7 +220,7 @@ export function DocumentsDataTable({
                           disabled={extractingDocId === doc.id}
                         >
                           <Database className="h-4 w-4 mr-2" />
-                          Réindexer (mettre à jour)
+                          {t("documents.reindex")}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
@@ -227,7 +229,7 @@ export function DocumentsDataTable({
                         className="text-orange-600"
                       >
                         <DatabaseBackup className="h-4 w-4 mr-2" />
-                        Retirer de la base de données
+                        {t("documents.removeFromDb")}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -247,7 +249,7 @@ export function DocumentsDataTable({
                     ) : (
                       <FileText className="h-4 w-4 mr-2" />
                     )}
-                    Extraire en markdown
+                    {t("documents.extractToMarkdown")}
                   </DropdownMenuItem>
                 </>
               )}
@@ -265,7 +267,7 @@ export function DocumentsDataTable({
                     ) : (
                       <Mic className="h-4 w-4 mr-2" />
                     )}
-                    Transcrire en markdown
+                    {t("documents.transcribeToMarkdown")}
                   </DropdownMenuItem>
                 </>
               )}
@@ -276,7 +278,7 @@ export function DocumentsDataTable({
                 className="text-destructive"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
+                {t("common.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -307,7 +309,7 @@ export function DocumentsDataTable({
       {/* Filters */}
       <div className="flex items-center gap-2">
         <Input
-          placeholder="Filtrer par nom..."
+          placeholder={t("documents.filterByName")}
           value={(table.getColumn("nom_fichier")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("nom_fichier")?.setFilterValue(event.target.value)
@@ -322,14 +324,14 @@ export function DocumentsDataTable({
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Type de fichier" />
+            <SelectValue placeholder={t("documents.fileType")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les fichiers</SelectItem>
-            <SelectItem value="source">Source</SelectItem>
-            <SelectItem value="transcription">Transcription</SelectItem>
-            <SelectItem value="pdf_extraction">Extraction PDF</SelectItem>
-            <SelectItem value="tts">Audio TTS</SelectItem>
+            <SelectItem value="all">{t("documents.allFiles")}</SelectItem>
+            <SelectItem value="source">{t("documents.source")}</SelectItem>
+            <SelectItem value="transcription">{t("documents.transcription")}</SelectItem>
+            <SelectItem value="pdf_extraction">{t("documents.pdfExtraction")}</SelectItem>
+            <SelectItem value="tts">{t("documents.audioTts")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -372,7 +374,7 @@ export function DocumentsDataTable({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center font-normal text-black">
-                  Aucun document trouvé.
+                  {t("documents.noDocumentsFound")}
                 </TableCell>
               </TableRow>
             )}

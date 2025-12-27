@@ -194,7 +194,7 @@ class DocumentIndexingService:
         query = """
         CREATE document_embedding CONTENT {{
             document_id: $document_id,
-            case_id: $case_id,
+            course_id: $course_id,
             chunk_index: $chunk_index,
             chunk_text: $chunk_text,
             embedding: $embedding,
@@ -207,7 +207,7 @@ class DocumentIndexingService:
 
         params = {
             "document_id": document_id,
-            "case_id": case_id,
+            "course_id": case_id,  # Note: case_id parameter maps to course_id field
             "chunk_index": chunk_index,
             "chunk_text": chunk_text,
             "embedding": embedding,

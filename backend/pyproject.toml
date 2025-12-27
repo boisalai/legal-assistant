@@ -38,14 +38,17 @@ dependencies = [
     "torch>=2.6.0",
     # Whisper pour transcription (développement)
     "mlx-whisper>=0.4.0",
-    # Text-to-Speech avec edge-tts
-    "edge-tts>=7.0.0",
+    # Text-to-Speech avec edge-tts (version 6.1.x stable, 7.x a des bugs)
+    "edge-tts>=6.1.12,<7.0.0",
     # Docling pour extraction avancée de documents (PDF, tables, OCR)
     "docling>=2.0.0",
     # MLX-LM pour modèles Hugging Face locaux (Apple Silicon)
     "mlx>=0.24.0",
     "mlx-lm>=0.22.0",
     "sentencepiece>=0.2.0",
+    # Web scraping pour recherche juridique
+    "playwright>=1.48.0",
+    "beautifulsoup4>=4.12.3",
 ]
 
 [project.optional-dependencies]

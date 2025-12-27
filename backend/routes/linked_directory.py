@@ -663,3 +663,90 @@ async def sync_linked_directories_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/courses/{course_id}/reindex-unindexed")
+async def reindex_unindexed_documents_endpoint(
+    course_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Réindexe tous les documents non-indexés d'un cours.
+
+    Returns:
+        {
+            "indexed": 5,
+            "failed": 0,
+            "total": 5
+        }
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normaliser l'ID du cours
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
+
+        # Récupérer tous les documents non indexés
+        query = """
+            SELECT * FROM document
+            WHERE course_id = $course_id
+            AND indexed = false
+            AND texte_extrait IS NOT NONE
+        """
+        result = await service.db.query(query, {"course_id": course_id})
+        docs = result if result else []
+
+        if not docs:
+            return {
+                "indexed": 0,
+                "failed": 0,
+                "total": 0,
+                "message": "Aucun document non indexé trouvé"
+            }
+
+        indexing_service = DocumentIndexingService()
+        indexed_count = 0
+        failed_count = 0
+
+        for doc in docs:
+            doc_id = str(doc["id"])
+            texte_extrait = doc.get("texte_extrait")
+
+            if not texte_extrait or not texte_extrait.strip():
+                continue
+
+            try:
+                result = await indexing_service.index_document(
+                    document_id=doc_id,
+                    case_id=course_id,
+                    text_content=texte_extrait
+                )
+
+                if result.get("success"):
+                    await service.merge(doc_id, {"indexed": True})
+                    indexed_count += 1
+                    logger.info(f"Indexed {doc.get('nom_fichier')}: {result.get('chunks_created')} chunks")
+                else:
+                    failed_count += 1
+                    logger.error(f"Failed to index {doc.get('nom_fichier')}: {result.get('error')}")
+
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Error indexing {doc.get('nom_fichier')}: {e}")
+
+        return {
+            "indexed": indexed_count,
+            "failed": failed_count,
+            "total": len(docs),
+            "message": f"Indexation terminée: {indexed_count} indexé(s), {failed_count} échec(s)"
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la réindexation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

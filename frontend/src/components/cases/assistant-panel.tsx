@@ -9,19 +9,19 @@ import {
   User,
   Loader2,
   AlertCircle,
-  MoreVertical,
   Copy,
   Check,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
-import { LLMSettingsModal } from "./llm-settings-modal";
-
-// Import SVG logos as React components
-import AnthropicLogo from "@/svg/anthropic.svg";
-import OllamaLogo from "@/svg/ollama.svg";
-import HuggingFaceLogo from "@/svg/hf-logo-colored.svg";
+import {
+  LLM_MODELS,
+  LLMConfig,
+  DEFAULT_LLM_CONFIG,
+  loadLLMConfig,
+  saveLLMConfig,
+} from "@/lib/llm-models";
 
 export interface Message {
   role: "user" | "assistant";
@@ -39,104 +39,6 @@ interface AssistantPanelProps {
   messages?: Message[];  // Optional: if provided, messages state is controlled by parent
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>;  // Optional: if provided, messages state is controlled by parent
 }
-
-interface LLMConfig {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
-}
-
-const LLM_CONFIG_STORAGE_KEY = "legal-assistant-llm-config";
-
-const DEFAULT_LLM_CONFIG: LLMConfig = {
-  model: "ollama:qwen2.5:7b",
-  temperature: 0.7,
-  maxTokens: 2000,
-  topP: 0.9,
-};
-
-function loadLLMConfig(): LLMConfig {
-  if (typeof window === "undefined") return DEFAULT_LLM_CONFIG;
-  try {
-    const stored = localStorage.getItem(LLM_CONFIG_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_LLM_CONFIG, ...parsed };
-    }
-  } catch (e) {
-    console.warn("Failed to load LLM config from localStorage:", e);
-  }
-  return DEFAULT_LLM_CONFIG;
-}
-
-function saveLLMConfig(config: LLMConfig): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(LLM_CONFIG_STORAGE_KEY, JSON.stringify(config));
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent("llm-config-changed", { detail: config }));
-  } catch (e) {
-    console.warn("Failed to save LLM config to localStorage:", e);
-  }
-}
-
-// Available LLM models (synced with ModelSelector)
-const LLM_MODELS = [
-  // Ollama models
-  {
-    value: "ollama:qwen2.5:7b",
-    label: "Ollama Qwen 2.5 7B",
-    provider: "ollama",
-  },
-  {
-    value: "ollama:llama3.2",
-    label: "Ollama Llama 3.2 3B",
-    provider: "ollama",
-  },
-  {
-    value: "ollama:mistral",
-    label: "Ollama Mistral 7B",
-    provider: "ollama",
-  },
-  {
-    value: "ollama:llama3.1:8b",
-    label: "Ollama Llama 3.1 8B",
-    provider: "ollama",
-  },
-  // Anthropic models
-  {
-    value: "anthropic:claude-sonnet-4-5-20250929",
-    label: "Claude Sonnet 4.5",
-    provider: "anthropic",
-  },
-  {
-    value: "anthropic:claude-sonnet-4-20250514",
-    label: "Claude Sonnet 4",
-    provider: "anthropic",
-  },
-  // MLX models
-  {
-    value: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit",
-    label: "MLX Qwen2.5-3B-Instruct-4bit",
-    provider: "mlx",
-  },
-  {
-    value: "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
-    label: "MLX Llama-3.2-3B-Instruct-4bit",
-    provider: "mlx",
-  },
-  {
-    value: "mlx:mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-    label: "MLX Mistral-7B-Instruct-v0.3-4bit",
-    provider: "mlx",
-  },
-  {
-    value: "mlx:mlx-community/Ministral-3-14B-Reasoning-2512-4bit",
-    label: "MLX Ministral-3 14B Reasoning",
-    provider: "mlx",
-  },
-];
 
 export function AssistantPanel({
   caseId,
@@ -170,7 +72,6 @@ export function AssistantPanel({
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Load config from localStorage on mount (client-side only)
   useEffect(() => {
@@ -211,44 +112,6 @@ export function AssistantPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // Get provider info from model ID
-  const getProviderInfo = (modelId: string): { provider: string; icon: React.ReactNode; label: string } => {
-    if (modelId.startsWith("anthropic:")) {
-      return {
-        provider: "anthropic",
-        icon: <AnthropicLogo className="h-4 w-4 flex-shrink-0" />,
-        label: "Claude"
-      };
-    } else if (modelId.startsWith("mlx:")) {
-      return {
-        provider: "mlx",
-        icon: <HuggingFaceLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
-        label: "MLX"
-      };
-    } else {
-      return {
-        provider: "ollama",
-        icon: <OllamaLogo className="h-4 w-4 flex-shrink-0 text-foreground" />,
-        label: "Ollama"
-      };
-    }
-  };
-
-  // Format model name for display
-  const getModelDisplayName = (modelId: string): string => {
-    const model = LLM_MODELS.find((m) => m.value === modelId);
-    if (model) {
-      // Remove provider prefix and clean up label
-      return model.label
-        .replace(" (Ollama)", "")
-        .replace(" (Anthropic)", "")
-        .replace(" - Recommandé", "")
-        .replace(" - Rapide", "")
-        .replace(" - Production", "");
-    }
-    return modelId;
-  };
 
   // Check if message looks like a transcription request
   const isTranscriptionRequest = (message: string): boolean => {
@@ -412,25 +275,7 @@ export function AssistantPanel({
     <div className="flex flex-col h-full border-l overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold">Assistant IA</h2>
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            {getProviderInfo(config.model).icon}
-            <span>
-              {getModelDisplayName(config.model)}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettingsModal(true)}
-            title="Paramètres LLM"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </Button>
-        </div>
+        <h2 className="text-xl font-bold">Assistant IA</h2>
       </div>
 
       {/* Backend status warning */}
@@ -541,17 +386,6 @@ export function AssistantPanel({
           </Button>
         </div>
       </div>
-
-      {/* LLM Settings Modal */}
-      <LLMSettingsModal
-        open={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        config={config}
-        onConfigChange={(newConfig) => {
-          setConfig(newConfig);
-          saveLLMConfig(newConfig);
-        }}
-      />
     </div>
   );
 }

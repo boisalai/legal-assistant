@@ -33,3 +33,35 @@ REMOVE TABLE case;
 INFO FOR DB;
 SELECT id, title, course_code, professor FROM course;
 SELECT count() as total FROM embedding WHERE case_id = 'course:938c0203' GROUP ALL;
+SELECT id, nom_fichier, indexed, source_type, type_fichier FROM document 
+SELECT id, nom_fichier, indexed, source_type, type_fichier FROM document WHERE course_id = 'course:4de2c06d' AND source_type = 'linked' LIMIT 5;
+SELECT id, nom_fichier, source_type, type_fichier, file_path FROM document WHERE course_id = 'course:4de2c06d' LIMIT 10;
+SELECT * FROM course WHERE id = 'course:4de2c06d';
+SELECT COUNT() as total FROM document GROUP ALL;
+SELECT * FROM course WHERE id = 'course:4de2c06d';
+SELECT id, nom_fichier, indexed, source_type, type_fichier FROM document WHERE course_id = 'course:4de2c06d' AND source_type = 'linked' LIMIT 5;
+SELECT COUNT() as total FROM embedding WHERE document_id CONTAINS 'document:';
+SELECT id, nom_fichier, texte_extrait FROM document WHERE id = 'document:12c2ec60';
+SELECT * FROM document LIMIT 2;
+SELECT COUNT() as total_embeddings FROM embedding;
+SELECT * FROM course:4de2c06d;
+UPDATE course:4de2c06d MERGE { pinned: true }; SELECT * FROM course:4de2c06d;
+UPDATE course:4de2c06d MERGE { pinned: true };
+UPDATE course:4de2c06d SET pinned = true; SELECT * FROM course:4de2c06d;
+INFO FOR TABLE course;
+DEFINE FIELD pinned ON course TYPE bool DEFAULT false PERMISSIONS FULL;
+UPDATE course:4de2c06d SET pinned = true; SELECT pinned FROM course:4de2c06d;
+SELECT * FROM course:4de2c06d;
+SELECT * FROM course WHERE id CONTAINS '4de2c06d';
+SELECT id, title, course_code, course_name FROM course LIMIT 10;
+SELECT id, title, course_code, course_name FROM course WHERE title CONTAINS 'Introduction';
+-- ============================================================================
+-- Migration 004: Add pinned field to course table
+-- ============================================================================
+-- Adds a boolean field to allow users to pin/unpin courses
+-- Pinned courses appear first in the list
+-- ============================================================================
+-- Add pinned field to course table
+DEFINE FIELD pinned ON course TYPE bool DEFAULT false PERMISSIONS FULL;
+-- Migration complete!
+INFO FOR TABLE course;

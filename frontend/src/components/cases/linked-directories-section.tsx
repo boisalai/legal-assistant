@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ export function LinkedDirectoriesSection({
   onDocumentsChange,
   onPreviewDirectory,
 }: LinkedDirectoriesSectionProps) {
+  const t = useTranslations();
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [directoryToUnlink, setDirectoryToUnlink] = useState<LinkedDirectory | null>(null);
   const [unlinking, setUnlinking] = useState(false);
@@ -142,7 +144,7 @@ export function LinkedDirectoriesSection({
       <div className="space-y-2">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Folder className="h-4 w-4" />
-          Répertoires liés ({linkedDirectories.length})
+          {t("courses.linkedDirectories")} ({linkedDirectories.length})
         </h3>
         <LinkedDirectoriesDataTable
           directories={linkedDirectories}
@@ -155,9 +157,9 @@ export function LinkedDirectoriesSection({
       <AlertDialog open={unlinkDialogOpen} onOpenChange={setUnlinkDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Délier ce répertoire ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("courses.unlinkDirectory")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tous les fichiers de ce répertoire ({directoryToUnlink?.totalFiles} fichiers) seront retirés de ce dossier.
+              {t("courses.unlinkWarning", { count: directoryToUnlink?.totalFiles || 0 })}
               <br />
               <br />
               <span className="font-mono text-xs block p-2 bg-muted rounded mt-2">
@@ -167,16 +169,16 @@ export function LinkedDirectoriesSection({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDirectoryToUnlink(null)}>
-              Annuler
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleUnlink} disabled={unlinking}>
               {unlinking ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Suppression...
+                  {t("courses.unlinking")}
                 </>
               ) : (
-                "Délier"
+                t("courses.unlink")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
