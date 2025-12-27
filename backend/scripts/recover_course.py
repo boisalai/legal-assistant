@@ -172,6 +172,9 @@ async def recover_course(course_id: str):
     print(f"   3. Utilisez 'Extraire en markdown' pour générer les fichiers .md")
     print(f"   4. Le texte sera automatiquement nettoyé des null bytes")
 
+    # Fermer la connexion pour flush les changements
+    await surreal_service.disconnect()
+
     print(f"\n✅ Récupération terminée!")
 
 

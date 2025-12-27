@@ -107,6 +107,9 @@ async def fix_null_bytes():
     print(f"   ❌ Errors: {error_count} documents")
     print(f"   📄 Total: {len(document_ids)} documents")
 
+    # Fermer la connexion pour flush les changements
+    await surreal_service.disconnect()
+
 
 if __name__ == "__main__":
     print("🚑 Emergency fix: Cleaning null bytes from database")
