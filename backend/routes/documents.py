@@ -538,6 +538,73 @@ async def link_file_or_folder(
         )
 
 
+# ============================================================================
+# DIAGNOSTIC ENDPOINT (Must be before /{doc_id} routes)
+# ============================================================================
+
+class DiagnosticResult(BaseModel):
+    """Résultat du diagnostic de cohérence fichiers/base de données."""
+    total_documents: int
+    missing_files: list[dict]
+    orphan_records: list[dict]
+    ok_count: int
+
+
+@router.get("/{course_id}/documents/diagnostic", response_model=DiagnosticResult)
+async def diagnose_documents(
+    course_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Diagnostic de cohérence entre base de données et système de fichiers.
+
+    Identifie:
+    - Les enregistrements en base sans fichier physique (orphelins)
+    - Les fichiers physiques sans enregistrement en base (manquants)
+    """
+    # Get all documents using document service (without auto-removal)
+    doc_service = get_document_service()
+    documents = await doc_service.list_documents(
+        course_id=course_id,
+        verify_files=False,  # Don't auto-remove missing files
+        auto_remove_missing=False
+    )
+
+    missing_files = []
+    ok_count = 0
+
+    # Verify each document
+    for doc in documents:
+        if not doc.file_path:
+            missing_files.append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "reason": "Aucun chemin de fichier enregistré"
+            })
+            continue
+
+        if not Path(doc.file_path).exists():
+            missing_files.append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "path": doc.file_path,
+                "reason": "Fichier physique manquant"
+            })
+        else:
+            ok_count += 1
+
+    return DiagnosticResult(
+        total_documents=len(documents),
+        missing_files=missing_files,
+        orphan_records=missing_files,  # Alias pour clarté
+        ok_count=ok_count
+    )
+
+
+# ============================================================================
+# ENDPOINTS WITH /{doc_id} PARAMETER (Must be after specific routes)
+# ============================================================================
+
 @router.get("/{course_id}/documents/{doc_id}/derived")
 async def get_derived_documents(
     course_id: str,
@@ -1842,62 +1909,4 @@ async def generate_tts(
 
 # ============================================================================
 # DIAGNOSTIC ENDPOINT
-# ============================================================================
-
-class DiagnosticResult(BaseModel):
-    """Résultat du diagnostic de cohérence fichiers/base de données."""
-    total_documents: int
-    missing_files: list[dict]
-    orphan_records: list[dict]
-    ok_count: int
-
-
-@router.get("/{course_id}/documents/diagnostic", response_model=DiagnosticResult)
-async def diagnose_documents(
-    course_id: str,
-    user_id: str = Depends(get_current_user_id)
-):
-    """
-    Diagnostic de cohérence entre base de données et système de fichiers.
-
-    Identifie:
-    - Les enregistrements en base sans fichier physique (orphelins)
-    - Les fichiers physiques sans enregistrement en base (manquants)
-    """
-    # Get all documents using document service (without auto-removal)
-    doc_service = get_document_service()
-    documents = await doc_service.list_documents(
-        course_id=course_id,
-        verify_files=False,  # Don't auto-remove missing files
-        auto_remove_missing=False
-    )
-
-    missing_files = []
-    ok_count = 0
-
-    # Verify each document
-    for doc in documents:
-        if not doc.file_path:
-            missing_files.append({
-                "id": doc.id,
-                "filename": doc.filename,
-                "reason": "Aucun chemin de fichier enregistré"
-            })
-            continue
-
-        if not Path(doc.file_path).exists():
-            missing_files.append({
-                "id": doc.id,
-                "filename": doc.filename,
-                "path": doc.file_path,
-                "reason": "Fichier physique manquant"
-            })
-        else:
-            ok_count += 1
-
-    return DiagnosticResult(
-        total_documents=len(documents),
-        missing_files=missing_files,
-        orphan_records=missing_files,  # Alias pour clarté
-        ok_count=ok_count
-    )
+# Diagnostic endpoint moved before /{doc_id} routes for correct routing
