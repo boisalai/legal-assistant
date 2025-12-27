@@ -116,7 +116,29 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ---
 
-## Session actuelle (2025-12-26 PM) - Refactoring Phase 2 & Tests Phase 3.1 ✅
+## Session actuelle (2025-12-27) - Nettoyage et Audit Dette Technique ✅
+
+**Objectif** : Nettoyer les fichiers temporaires et auditer la dette technique.
+
+**Actions complétées** :
+- ✅ Suppression fichier debug `test_upload_debug.py`
+- ✅ Correction sécurité : Retrait clé API dans `.env.example` (non committée)
+- ✅ Audit duplication `DocumentResponse` : Déjà corrigée !
+- ✅ Vérification imports : Tous les fichiers utilisent `models/document_models.py`
+- ✅ Mise à jour `CLAUDE.md` : Recommandations obsolètes retirées
+
+**Découvertes** :
+- La duplication `DocumentResponse` avait déjà été éliminée lors d'une session précédente
+- Aucune définition locale restante dans `routes/`
+- Pattern d'import correct appliqué partout
+
+**Prochaine session** : Phase 3.2 - Benchmarking et optimisation RAG
+
+---
+
+## Sessions récentes (Résumé)
+
+### 2025-12-26 PM - Refactoring Phase 2 & Tests Phase 3.1 ✅
 
 **Objectif** : Finaliser le refactoring DocumentService et valider avec tests d'intégration.
 
@@ -141,13 +163,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `89792bd` - fix: Correct test expectations and route order for diagnostic endpoint
 - `c1a3b8f` - docs: Update ROADMAP - Phase 3.1 completed
 
-**Prochaine session** : Phase 3.2 - Benchmarking et optimisation RAG
-
 **Détails complets** : Voir `docs/ROADMAP_2025.md` et `docs/archive/SESSIONS_2025-12.md`
-
----
-
-## Sessions récentes (Résumé)
 
 ### 2025-12-26 AM - Tuteur IA pédagogique ✨
 
@@ -203,7 +219,11 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - Définition locale dans routes manquait le champ `linked_source`
 - Pydantic omettait silencieusement le champ lors de la sérialisation
 
-**Solution** : Ajout `linked_source: Optional[dict]` dans `routes/documents.py`
+**Solution initiale** : Ajout `linked_source: Optional[dict]` dans `routes/documents.py`
+
+**Solution finale** : ✅ Duplication complètement éliminée (session ultérieure)
+- Utilisation unique de `models/document_models.py`
+- Import correct dans tous les fichiers de routes
 
 **Leçon** : Toujours suivre le flux de données : DB → Query → Serialization → API → Frontend
 
@@ -292,11 +312,11 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
    - ✅ Ajouté documentation complète dans section Utilisation
    - ✅ Mis à jour liste des technologies
 
-2. **Refactoring DocumentResponse** (~2h)
-   - ❌ **À FAIRE** : Supprimer la duplication dans `routes/documents.py` (lignes 61-78)
-   - Utiliser uniquement `models/document_models.py`
-   - Importer au lieu de redéfinir localement
-   - **Critique** : Cette duplication a déjà causé des bugs (session 2025-12-08)
+2. **Refactoring DocumentResponse** (~2h) ✅ **FAIT** (2025-12-27)
+   - ✅ Duplication complètement éliminée
+   - ✅ Utilisation unique de `models/document_models.py`
+   - ✅ Import correct dans tous les fichiers de routes
+   - Aucune définition locale restante
 
 3. **Simplification documents.py** (~4-6h)
    - ❌ **À FAIRE** : Fichier trop long (~2100 lignes)
