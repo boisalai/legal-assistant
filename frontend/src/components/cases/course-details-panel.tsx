@@ -444,8 +444,8 @@ export function CaseDetailsPanel({
                   <Input
                     id="edit-credits"
                     type="number"
-                    min="1"
-                    max="12"
+                    min="0"
+                    max="6"
                     value={editCredits}
                     onChange={(e) => setEditCredits(e.target.value)}
                     disabled={isSaving}
