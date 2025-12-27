@@ -1046,17 +1046,15 @@ wheels = [
 
 [[package]]
 name = "edge-tts"
-version = "7.2.3"
+version = "6.1.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "certifi" },
-    { name = "tabulate" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/d0/db9a841ac29f119ca8e3d2a22325849997c571a4f31f728042c5fdbdff33/edge_tts-7.2.3.tar.gz", hash = "sha256:b85e271181cd52656934069237bfc3853335a17f7e51a4f7116e2936d32e62d2", size = 27308, upload-time = "2025-08-28T21:13:53.376Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/81/58663476b9afe5ae7f28767d6cadffbf30ed99063a219e213edacecb841b/edge_tts-6.1.19.tar.gz", hash = "sha256:52fdfbaef2b3afee98bbba5e5c6365b5a6156fe78fe4e81e55749f7a563add38", size = 20131, upload-time = "2024-11-22T01:18:03.991Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/c6/9387c3f9decdd9780dfe21b7d9c0831aafd5d6813baf4f17b50afc7b7d77/edge_tts-7.2.3-py3-none-any.whl", hash = "sha256:62c87df25dedb6cd565cbdf87c639e01c466095b1e8f48ab8fa9efbb2123f53c", size = 30349, upload-time = "2025-08-28T21:13:52.145Z" },
+    { url = "https://files.pythonhosted.org/packages/52/8d/6b91e2efa7e6f2438888142a66ff053e2bc301b8eddd3cb0fd2452644890/edge_tts-6.1.19-py3-none-any.whl", hash = "sha256:af49ea0539f54b0d76a73bc76cefd9deb2010a11c5ee2a189967e15830a6ba37", size = 22125, upload-time = "2024-11-22T01:18:01.14Z" },
 ]
 
 [[package]]
@@ -1863,6 +1861,7 @@ source = { editable = "." }
 dependencies = [
     { name = "agno" },
     { name = "anthropic" },
+    { name = "beautifulsoup4" },
     { name = "docling" },
     { name = "edge-tts" },
     { name = "email-validator" },
@@ -1875,6 +1874,7 @@ dependencies = [
     { name = "ollama" },
     { name = "openai" },
     { name = "passlib", extra = ["bcrypt"] },
+    { name = "playwright" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pypdf" },
@@ -1943,9 +1943,10 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.74.0" },
     { name = "anthropic", marker = "extra == 'all-llm'", specifier = ">=0.42.0" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.42.0" },
+    { name = "beautifulsoup4", specifier = ">=4.12.3" },
     { name = "docling", specifier = ">=2.0.0" },
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.0.0" },
-    { name = "edge-tts", specifier = ">=7.0.0" },
+    { name = "edge-tts", specifier = ">=6.1.12,<7.0.0" },
     { name = "email-validator", specifier = ">=2.3.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=33.1.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
@@ -1964,6 +1965,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.8.1" },
     { name = "openai-whisper", marker = "extra == 'whisper-openai'", specifier = ">=20231117" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
+    { name = "playwright", specifier = ">=1.48.0" },
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "pydantic-settings", specifier = ">=2.7.0" },
     { name = "pypdf", specifier = ">=5.1.0" },
@@ -3303,6 +3305,25 @@ wheels = [
 ]
 
 [[package]]
+name = "playwright"
+version = "1.57.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "greenlet" },
+    { name = "pyee" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ed/b6/e17543cea8290ae4dced10be21d5a43c360096aa2cce0aa7039e60c50df3/playwright-1.57.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:9351c1ac3dfd9b3820fe7fc4340d96c0d3736bb68097b9b7a69bd45d25e9370c", size = 41985039, upload-time = "2025-12-09T08:06:18.408Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/04/ef95b67e1ff59c080b2effd1a9a96984d6953f667c91dfe9d77c838fc956/playwright-1.57.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a4a9d65027bce48eeba842408bcc1421502dfd7e41e28d207e94260fa93ca67e", size = 40775575, upload-time = "2025-12-09T08:06:22.105Z" },
+    { url = "https://files.pythonhosted.org/packages/60/bd/5563850322a663956c927eefcf1457d12917e8f118c214410e815f2147d1/playwright-1.57.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:99104771abc4eafee48f47dac2369e0015516dc1ce8c409807d2dd440828b9a4", size = 41985042, upload-time = "2025-12-09T08:06:25.357Z" },
+    { url = "https://files.pythonhosted.org/packages/56/61/3a803cb5ae0321715bfd5247ea871d25b32c8f372aeb70550a90c5f586df/playwright-1.57.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:284ed5a706b7c389a06caa431b2f0ba9ac4130113c3a779767dda758c2497bb1", size = 45975252, upload-time = "2025-12-09T08:06:29.186Z" },
+    { url = "https://files.pythonhosted.org/packages/83/d7/b72eb59dfbea0013a7f9731878df8c670f5f35318cedb010c8a30292c118/playwright-1.57.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:38a1bae6c0a07839cdeaddbc0756b3b2b85e476c07945f64ece08f1f956a86f1", size = 45706917, upload-time = "2025-12-09T08:06:32.549Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/09/3fc9ebd7c95ee54ba6a68d5c0bc23e449f7235f4603fc60534a364934c16/playwright-1.57.0-py3-none-win32.whl", hash = "sha256:1dd93b265688da46e91ecb0606d36f777f8eadcf7fbef12f6426b20bf0c9137c", size = 36553860, upload-time = "2025-12-09T08:06:35.864Z" },
+    { url = "https://files.pythonhosted.org/packages/58/d4/dcdfd2a33096aeda6ca0d15584800443dd2be64becca8f315634044b135b/playwright-1.57.0-py3-none-win_amd64.whl", hash = "sha256:6caefb08ed2c6f29d33b8088d05d09376946e49a73be19271c8cd5384b82b14c", size = 36553864, upload-time = "2025-12-09T08:06:38.915Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/60/fe31d7e6b8907789dcb0584f88be741ba388413e4fbce35f1eba4e3073de/playwright-1.57.0-py3-none-win_arm64.whl", hash = "sha256:5f065f5a133dbc15e6e7c71e7bc04f258195755b1c32a432b792e28338c8335e", size = 32837940, upload-time = "2025-12-09T08:06:42.268Z" },
+]
+
+[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3717,6 +3738,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/43/4b/ac7e0aae12027748076d72a8764ff1c9d82ca75a7a52622e67ed3f765c54/pydantic_settings-2.12.0.tar.gz", hash = "sha256:005538ef951e3c2a68e1c08b292b5f2e71490def8589d4221b95dab00dafcfd0", size = 194184, upload-time = "2025-11-10T14:25:47.013Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/60/5d4751ba3f4a40a6891f24eec885f51afd78d208498268c734e256fb13c4/pydantic_settings-2.12.0-py3-none-any.whl", hash = "sha256:fddb9fd99a5b18da837b29710391e945b1e30c135477f484084ee513adb93809", size = 51880, upload-time = "2025-11-10T14:25:45.546Z" },
+]
+
+[[package]]
+name = "pyee"
+version = "13.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/03/1fd98d5841cd7964a27d729ccf2199602fe05eb7a405c1462eb7277945ed/pyee-13.0.0.tar.gz", hash = "sha256:b391e3c5a434d1f5118a25615001dbc8f669cf410ab67d04c4d4e07c55481c37", size = 31250, upload-time = "2025-03-17T18:53:15.955Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/4d/b9add7c84060d4c1906abe9a7e5359f2a60f7a9a4f67268b2766673427d8/pyee-13.0.0-py3-none-any.whl", hash = "sha256:48195a3cddb3b1515ce0695ed76036b5ccc2ef3a9f963ff9f77aec0139845498", size = 15730, upload-time = "2025-03-17T18:53:14.532Z" },
 ]
 
 [[package]]

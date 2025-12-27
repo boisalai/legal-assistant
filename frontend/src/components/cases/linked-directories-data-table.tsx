@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   ColumnDef,
   SortingState,
@@ -52,6 +53,7 @@ export function LinkedDirectoriesDataTable({
   onViewTree,
   onUnlink,
 }: LinkedDirectoriesDataTableProps) {
+  const t = useTranslations();
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const columns: ColumnDef<LinkedDirectory>[] = [
@@ -63,7 +65,7 @@ export function LinkedDirectoriesDataTable({
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Nom du répertoire
+            {t("courses.directoryName")}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
@@ -94,7 +96,7 @@ export function LinkedDirectoriesDataTable({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => onViewTree(directory)}>
                   <Eye className="h-4 w-4 mr-2" />
-                  Voir l'arborescence
+                  {t("courses.viewTree")}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -104,7 +106,7 @@ export function LinkedDirectoriesDataTable({
                   className="text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Délier le répertoire
+                  {t("courses.unlinkDirectoryAction")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

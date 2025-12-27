@@ -2,6 +2,15 @@ import { getRequestConfig } from "next-intl/server";
 import { cookies } from "next/headers";
 import { defaultLocale, locales, type Locale } from "./config";
 
+// Import messages explicitly to avoid Next.js bundling issues
+import enMessages from "../../messages/en.json";
+import frMessages from "../../messages/fr.json";
+
+const messagesMap = {
+  en: enMessages,
+  fr: frMessages,
+} as const;
+
 export default getRequestConfig(async () => {
   // Get locale from cookie, fallback to default
   const cookieStore = await cookies();
@@ -14,6 +23,6 @@ export default getRequestConfig(async () => {
 
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
+    messages: messagesMap[locale],
   };
 });

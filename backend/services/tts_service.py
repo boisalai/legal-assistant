@@ -83,6 +83,10 @@ class TTSService:
         # Sauvegarder le texte original pour logging
         original_length = len(text)
 
+        # 0. Supprimer le frontmatter YAML Docusaurus (---\n...\n---)
+        # Le frontmatter doit être au début du fichier
+        text = re.sub(r'^---\n.*?\n---\n', '', text, flags=re.DOTALL)
+
         # 1. Remplacer les titres (# Titre) par juste le texte
         text = re.sub(r'^#{1,6}\s+(.+)$', r'\1', text, flags=re.MULTILINE)
 
