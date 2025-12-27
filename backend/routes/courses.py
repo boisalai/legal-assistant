@@ -56,6 +56,8 @@ class CourseResponse(BaseModel):
     professor: Optional[str] = None
     credits: Optional[int] = None
     color: Optional[str] = None
+    year: Optional[int] = None
+    semester: Optional[str] = None
 
     # UI preferences
     pinned: bool = False
@@ -207,6 +209,8 @@ async def list_courses(
                         professor=item.get("professor"),
                         credits=item.get("credits"),
                         color=item.get("color"),
+                        year=item.get("year"),
+                        semester=item.get("semester"),
                         # UI preferences
                         pinned=item.get("pinned", False),
                     ))
@@ -301,6 +305,8 @@ async def create_course(
             professor=created_case.get("professor"),
             credits=created_case.get("credits"),
             color=created_case.get("color"),
+            year=created_case.get("year"),
+            semester=created_case.get("semester"),
             # UI preferences
             pinned=created_case.get("pinned", False),
         )
@@ -362,6 +368,8 @@ async def get_case(
             professor=item.get("professor"),
             credits=item.get("credits"),
             color=item.get("color"),
+            year=item.get("year"),
+            semester=item.get("semester"),
             # UI preferences
             pinned=item.get("pinned", False),
         )
@@ -459,6 +467,8 @@ async def update_course(
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
             color=updated_item.get("color"),
+            year=updated_item.get("year"),
+            semester=updated_item.get("semester"),
             # UI preferences
             pinned=updated_item.get("pinned", False),
         )
@@ -533,6 +543,8 @@ async def toggle_pin_course(
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
             color=updated_item.get("color"),
+            year=updated_item.get("year"),
+            semester=updated_item.get("semester"),
             # UI preferences
             pinned=updated_item.get("pinned", False),
         )

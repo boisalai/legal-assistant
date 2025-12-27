@@ -2,22 +2,6 @@
 // Assistant d'etudes juridiques - Gestion de dossiers
 
 // ============================================
-// Session Types (Academic)
-// ============================================
-
-// Academic session (e.g., "Automne 2024", "Hiver 2025")
-export interface Session {
-  id: string;
-  title: string;              // Session title (e.g., "Automne 2024")
-  semester: string;           // Semester (e.g., "Automne", "Hiver", "Été")
-  year: number;               // Academic year
-  start_date: string;         // ISO datetime string
-  end_date: string;           // ISO datetime string
-  created_at: string;
-  updated_at: string;
-}
-
-// ============================================
 // Course Types
 // ============================================
 
@@ -38,6 +22,8 @@ export interface Course {
   professor?: string;         // Professor name
   credits?: number;           // Number of credits (1-12)
   color?: string;             // UI color (hex code)
+  year?: number;              // Academic year (e.g., 2025)
+  semester?: string;          // Semester (Hiver, Été, Automne)
 
   // Legacy fields for analysis page
   nom_dossier?: string;       // Deprecated: use title instead

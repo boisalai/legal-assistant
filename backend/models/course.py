@@ -27,6 +27,8 @@ class CourseBase(BaseModel):
     professor: Optional[str] = Field(None, description="Nom du professeur")
     credits: int = Field(3, ge=0, le=6, description="Nombre de crédits (0-6)")
     color: Optional[str] = Field(None, description="Couleur pour l'UI (hex code)")
+    year: Optional[int] = Field(None, description="Année académique (ex: 2025)")
+    semester: Optional[str] = Field(None, description="Session (Hiver, Été, Automne)")
 
     # UI preferences
     pinned: bool = Field(False, description="Cours épinglé en haut de la liste")
@@ -50,6 +52,8 @@ class CourseUpdate(BaseModel):
     professor: Optional[str] = None
     credits: Optional[int] = Field(None, ge=0, le=6)
     color: Optional[str] = None
+    year: Optional[int] = None
+    semester: Optional[str] = None
 
     # UI preferences (optional)
     pinned: Optional[bool] = None
