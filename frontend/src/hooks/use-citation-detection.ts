@@ -45,11 +45,11 @@ export function useCitationDetection(
             // Look for sources or recent document mentions
             if (message.sources && message.sources.length > 0) {
               message.sources.forEach((source) => {
-                const doc = documents.find((d) => d.nom_fichier === source.name);
+                const doc = documents.find((d) => d.filename === source.name);
                 if (doc) {
                   citations.push({
                     documentId: doc.id,
-                    documentName: doc.nom_fichier || "",
+                    documentName: doc.filename || "",
                     page,
                     messageIndex,
                   });
@@ -62,7 +62,7 @@ export function useCitationDetection(
 
       // Pattern 2: "document X.pdf" or "fichier X.pdf" with optional page
       documents.forEach((doc) => {
-        const fileName = doc.nom_fichier?.toLowerCase() || "";
+        const fileName = doc.filename?.toLowerCase() || "";
         if (fileName && content.includes(fileName)) {
           // Check if there's a page reference nearby
           const docIndex = content.indexOf(fileName);
@@ -73,7 +73,7 @@ export function useCitationDetection(
 
           citations.push({
             documentId: doc.id,
-            documentName: doc.nom_fichier || "",
+            documentName: doc.filename || "",
             page,
             messageIndex,
           });
@@ -83,7 +83,7 @@ export function useCitationDetection(
       // Pattern 3: Sources mentioned explicitly
       if (message.sources && message.sources.length > 0) {
         message.sources.forEach((source) => {
-          const doc = documents.find((d) => d.nom_fichier === source.name);
+          const doc = documents.find((d) => d.filename === source.name);
           if (doc) {
             // Only add if not already added
             const exists = citations.some(
@@ -95,7 +95,7 @@ export function useCitationDetection(
             if (!exists) {
               citations.push({
                 documentId: doc.id,
-                documentName: doc.nom_fichier || "",
+                documentName: doc.filename || "",
                 messageIndex,
               });
             }

@@ -57,7 +57,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
 
   const columns: ColumnDef<Document>[] = [
     {
-      accessorKey: "nom_fichier",
+      accessorKey: "filename",
       header: ({ column }) => {
         return (
           <Button
@@ -72,12 +72,12 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
       cell: ({ row }) => {
         const doc = row.original;
         return (
-          <span className="font-normal truncate">{doc.nom_fichier}</span>
+          <span className="font-normal truncate">{doc.filename}</span>
         );
       },
     },
     {
-      accessorKey: "taille",
+      accessorKey: "size",
       header: ({ column }) => {
         return (
           <Button
@@ -92,7 +92,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
       cell: ({ row }) => {
         return (
           <span className="text-sm text-black">
-            {formatFileSize(row.original.taille)}
+            {formatFileSize(row.original.size)}
           </span>
         );
       },

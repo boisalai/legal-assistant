@@ -50,7 +50,7 @@ export function LinkedDirectoriesSection({
     documents.forEach((doc) => {
       console.log("Processing doc:", {
         id: doc.id,
-        name: doc.nom_fichier,
+        name: doc.filename,
         source_type: doc.source_type,
         has_linked_source: !!doc.linked_source,
         linked_source: doc.linked_source
@@ -82,7 +82,7 @@ export function LinkedDirectoriesSection({
       const dir = byLinkId.get(linkId)!;
       dir.documents.push(doc);
       dir.totalFiles++;
-      dir.totalSize += doc.taille || 0;
+      dir.totalSize += doc.size || 0;
     });
 
     const result = Array.from(byLinkId.values());

@@ -8,6 +8,7 @@ import { DataTable } from "@/components/cases/data-table";
 import { createColumns } from "@/components/cases/columns";
 import { AppShell } from "@/components/layout";
 import { NewCaseModal } from "@/components/cases/new-course-modal";
+import type { Course } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,7 +87,12 @@ function DashboardContent() {
     }
   };
 
-  const columns = createColumns(handleDelete, handleTogglePin, (key: string) => t(key));
+  const handleEdit = (course: Course) => {
+    // TODO: Implement edit functionality
+    console.log("Edit course:", course);
+  };
+
+  const columns = createColumns(handleDelete, handleTogglePin, handleEdit, (key: string) => t(key));
 
   if (loading) {
     return (

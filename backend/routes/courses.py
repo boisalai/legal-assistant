@@ -254,6 +254,12 @@ async def create_course(
         if "title" not in case_data or not case_data["title"]:
             case_data["title"] = "Sans titre"
 
+        # Apply default values for optional fields
+        if "credits" not in case_data:
+            case_data["credits"] = 3  # Default from CourseBase model
+        if "pinned" not in case_data:
+            case_data["pinned"] = False  # Default from CourseBase model
+
         # Normalize session_id if present
         if "session_id" in case_data and case_data["session_id"]:
             if not case_data["session_id"].startswith("session:"):
@@ -303,7 +309,7 @@ async def create_course(
             session_id=str(created_case.get("session_id")) if created_case.get("session_id") else None,
             course_code=created_case.get("course_code"),
             professor=created_case.get("professor"),
-            credits=created_case.get("credits"),
+            credits=created_case.get("credits", 3),  # Default value from CourseBase model
             color=created_case.get("color"),
             year=created_case.get("year"),
             semester=created_case.get("semester"),

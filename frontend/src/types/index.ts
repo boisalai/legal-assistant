@@ -35,9 +35,9 @@ export interface Course {
 export interface Document {
   id: string;
   course_id: string;          // Course ID (formerly case_id)
-  nom_fichier: string;        // File name
-  type_fichier: string;       // File type (pdf, docx, txt, audio, etc.)
-  taille: number;             // Size in bytes
+  filename: string;           // File name
+  file_type: string;          // File type (pdf, docx, txt, audio, etc.)
+  size: number;               // Size in bytes
   chemin_stockage: string;    // Storage path (legacy)
   file_path: string;          // Absolute path to file on disk
   hash_sha256: string;        // File hash
@@ -45,7 +45,7 @@ export interface Document {
   file_exists: boolean;       // Whether the file exists on disk
 
   // Document metadata
-  type_mime?: string;         // MIME type
+  mime_type?: string;         // MIME type
   document_type?: string;     // Type of document
   language?: string;          // Language (fr, en)
   use_ocr?: boolean;          // OCR was used
@@ -54,7 +54,7 @@ export interface Document {
   created_at?: string;        // Creation timestamp
 
   // Extraction and transcription
-  texte_extrait?: string;     // Extracted text
+  extracted_text?: string;    // Extracted text
   transcription?: string;     // Audio transcription
   extraction_status?: "pending" | "processing" | "completed" | "error";
 

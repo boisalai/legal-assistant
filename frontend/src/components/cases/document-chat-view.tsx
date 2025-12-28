@@ -45,7 +45,7 @@ export function DocumentChatView({
   const [internalMessages, setInternalMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `Je peux vous aider à analyser le document "${activeDocument.nom_fichier}". Posez-moi des questions!`,
+      content: `Je peux vous aider à analyser le document "${activeDocument.filename}". Posez-moi des questions!`,
     },
   ]);
 
@@ -61,14 +61,14 @@ export function DocumentChatView({
   }, [document]);
 
   // Determine file type
-  const ext = activeDocument.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+  const ext = activeDocument.filename?.split(".").pop()?.toLowerCase() || "";
   const isPdf =
-    activeDocument.type_mime?.includes("pdf") ||
-    activeDocument.type_fichier === "pdf" ||
+    activeDocument.mime_type?.includes("pdf") ||
+    activeDocument.file_type === "pdf" ||
     ext === "pdf";
   const isMarkdown =
-    activeDocument.type_mime?.includes("markdown") ||
-    activeDocument.type_fichier === "md" ||
+    activeDocument.mime_type?.includes("markdown") ||
+    activeDocument.file_type === "md" ||
     ext === "md" ||
     ext === "markdown";
 
@@ -122,7 +122,7 @@ export function DocumentChatView({
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="font-semibold text-sm truncate">
-            {activeDocument.nom_fichier}
+            {activeDocument.filename}
           </h3>
         </div>
         <div className="flex items-center gap-1">
@@ -160,15 +160,15 @@ export function DocumentChatView({
               <PDFViewer
                 ref={pdfViewerRef}
                 url={documentUrl}
-                fileName={activeDocument.nom_fichier || ""}
+                fileName={activeDocument.filename || ""}
                 highlightPage={highlightPage}
               />
             )}
-            {isMarkdown && activeDocument.texte_extrait && (
+            {isMarkdown && activeDocument.extracted_text && (
               <MarkdownViewer
                 ref={markdownViewerRef}
-                content={activeDocument.texte_extrait}
-                fileName={activeDocument.nom_fichier || ""}
+                content={activeDocument.extracted_text}
+                fileName={activeDocument.filename || ""}
               />
             )}
           </div>
@@ -181,15 +181,15 @@ export function DocumentChatView({
                 <PDFViewer
                   ref={pdfViewerRef}
                   url={documentUrl}
-                  fileName={activeDocument.nom_fichier || ""}
+                  fileName={activeDocument.filename || ""}
                   highlightPage={highlightPage}
                 />
               )}
-              {isMarkdown && activeDocument.texte_extrait && (
+              {isMarkdown && activeDocument.extracted_text && (
                 <MarkdownViewer
                   ref={markdownViewerRef}
-                  content={activeDocument.texte_extrait}
-                  fileName={activeDocument.nom_fichier || ""}
+                  content={activeDocument.extracted_text}
+                  fileName={activeDocument.filename || ""}
                 />
               )}
               {!isPdf && !isMarkdown && (

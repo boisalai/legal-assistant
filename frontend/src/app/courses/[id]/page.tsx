@@ -141,7 +141,7 @@ export default function CourseDetailPage() {
     try {
       // Find the document to get its filename and file_path
       const doc = documents.find((d) => d.id === docId);
-      const filename = doc?.nom_fichier;
+      const filename = doc?.filename;
       const filePath = doc?.file_path;
 
       await documentsApi.delete(courseId, docId, filename, filePath);

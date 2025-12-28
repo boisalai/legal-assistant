@@ -90,7 +90,7 @@ export function DocumentsDataTable({
 
   const columns: ColumnDef<Document>[] = [
     {
-      accessorKey: "nom_fichier",
+      accessorKey: "filename",
       header: ({ column }) => {
         return (
           <Button
@@ -107,8 +107,8 @@ export function DocumentsDataTable({
 
         return (
           <div className="flex items-center gap-2">
-            <span className="font-normal">{doc.nom_fichier}</span>
-            {doc.texte_extrait && (
+            <span className="font-normal">{doc.filename}</span>
+            {doc.extracted_text && (
               <Database className="h-4 w-4 text-muted-foreground shrink-0" aria-label={t("documents.indexed")} />
             )}
           </div>
@@ -196,7 +196,7 @@ export function DocumentsDataTable({
               </DropdownMenuItem>
 
               {/* INDEXATION (RAG) */}
-              {(needsExtraction(doc) || doc.texte_extrait) && (
+              {(needsExtraction(doc) || doc.extracted_text) && (
                 <>
                   <DropdownMenuSeparator />
                   {needsExtraction(doc) && (
@@ -212,9 +212,9 @@ export function DocumentsDataTable({
                       {t("documents.indexInDb")}
                     </DropdownMenuItem>
                   )}
-                  {doc.texte_extrait && (
+                  {doc.extracted_text && (
                     <>
-                      {!doc.nom_fichier?.endsWith('.md') && (
+                      {!doc.filename?.endsWith('.md') && (
                         <DropdownMenuItem
                           onClick={() => onExtract(doc)}
                           disabled={extractingDocId === doc.id}
@@ -255,7 +255,7 @@ export function DocumentsDataTable({
               )}
 
               {/* AUDIO (si applicable) */}
-              {isAudioFile(doc) && !doc.texte_extrait && (
+              {isAudioFile(doc) && !doc.extracted_text && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -310,9 +310,9 @@ export function DocumentsDataTable({
       <div className="flex items-center gap-2">
         <Input
           placeholder={t("documents.filterByName")}
-          value={(table.getColumn("nom_fichier")?.getFilterValue() as string) ?? ""}
+          value={(table.getColumn("filename")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("nom_fichier")?.setFilterValue(event.target.value)
+            table.getColumn("filename")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
