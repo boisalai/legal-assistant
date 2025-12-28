@@ -51,7 +51,6 @@ class CourseResponse(BaseModel):
     updated_at: Optional[str] = None
 
     # Academic fields
-    session_id: Optional[str] = None
     course_code: Optional[str] = None
     professor: Optional[str] = None
     credits: Optional[int] = None
@@ -204,7 +203,6 @@ async def list_courses(
                         created_at=created_at,
                         updated_at=updated_at,
                         # Academic fields
-                        session_id=str(item.get("session_id")) if item.get("session_id") else None,
                         course_code=item.get("course_code"),
                         professor=item.get("professor"),
                         credits=item.get("credits"),
@@ -260,22 +258,26 @@ async def create_course(
         if "pinned" not in case_data:
             case_data["pinned"] = False  # Default from CourseBase model
 
-        # Normalize session_id if present
-        if "session_id" in case_data and case_data["session_id"]:
-            if not case_data["session_id"].startswith("session:"):
-                case_data["session_id"] = f"session:{case_data['session_id']}"
-
-        # Check for duplicate course_code in same session (if academic mode)
-        if case_data.get("course_code") and case_data.get("session_id"):
+        # Check for duplicate course_code in same year/semester (if academic mode)
+        if case_data.get("course_code"):
             course_service = get_course_service()
             exists = await course_service.check_course_code_exists(
                 course_code=case_data["course_code"],
-                session_id=case_data["session_id"]
+                year=case_data.get("year"),
+                semester=case_data.get("semester")
             )
             if exists:
+                session_info = ""
+                if case_data.get("year") or case_data.get("semester"):
+                    parts = []
+                    if case_data.get("semester"):
+                        parts.append(case_data["semester"])
+                    if case_data.get("year"):
+                        parts.append(str(case_data["year"]))
+                    session_info = f" ({' '.join(parts)})" if parts else ""
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Course code '{case_data['course_code']}' already exists in this session"
+                    detail=f"Course code '{case_data['course_code']}' already exists{session_info}"
                 )
 
         result = await service.create("course", case_data, record_id=course_id)
@@ -306,7 +308,6 @@ async def create_course(
             created_at=created_at,
             updated_at=updated_at,
             # Academic fields
-            session_id=str(created_case.get("session_id")) if created_case.get("session_id") else None,
             course_code=created_case.get("course_code"),
             professor=created_case.get("professor"),
             credits=created_case.get("credits", 3),  # Default value from CourseBase model
@@ -369,7 +370,6 @@ async def get_case(
             created_at=created_at,
             updated_at=updated_at,
             # Academic fields
-            session_id=str(item.get("session_id")) if item.get("session_id") else None,
             course_code=item.get("course_code"),
             professor=item.get("professor"),
             credits=item.get("credits"),
@@ -421,27 +421,32 @@ async def update_course(
         updates = update_data.model_dump(exclude_unset=True)
         updates["updated_at"] = now
 
-        # Normalize session_id if present
-        if "session_id" in updates and updates["session_id"]:
-            if not updates["session_id"].startswith("session:"):
-                updates["session_id"] = f"session:{updates['session_id']}"
-
         # Check for duplicate course_code if updating it
         if "course_code" in updates and updates["course_code"]:
-            # Get current session_id (from updates or existing item)
-            session_id = updates.get("session_id") or item.get("session_id")
-            if session_id:
-                course_service = get_course_service()
-                exists = await course_service.check_course_code_exists(
-                    course_code=updates["course_code"],
-                    session_id=session_id,
-                    exclude_id=course_id
+            # Get current year/semester (from updates or existing item)
+            year = updates.get("year") if "year" in updates else item.get("year")
+            semester = updates.get("semester") if "semester" in updates else item.get("semester")
+
+            course_service = get_course_service()
+            exists = await course_service.check_course_code_exists(
+                course_code=updates["course_code"],
+                year=year,
+                semester=semester,
+                exclude_id=course_id
+            )
+            if exists:
+                session_info = ""
+                if year or semester:
+                    parts = []
+                    if semester:
+                        parts.append(semester)
+                    if year:
+                        parts.append(str(year))
+                    session_info = f" ({' '.join(parts)})" if parts else ""
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Course code '{updates['course_code']}' already exists{session_info}"
                 )
-                if exists:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Course code '{updates['course_code']}' already exists in this session"
-                    )
 
         # Update in database
         await service.merge(course_id, updates)
@@ -468,7 +473,6 @@ async def update_course(
             created_at=created_at,
             updated_at=updated_at,
             # Academic fields
-            session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
             course_code=updated_item.get("course_code"),
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
@@ -544,7 +548,6 @@ async def toggle_pin_course(
             created_at=created_at,
             updated_at=updated_at,
             # Academic fields
-            session_id=str(updated_item.get("session_id")) if updated_item.get("session_id") else None,
             course_code=updated_item.get("course_code"),
             professor=updated_item.get("professor"),
             credits=updated_item.get("credits"),
