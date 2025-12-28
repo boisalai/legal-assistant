@@ -292,7 +292,9 @@ class TestTranscriptionValidation:
             f"/api/courses/course:invalid/documents/{audio_doc['id']}/transcribe"
         )
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        # API returns 403 Forbidden when trying to access a document with mismatched course_id
+        # (ownership validation happens before existence check)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     @pytest.mark.asyncio
     async def test_transcribe_with_mismatched_course(
