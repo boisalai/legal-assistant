@@ -1066,9 +1066,12 @@ export const linkedDirectoryApi = {
   async link(
     caseId: string,
     directoryPath: string,
+    autoExtractMarkdown: boolean,
+    signal: AbortSignal,
     onProgress?: (event: LinkedDirectoryProgressEvent) => void,
     onComplete?: (result: { success: boolean; total_indexed: number; link_id: string }) => void,
-    onError?: (error: string) => void
+    onError?: (error: string) => void,
+    onLinkIdReceived?: (linkId: string) => void
   ): Promise<void> {
     const cleanId = caseId.replace("course:", "").replace("case:", "");
     const url = `${API_BASE_URL}/api/courses/${cleanId}/link-directory`;
@@ -1089,7 +1092,11 @@ export const linkedDirectoryApi = {
     const response = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ directory_path: directoryPath }),
+      signal,
+      body: JSON.stringify({
+        directory_path: directoryPath,
+        auto_extract_markdown: autoExtractMarkdown,
+      }),
     });
 
     if (!response.ok) {
@@ -1104,6 +1111,7 @@ export const linkedDirectoryApi = {
     }
 
     let currentEvent = "";
+    let linkIdCaptured = false;
 
     try {
       while (true) {
@@ -1122,10 +1130,23 @@ export const linkedDirectoryApi = {
           if (line.startsWith("data: ")) {
             const data = JSON.parse(line.slice(6));
 
-            if (currentEvent === "progress" && onProgress) {
+            if (currentEvent === "started") {
+              // Capture link_id from started event immediately
+              if (data.link_id && !linkIdCaptured && onLinkIdReceived) {
+                onLinkIdReceived(data.link_id);
+                linkIdCaptured = true;
+              }
+            } else if (currentEvent === "progress" && onProgress) {
               onProgress(data);
-            } else if (currentEvent === "complete" && onComplete) {
-              onComplete(data);
+            } else if (currentEvent === "complete") {
+              // Also capture link_id from complete event as fallback
+              if (data.link_id && !linkIdCaptured && onLinkIdReceived) {
+                onLinkIdReceived(data.link_id);
+                linkIdCaptured = true;
+              }
+              if (onComplete) {
+                onComplete(data);
+              }
             } else if (currentEvent === "error" && onError) {
               onError(data.error);
             }
@@ -1134,6 +1155,13 @@ export const linkedDirectoryApi = {
           }
         }
       }
+    } catch (error) {
+      // If aborted, rethrow the error
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
+      // Otherwise, handle as regular error
+      throw error;
     } finally {
       reader.releaseLock();
     }
