@@ -90,3 +90,7 @@ backend/scripts/test_*.py
 backend/scripts/.env.example
 backend/scripts/CAIJ_POC_RESULTS.md
 backend/scripts/caij_api_endpoints.json
+
+# Debug and temporary files (general patterns)
+backend/*.png
+backend/history.txt
