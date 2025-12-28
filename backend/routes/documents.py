@@ -28,14 +28,7 @@ from services.document_indexing_service import DocumentIndexingService
 from utils.text_utils import remove_yaml_frontmatter
 from models.document_models import DocumentResponse, DocumentListResponse, RegisterDocumentRequest
 from services.document_service import get_document_service
-from models.transcription_models import (
-    ExtractionResponse,
-    TranscriptionResponse,
-    TranscribeWorkflowRequest,
-    YouTubeDownloadRequest,
-    YouTubeInfoResponse,
-    YouTubeDownloadResponse
-)
+from models.transcription_models import ExtractionResponse
 from models.tts_models import TTSVoice, TTSRequest, TTSResponse
 from utils.file_utils import (
     ALLOWED_EXTENSIONS,
