@@ -318,9 +318,14 @@ async def extract_pdf_to_markdown(
                     # Handle existing markdown
                     if markdown_path.exists() or (existing_docs and len(existing_docs) > 0):
                         if not force_reextract:
+                            # Send "complete" event with error instead of "error" event
+                            # This ensures the frontend receives a proper completion signal
                             await progress_queue.put({
-                                "type": "error",
-                                "data": {"message": f"Un fichier markdown '{markdown_filename}' existe déjà pour ce PDF. Utilisez 'force_reextract=true' pour le remplacer."}
+                                "type": "complete",
+                                "data": {
+                                    "success": False,
+                                    "error": f"Un fichier markdown '{markdown_filename}' existe déjà pour ce PDF."
+                                }
                             })
                             return
 
