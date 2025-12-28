@@ -209,7 +209,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       }
     }
 
-    console.log("[Transcription] Looking for file:", filename, "in", currentDocs.map(d => d.nom_fichier));
+    console.log("[Transcription] Looking for file:", filename, "in", currentDocs.map(d => d.filename));
 
     // Find the document by filename
     let doc: Document | undefined;
@@ -217,14 +217,14 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
     if (filename) {
       // First try exact match
       doc = currentDocs.find(d =>
-        d.nom_fichier.toLowerCase() === filename.toLowerCase()
+        d.filename.toLowerCase() === filename.toLowerCase()
       );
 
       // Then try includes match
       if (!doc) {
         doc = currentDocs.find(d =>
-          d.nom_fichier.toLowerCase().includes(filename.toLowerCase()) ||
-          filename.toLowerCase().includes(d.nom_fichier.toLowerCase().replace(/\.[^/.]+$/, ""))
+          d.filename.toLowerCase().includes(filename.toLowerCase()) ||
+          filename.toLowerCase().includes(d.filename.toLowerCase().replace(/\.[^/.]+$/, ""))
         );
       }
     }
@@ -232,27 +232,27 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
     if (!doc) {
       // Look for any untranscribed audio file if no specific filename found
       const audioDoc = currentDocs.find(d =>
-        isAudioFile(d.nom_fichier) && !d.texte_extrait
+        isAudioFile(d.filename) && !d.extracted_text
       );
 
       if (!audioDoc) {
         // List available audio files
-        const audioFiles = currentDocs.filter(d => isAudioFile(d.nom_fichier));
+        const audioFiles = currentDocs.filter(d => isAudioFile(d.filename));
         if (audioFiles.length === 0) {
           return "Je n'ai pas trouvé de fichier audio dans ce dossier.";
         }
-        return `Je n'ai pas trouvé de fichier audio non transcrit. Fichiers audio disponibles: ${audioFiles.map(d => d.nom_fichier).join(", ")}`;
+        return `Je n'ai pas trouvé de fichier audio non transcrit. Fichiers audio disponibles: ${audioFiles.map(d => d.filename).join(", ")}`;
       }
 
-      console.log("[Transcription] Using first untranscribed audio:", audioDoc.nom_fichier);
+      console.log("[Transcription] Using first untranscribed audio:", audioDoc.filename);
       return await runTranscription(audioDoc);
     }
 
-    if (!isAudioFile(doc.nom_fichier)) {
-      return `Le fichier "${doc.nom_fichier}" n'est pas un fichier audio.`;
+    if (!isAudioFile(doc.filename)) {
+      return `Le fichier "${doc.filename}" n'est pas un fichier audio.`;
     }
 
-    console.log("[Transcription] Found document:", doc.nom_fichier);
+    console.log("[Transcription] Found document:", doc.filename);
     return await runTranscription(doc);
   }, [documents, caseData.id]);
 
@@ -284,8 +284,8 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         // Refresh documents list
         await loadDocuments();
 
-        const baseName = doc.nom_fichier.replace(/\.[^/.]+$/, "");
-        return `J'ai transcrit le fichier audio "${doc.nom_fichier}" et créé un document markdown "${baseName}_transcription.md" avec le contenu formaté.\n\nVoici un aperçu de la transcription:\n\n${result.transcript_text?.slice(0, 500)}${(result.transcript_text?.length || 0) > 500 ? "..." : ""}`;
+        const baseName = doc.filename.replace(/\.[^/.]+$/, "");
+        return `J'ai transcrit le fichier audio "${doc.filename}" et créé un document markdown "${baseName}_transcription.md" avec le contenu formaté.\n\nVoici un aperçu de la transcription:\n\n${result.transcript_text?.slice(0, 500)}${(result.transcript_text?.length || 0) > 500 ? "..." : ""}`;
       } else {
         return `Erreur lors de la transcription: ${result.error || "Erreur inconnue"}`;
       }

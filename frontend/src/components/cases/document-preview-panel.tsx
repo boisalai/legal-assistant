@@ -34,10 +34,10 @@ export function DocumentPreviewPanel({
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
 
-  const ext = document.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-  const isAudio = document.type_mime?.includes("audio") || document.type_fichier?.includes("audio") || ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"].includes(ext);
-  const isPdf = document.type_mime?.includes("pdf") || document.type_fichier === "pdf" || ext === "pdf";
-  const isMarkdown = document.type_mime?.includes("markdown") || document.type_fichier === "md" || ext === "md" || ext === "markdown";
+  const ext = document.filename?.split(".").pop()?.toLowerCase() || "";
+  const isAudio = document.mime_type?.includes("audio") || document.file_type?.includes("audio") || ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"].includes(ext);
+  const isPdf = document.mime_type?.includes("pdf") || document.file_type === "pdf" || ext === "pdf";
+  const isMarkdown = document.mime_type?.includes("markdown") || document.file_type === "md" || ext === "md" || ext === "markdown";
 
   // Clean IDs for API calls
   const cleanCaseId = caseId.replace("judgment:", "");
@@ -91,12 +91,12 @@ export function DocumentPreviewPanel({
             setAudioUrl(url);
           }
         } else if (isMarkdown) {
-          // For markdown files: use texte_extrait (cleaned content) if available
-          if (document.texte_extrait && document.texte_extrait.trim()) {
-            const cleanedContent = removeFrontmatter(document.texte_extrait);
+          // For markdown files: use extracted_text (cleaned content) if available
+          if (document.extracted_text && document.extracted_text.trim()) {
+            const cleanedContent = removeFrontmatter(document.extracted_text);
             setMarkdownContent(cleanedContent);
           } else {
-            // Fallback to downloading the file if texte_extrait is not available
+            // Fallback to downloading the file if extracted_text is not available
             const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/courses/${cleanCaseId}/documents/${cleanDocId}/download`;
             try {
               const response = await fetch(downloadUrl);
@@ -124,9 +124,9 @@ export function DocumentPreviewPanel({
     // Track document view
     trackActivity("view_document", {
       document_id: document.id,
-      document_name: document.nom_fichier,
+      document_name: document.filename,
     });
-  }, [document.id, isPdf, isAudio, isMarkdown, cleanCaseId, cleanDocId, document.texte_extrait, trackActivity, document.nom_fichier]);
+  }, [document.id, isPdf, isAudio, isMarkdown, cleanCaseId, cleanDocId, document.extracted_text, trackActivity, document.filename]);
 
   const handleOpenExternal = () => {
     if (document.file_path) {
@@ -145,7 +145,7 @@ export function DocumentPreviewPanel({
     // Track TTS generation
     trackActivity("generate_tts", {
       document_id: document.id,
-      document_name: document.nom_fichier,
+      document_name: document.filename,
       language,
     });
 
@@ -200,7 +200,7 @@ export function DocumentPreviewPanel({
     // Track document close
     trackActivity("close_document", {
       document_id: document.id,
-      document_name: document.nom_fichier,
+      document_name: document.filename,
     });
     onClose();
   };
@@ -210,7 +210,7 @@ export function DocumentPreviewPanel({
       {/* Header */}
       <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <h2 className="text-xl font-bold truncate">{document.nom_fichier}</h2>
+          <h2 className="text-xl font-bold truncate">{document.filename}</h2>
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             {isAudio ? (
               <Music className="h-4 w-4 flex-shrink-0" />
@@ -224,7 +224,7 @@ export function DocumentPreviewPanel({
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-4">
           {/* TTS Button - Only show if document has extracted text */}
-          {document.texte_extrait && !isAudio && (
+          {document.extracted_text && !isAudio && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -326,7 +326,7 @@ export function DocumentPreviewPanel({
               <iframe
                 src={pdfUrl}
                 className="w-full h-full border-0"
-                title={document.nom_fichier}
+                title={document.filename}
               />
             )}
 
@@ -342,9 +342,9 @@ export function DocumentPreviewPanel({
               <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
                 <Music className="h-24 w-24 text-purple-500/50" />
                 <div className="text-center">
-                  <h4 className="font-medium text-lg">{document.nom_fichier}</h4>
+                  <h4 className="font-medium text-lg">{document.filename}</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {document.taille ? `${(document.taille / 1024).toFixed(1)} KB` : ""}
+                    {document.size ? `${(document.size / 1024).toFixed(1)} KB` : ""}
                   </p>
                 </div>
                 <audio
@@ -356,11 +356,11 @@ export function DocumentPreviewPanel({
                 </audio>
 
                 {/* Show transcription if available */}
-                {document.texte_extrait && (
+                {document.extracted_text && (
                   <div className="w-full max-w-2xl mt-4">
                     <h5 className="font-medium text-sm mb-2">Transcription</h5>
                     <div className="p-4 bg-muted rounded-lg text-sm max-h-64 overflow-y-auto">
-                      {document.texte_extrait}
+                      {document.extracted_text}
                     </div>
                   </div>
                 )}
@@ -368,18 +368,18 @@ export function DocumentPreviewPanel({
             )}
 
             {/* Text/Other file with extracted content */}
-            {!isPdf && !isMarkdown && !isAudio && document.texte_extrait && (
+            {!isPdf && !isMarkdown && !isAudio && document.extracted_text && (
               <div className="p-4">
                 <div className="prose prose-sm dark:prose-invert max-w-none">
                   <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg">
-                    {document.texte_extrait}
+                    {document.extracted_text}
                   </pre>
                 </div>
               </div>
             )}
 
             {/* No content available */}
-            {!isPdf && !isAudio && !markdownContent && !document.texte_extrait && (
+            {!isPdf && !isAudio && !markdownContent && !document.extracted_text && (
               <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
                 <FileText className="h-16 w-16 text-muted-foreground/50" />
                 <div>

@@ -232,28 +232,28 @@ export function CaseDetailsPanel({
 
   // Check if document is an audio file
   const isAudioFile = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
     const audioExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
-    return audioExtensions.includes(ext) || (doc.type_mime?.includes("audio") ?? false);
+    return audioExtensions.includes(ext) || (doc.mime_type?.includes("audio") ?? false);
   };
 
   // Check if document is a PDF file
   const isPDFFile = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-    return ext === "pdf" || doc.type_mime === "application/pdf";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
+    return ext === "pdf" || doc.mime_type === "application/pdf";
   };
 
-  // Check if a document can have text extracted (non-audio without texte_extrait)
+  // Check if a document can have text extracted (non-audio without extracted_text)
   const canExtractText = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
     // PDF files should use "Extraire en markdown" instead of direct extraction
     const extractableExtensions = ["doc", "docx", "txt", "rtf", "md"];
     return extractableExtensions.includes(ext);
   };
 
-  // Check if a document needs text extraction (non-audio without texte_extrait)
+  // Check if a document needs text extraction (non-audio without extracted_text)
   const needsExtraction = (doc: Document) => {
-    return canExtractText(doc) && !doc.texte_extrait;
+    return canExtractText(doc) && !doc.extracted_text;
   };
 
   const handleExtractText = async (doc: Document) => {
@@ -363,9 +363,9 @@ export function CaseDetailsPanel({
   const handleConfirmDelete = async () => {
     if (docToDelete) {
       // Only clear text for non-markdown documents with extracted text
-      // Markdown files store their content in texte_extrait but don't need clearing
-      const isMarkdown = docToDelete.nom_fichier?.endsWith('.md');
-      if (docToDelete.texte_extrait && !isMarkdown) {
+      // Markdown files store their content in extracted_text but don't need clearing
+      const isMarkdown = docToDelete.filename?.endsWith('.md');
+      if (docToDelete.extracted_text && !isMarkdown) {
         try {
           await documentsApi.clearText(caseData.id, docToDelete.id);
         } catch (err) {
@@ -726,11 +726,11 @@ export function CaseDetailsPanel({
             <AlertDialogDescription>
               {docToDelete?.file_path?.includes('data/uploads/') ? (
                 <>
-                  Le document « {docToDelete?.nom_fichier} » sera définitivement supprimé du dossier et du disque.
+                  Le document « {docToDelete?.filename} » sera définitivement supprimé du dossier et du disque.
                 </>
               ) : (
                 <>
-                  Le document « {docToDelete?.nom_fichier} » sera retiré de ce dossier.
+                  Le document « {docToDelete?.filename} » sera retiré de ce dossier.
                   Le fichier original ne sera pas supprimé de votre disque.
                 </>
               )}

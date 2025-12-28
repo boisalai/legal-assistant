@@ -15,20 +15,19 @@ class DocusaurusSource(BaseModel):
 
 
 class DocumentResponse(BaseModel):
-    """Réponse pour un document unique.
+    """Response for a single document.
 
-    Note: Uses serialization_alias to maintain backwards compatibility with French field names
-    in the API response while using English names internally.
+    Uses English field names throughout the API for consistency.
     """
     id: str
     course_id: str
-    filename: str = Field(serialization_alias="nom_fichier")
-    file_type: str = Field(serialization_alias="type_fichier")
-    mime_type: str = Field(serialization_alias="type_mime")
-    size: int = Field(serialization_alias="taille")
+    filename: str
+    file_type: str
+    mime_type: str
+    size: int
     file_path: str
     created_at: str
-    extracted_text: Optional[str] = Field(default=None, serialization_alias="texte_extrait")
+    extracted_text: Optional[str] = None
     file_exists: bool = True
     source_document_id: Optional[str] = None
     is_derived: Optional[bool] = None
@@ -37,9 +36,6 @@ class DocumentResponse(BaseModel):
     linked_source: Optional[Dict[str, Any]] = None
     docusaurus_source: Optional[DocusaurusSource] = None
     indexed: Optional[bool] = None
-
-    class Config:
-        populate_by_name = True  # Allow populating by both alias and field name
 
 
 class DocumentListResponse(BaseModel):

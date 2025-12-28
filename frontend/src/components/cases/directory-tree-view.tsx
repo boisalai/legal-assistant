@@ -89,21 +89,21 @@ export function DirectoryTreeView({
 
   // Check if document is a PDF file
   const isPDFFile = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
-    return ext === "pdf" || doc.type_mime === "application/pdf";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
+    return ext === "pdf" || doc.mime_type === "application/pdf";
   };
 
   // Check if document is a Word file
   const isWordFile = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
     return ["doc", "docx"].includes(ext);
   };
 
   // Check if document is an audio file
   const isAudioFile = (doc: Document) => {
-    const ext = doc.nom_fichier?.split(".").pop()?.toLowerCase() || "";
+    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
     const audioExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
-    return audioExtensions.includes(ext) || (doc.type_mime?.includes("audio") ?? false);
+    return audioExtensions.includes(ext) || (doc.mime_type?.includes("audio") ?? false);
   };
 
   const columns: ColumnDef<Document>[] = [
@@ -146,7 +146,7 @@ export function DirectoryTreeView({
           return (
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-medium">{relativePath || doc.nom_fichier}</span>
+              <span className="font-medium">{relativePath || doc.filename}</span>
             </div>
           );
         }
@@ -194,7 +194,7 @@ export function DirectoryTreeView({
       accessorFn: (row) => row.linked_source?.source_mtime || 0,
     },
     {
-      accessorKey: "taille",
+      accessorKey: "size",
       header: ({ column }) => {
         return (
           <div className="flex justify-end">
@@ -212,7 +212,7 @@ export function DirectoryTreeView({
         return (
           <div className="text-right">
             <span className="text-sm text-muted-foreground">
-              {formatFileSize(row.original.taille || 0)}
+              {formatFileSize(row.original.size || 0)}
             </span>
           </div>
         );
