@@ -102,6 +102,8 @@ export function CaseDetailsPanel({
   const [extractingPDFDocId, setExtractingPDFDocId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [reextractDialogOpen, setReextractDialogOpen] = useState(false);
+  const [docToReextract, setDocToReextract] = useState<Document | null>(null);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncTasks, setSyncTasks] = useState<SyncTask[]>([]);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -326,20 +328,24 @@ export function CaseDetailsPanel({
       // Check if error is about existing markdown file
       if (errorMessage.includes("existe déjà")) {
         // Ask user if they want to force re-extract
-        const confirmed = window.confirm(
-          `${errorMessage}\n\nVoulez-vous supprimer et réextraire le fichier ?`
-        );
-
-        if (confirmed) {
-          // Retry with forceReextract=true
-          await handleExtractPDF(doc, true);
-          return;
-        }
+        setDocToReextract(doc);
+        setReextractDialogOpen(true);
+        setExtractingPDFDocId(null);
+        return;
       }
 
       toast.error(errorMessage);
     } finally {
       setExtractingPDFDocId(null);
+    }
+  };
+
+  // Handle confirm re-extract PDF
+  const handleConfirmReextract = async () => {
+    if (docToReextract) {
+      setReextractDialogOpen(false);
+      await handleExtractPDF(docToReextract, true);
+      setDocToReextract(null);
     }
   };
 
@@ -740,6 +746,25 @@ export function CaseDetailsPanel({
             <AlertDialogCancel onClick={() => setDocToDelete(null)}>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete}>
               {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer' : 'Retirer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Re-extract PDF Confirmation Dialog */}
+      <AlertDialog open={reextractDialogOpen} onOpenChange={setReextractDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fichier markdown existant</AlertDialogTitle>
+            <AlertDialogDescription>
+              Un fichier markdown existe déjà pour ce PDF.
+              Voulez-vous supprimer et réextraire le fichier ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDocToReextract(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReextract}>
+              Supprimer et réextraire
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

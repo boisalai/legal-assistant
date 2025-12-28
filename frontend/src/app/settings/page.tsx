@@ -22,6 +22,16 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Settings,
   FileText,
   FileSearch,
@@ -36,6 +46,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { settingsApi } from "@/lib/api";
+import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import {
   LLMConfig,
@@ -148,6 +159,7 @@ export default function SettingsPage() {
     current_model: string;
   } | null>(null);
   const [reindexing, setReindexing] = useState(false);
+  const [reindexDialogOpen, setReindexDialogOpen] = useState(false);
 
   // Load settings from backend
   const loadSettings = useCallback(async () => {
@@ -290,10 +302,7 @@ export default function SettingsPage() {
   }, [apiConnected, selectedEmbeddingModel, checkEmbeddingMismatch]);
 
   const handleReindexAll = async () => {
-    if (!confirm("⚠️ ATTENTION: Cette opération va supprimer tous les anciens embeddings et réindexer tous les documents. Cela peut prendre plusieurs minutes. Continuer ?")) {
-      return;
-    }
-
+    setReindexDialogOpen(false);
     setReindexing(true);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/settings/reindex-all`, {
@@ -302,15 +311,21 @@ export default function SettingsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`✓ Réindexation terminée avec succès!\n\n${data.documents_processed}/${data.total_documents} documents traités\n${data.chunks_created} chunks créés`);
+        toast.success(`Réindexation terminée avec succès!`, {
+          description: `${data.documents_processed}/${data.total_documents} documents traités, ${data.chunks_created} chunks créés`,
+        });
         // Recheck mismatch
         await checkEmbeddingMismatch();
       } else {
         const error = await response.json();
-        alert(`Erreur lors de la réindexation: ${error.detail || "Erreur inconnue"}`);
+        toast.error(`Erreur lors de la réindexation`, {
+          description: error.detail || "Erreur inconnue",
+        });
       }
     } catch (err) {
-      alert(`Erreur lors de la réindexation: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
+      toast.error(`Erreur lors de la réindexation`, {
+        description: err instanceof Error ? err.message : "Erreur inconnue",
+      });
     } finally {
       setReindexing(false);
     }
@@ -687,7 +702,7 @@ export default function SettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleReindexAll}
+                        onClick={() => setReindexDialogOpen(true)}
                         disabled={reindexing}
                         className="border-amber-600 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900"
                       >
@@ -818,6 +833,25 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Reindex Confirmation Dialog */}
+      <AlertDialog open={reindexDialogOpen} onOpenChange={setReindexDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Réindexer tous les documents ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette opération va supprimer tous les anciens embeddings et réindexer tous les documents.
+              Cela peut prendre plusieurs minutes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReindexAll}>
+              Continuer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
