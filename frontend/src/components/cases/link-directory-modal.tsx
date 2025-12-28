@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Folder, Loader2, FolderOpen, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { linkedDirectoryApi } from "@/lib/api";
 import type { LinkedDirectoryScanResult } from "@/types";
@@ -47,6 +48,9 @@ export function LinkDirectoryModal({
   const [scanResult, setScanResult] = useState<LinkedDirectoryScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linkingProgress, setLinkingProgress] = useState({ indexed: 0, total: 0, percentage: 0, currentFile: "" });
+  const [autoExtractMarkdown, setAutoExtractMarkdown] = useState(false);
+  const [currentLinkId, setCurrentLinkId] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // Reset state when modal closes
   const handleClose = () => {
@@ -56,6 +60,9 @@ export function LinkDirectoryModal({
       setScanResult(null);
       setError(null);
       setLinkingProgress({ indexed: 0, total: 0, percentage: 0, currentFile: "" });
+      setAutoExtractMarkdown(false);
+      setCurrentLinkId(null);
+      setAbortController(null);
       onOpenChange(false);
     }
   };
@@ -71,13 +78,51 @@ export function LinkDirectoryModal({
     setError(null);
 
     try {
-      const result = await linkedDirectoryApi.scan(directoryPath.trim());
+      // Clean the path: remove quotes and trim whitespace
+      const cleanPath = directoryPath.trim().replace(/^['"]|['"]$/g, '');
+      const result = await linkedDirectoryApi.scan(cleanPath);
       setScanResult(result);
       setState("confirm");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors du scan du répertoire");
       setState("error");
     }
+  };
+
+  // Cancel linking
+  const handleCancel = async () => {
+    if (!currentLinkId) {
+      return;
+    }
+
+    // Abort the SSE stream
+    if (abortController) {
+      abortController.abort();
+    }
+
+    // Call backend to clean up partial data
+    try {
+      const cleanId = caseId.replace("course:", "").replace("case:", "");
+      const response = await fetch(`http://localhost:8000/api/courses/${cleanId}/link-directory/${currentLinkId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Nettoyage effectué:", result);
+      }
+    } catch (err) {
+      console.error("Erreur lors du nettoyage:", err);
+    }
+
+    // Reset state
+    setState("input");
+    setCurrentLinkId(null);
+    setAbortController(null);
+    setLinkingProgress({ indexed: 0, total: 0, percentage: 0, currentFile: "" });
   };
 
   // Link directory
@@ -87,10 +132,18 @@ export function LinkDirectoryModal({
     setState("linking");
     setLinkingProgress({ indexed: 0, total: scanResult.total_files, percentage: 0, currentFile: "" });
 
+    // Create abort controller
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
+      // Clean the path: remove quotes and trim whitespace
+      const cleanPath = directoryPath.trim().replace(/^['"]|['"]$/g, '');
       await linkedDirectoryApi.link(
         caseId,
-        directoryPath.trim(),
+        cleanPath,
+        autoExtractMarkdown,
+        controller.signal,
         (progress) => {
           setLinkingProgress({
             indexed: progress.indexed,
@@ -99,7 +152,8 @@ export function LinkDirectoryModal({
             currentFile: progress.current_file,
           });
         },
-        () => {
+        (complete) => {
+          setCurrentLinkId(complete.link_id);
           setState("success");
           setTimeout(() => {
             onLinkSuccess();
@@ -109,9 +163,17 @@ export function LinkDirectoryModal({
         (err) => {
           setError(err);
           setState("error");
+        },
+        (linkId) => {
+          // Callback to capture link_id early
+          setCurrentLinkId(linkId);
         }
       );
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // Linking was cancelled by user
+        return;
+      }
       setError(err instanceof Error ? err.message : "Erreur lors de la liaison du répertoire");
       setState("error");
     }
@@ -144,7 +206,7 @@ export function LinkDirectoryModal({
     <>
       {/* Main dialog */}
       <Dialog open={open && state !== "confirm"} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={`max-w-2xl ${state === "linking" ? "[&>button]:hidden" : ""}`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Folder className="h-5 w-5" />
@@ -249,8 +311,12 @@ export function LinkDirectoryModal({
             )}
 
             {state === "linking" && (
-              <Button variant="outline" disabled>
-                Indexation en cours...
+              <Button
+                variant="destructive"
+                onClick={handleCancel}
+                disabled={!currentLinkId}
+              >
+                Annuler
               </Button>
             )}
           </DialogFooter>
@@ -304,6 +370,28 @@ export function LinkDirectoryModal({
               <div className="p-3 bg-muted rounded text-xs font-mono break-all">
                 {scanResult.base_path}
               </div>
+
+              {/* Auto-extract option */}
+              {scanResult && (scanResult.files_by_type.pdf || scanResult.files_by_type.docx || scanResult.files_by_type.doc) && (
+                <div className="flex items-start space-x-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <Checkbox
+                    id="auto-extract"
+                    checked={autoExtractMarkdown}
+                    onCheckedChange={(checked) => setAutoExtractMarkdown(checked === true)}
+                  />
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="auto-extract"
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      Extraire automatiquement en Markdown
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Les fichiers PDF, Word et audio seront automatiquement convertis en fichiers .md pour une meilleure recherche sémantique
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

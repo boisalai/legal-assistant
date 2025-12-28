@@ -67,6 +67,7 @@ class LinkDirectoryRequest(BaseModel):
     """Requête pour lier un répertoire."""
     directory_path: str
     file_paths: Optional[List[str]] = None  # Si None, importe tous les fichiers trouvés
+    auto_extract_markdown: bool = False  # Si True, extrait automatiquement PDF/DOCX/Audio en markdown
 
 
 class LinkedDirectoryMetadata(BaseModel):
@@ -219,6 +220,98 @@ def extract_text_from_file(file_path: Path) -> str:
         return ""
 
 
+async def create_markdown_from_file(
+    service,
+    source_file: Path,
+    course_id: str,
+    user_id: str,
+    link_id: str,
+    linked_source_metadata: dict
+) -> Optional[tuple[str, str]]:
+    """
+    Extrait un fichier (PDF, Word, Audio) et crée un fichier Markdown dérivé.
+
+    Args:
+        service: Instance de SurrealService
+        source_file: Chemin du fichier source
+        course_id: ID du cours
+        user_id: ID de l'utilisateur
+        link_id: ID de liaison du répertoire
+        linked_source_metadata: Métadonnées de la source liée
+
+    Returns:
+        Tuple (document_id, texte_extrait) ou None si l'extraction a échoué
+    """
+    from services.document_extraction_service import get_extraction_service
+
+    extraction_service = get_extraction_service()
+    extension = source_file.suffix.lower()
+
+    # Extraire le contenu
+    try:
+        extraction_result = await extraction_service.extract(
+            file_path=source_file,
+            language="fr"
+        )
+
+        if not extraction_result.success or not extraction_result.text:
+            logger.warning(f"Extraction failed for {source_file.name}: {extraction_result.error}")
+            return None
+
+        # Créer le fichier markdown dans le même répertoire que le fichier source
+        markdown_filename = source_file.stem + ".md"
+        markdown_path = source_file.parent / markdown_filename
+
+        # Écrire le fichier markdown
+        with open(markdown_path, "w", encoding="utf-8") as f:
+            f.write(extraction_result.text)
+
+        # Créer l'enregistrement dans SurrealDB
+        now = datetime.utcnow().isoformat()
+        doc_id = str(uuid.uuid4())[:8]
+
+        # Déterminer le type de dérivation
+        derivation_type = "pdf_extraction" if extension == ".pdf" else \
+                         "word_extraction" if extension in [".doc", ".docx"] else \
+                         "audio_transcription"
+
+        # Créer les métadonnées de liaison pour le fichier markdown
+        md_linked_source = linked_source_metadata.copy()
+        md_linked_source["absolute_path"] = str(markdown_path)
+        md_linked_source["relative_path"] = str(Path(linked_source_metadata["relative_path"]).parent / markdown_filename)
+        md_linked_source["derived_from"] = str(source_file)
+        md_linked_source["last_sync"] = now
+        md_linked_source["source_hash"] = calculate_file_hash(markdown_path)
+        md_linked_source["source_mtime"] = markdown_path.stat().st_mtime
+
+        document_data = {
+            "course_id": course_id,
+            "nom_fichier": markdown_filename,
+            "type_fichier": "md",
+            "type_mime": "text/markdown",
+            "taille": len(extraction_result.text.encode('utf-8')),
+            "file_path": str(markdown_path),
+            "user_id": user_id,
+            "created_at": now,
+            "source_type": "linked",
+            "linked_source": md_linked_source,
+            "texte_extrait": extraction_result.text,
+            "indexed": False,
+            "is_derived": True,
+            "derivation_type": derivation_type,
+            "is_transcription": extraction_result.is_transcription,
+        }
+
+        await service.create("document", document_data, record_id=doc_id)
+        logger.info(f"Created markdown document {doc_id} from {source_file.name}")
+
+        return (f"document:{doc_id}", extraction_result.text)
+
+    except Exception as e:
+        logger.error(f"Error creating markdown from {source_file.name}: {e}")
+        return None
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
@@ -300,6 +393,14 @@ async def link_directory_endpoint(
                 "last_refresh": now
             }
 
+            # Envoyer l'événement "started" avec le link_id pour permettre l'annulation
+            started_data = {
+                "link_id": link_id,
+                "total": total,
+                "message": "Indexation démarrée"
+            }
+            yield f"event: started\ndata: {json.dumps(started_data)}\n\n"
+
             try:
                 indexing_service = DocumentIndexingService()
 
@@ -357,22 +458,46 @@ async def link_directory_endpoint(
 
                         await service.create("document", document_data, record_id=doc_id)
 
+                        # Si auto_extract_markdown est activé et le fichier est PDF/DOCX/Audio
+                        markdown_result = None
+                        if request.auto_extract_markdown and file_info.extension in ["pdf", "docx", "doc", "mp3", "m4a", "wav", "mp4", "webm", "ogg"]:
+                            markdown_result = await create_markdown_from_file(
+                                service=service,
+                                source_file=source_file,
+                                course_id=course_id,
+                                user_id=user_id,
+                                link_id=link_id,
+                                linked_source_metadata=linked_source
+                            )
+
+                        # Déterminer quel contenu indexer
+                        content_to_index = None
+                        doc_id_to_index = None
+
+                        if markdown_result:
+                            # Si markdown créé avec succès, indexer le markdown
+                            doc_id_to_index, content_to_index = markdown_result
+                        elif content and not content.startswith("[Contenu"):
+                            # Sinon, indexer le fichier source si contenu disponible
+                            content_to_index = content
+                            doc_id_to_index = f"document:{doc_id}"
+
                         # Indexer si contenu disponible
-                        if content and not content.startswith("[Contenu"):
+                        if content_to_index and doc_id_to_index:
                             try:
                                 result = await indexing_service.index_document(
-                                    document_id=f"document:{doc_id}",
+                                    document_id=doc_id_to_index,
                                     course_id=course_id,
-                                    text_content=content
+                                    text_content=content_to_index
                                 )
 
                                 if result.get("success"):
                                     await service.merge(
-                                        f"document:{doc_id}",
+                                        doc_id_to_index,
                                         {"indexed": True}
                                     )
                             except Exception as e:
-                                logger.error(f"Erreur lors de l'indexation du document:{doc_id}: {e}")
+                                logger.error(f"Erreur lors de l'indexation du document:{doc_id_to_index}: {e}")
 
                         indexed += 1
 
@@ -757,6 +882,112 @@ async def reindex_unindexed_documents_endpoint(
 
     except Exception as e:
         logger.error(f"Erreur lors de la réindexation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.delete("/courses/{course_id}/link-directory/{link_id}")
+async def cancel_link_directory(
+    course_id: str,
+    link_id: str,
+    user_id: str = Depends(require_auth)
+):
+    """
+    Annule une liaison de répertoire en cours et nettoie tous les documents associés.
+
+    Supprime :
+    - Tous les documents avec le link_id spécifié
+    - Tous les embeddings associés à ces documents
+    - Les fichiers markdown dérivés créés sur le disque (optionnel)
+
+    Args:
+        course_id: ID du cours
+        link_id: ID de la liaison à annuler
+        user_id: ID de l'utilisateur (auth)
+
+    Returns:
+        {
+            "success": true,
+            "documents_deleted": 10,
+            "embeddings_deleted": 150,
+            "message": "Liaison annulée avec succès"
+        }
+    """
+    try:
+        service = get_surreal_service()
+        if not service.db:
+            await service.connect()
+
+        # Normaliser l'ID du cours
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
+
+        logger.info(f"Annulation de la liaison {link_id} pour le cours {course_id}")
+
+        # Récupérer tous les documents avec ce link_id
+        query = """
+            SELECT * FROM document
+            WHERE course_id = $course_id
+            AND source_type = 'linked'
+            AND linked_source.link_id = $link_id
+        """
+        result = await service.db.query(query, {"course_id": course_id, "link_id": link_id})
+        docs = result if result else []
+
+        if not docs:
+            return {
+                "success": True,
+                "documents_deleted": 0,
+                "embeddings_deleted": 0,
+                "message": "Aucun document trouvé pour ce link_id"
+            }
+
+        documents_deleted = 0
+        embeddings_deleted = 0
+        markdown_files_deleted = []
+
+        # Supprimer chaque document et ses embeddings
+        for doc in docs:
+            doc_id = str(doc["id"])
+
+            # Supprimer les embeddings associés
+            embed_result = await service.db.query(
+                "DELETE FROM embedding_chunk WHERE document_id = $doc_id RETURN BEFORE",
+                {"doc_id": doc_id}
+            )
+            if embed_result and len(embed_result) > 0:
+                embeddings_deleted += len(embed_result)
+
+            # Si c'est un fichier markdown dérivé, supprimer le fichier du disque
+            if doc.get("is_derived") and doc.get("derivation_type") in ["pdf_extraction", "word_extraction", "audio_transcription"]:
+                file_path = doc.get("file_path")
+                if file_path and Path(file_path).exists():
+                    try:
+                        Path(file_path).unlink()
+                        markdown_files_deleted.append(file_path)
+                        logger.info(f"Supprimé le fichier markdown dérivé: {file_path}")
+                    except Exception as e:
+                        logger.warning(f"Impossible de supprimer le fichier {file_path}: {e}")
+
+            # Supprimer le document de la base de données
+            await service.delete(doc_id)
+            documents_deleted += 1
+
+        logger.info(f"Liaison {link_id} annulée: {documents_deleted} documents et {embeddings_deleted} embeddings supprimés")
+
+        return {
+            "success": True,
+            "documents_deleted": documents_deleted,
+            "embeddings_deleted": embeddings_deleted,
+            "markdown_files_deleted": len(markdown_files_deleted),
+            "message": f"Liaison annulée: {documents_deleted} document(s) supprimé(s)"
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur lors de l'annulation de la liaison: {e}")
+        logger.error(f"Traceback complet:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
