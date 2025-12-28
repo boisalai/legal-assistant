@@ -201,11 +201,11 @@ class CAIJSearchService:
         print(f"🔎 Recherche CAIJ: '{request.query}' (max {request.max_results} résultats)")
 
         try:
-            # Retourner à la page d'accueil si on n'y est pas
-            if "app.caij.qc.ca/fr" not in self.page.url:
-                await self.page.goto("https://app.caij.qc.ca/fr")
-                await self.page.wait_for_load_state("networkidle")
-                await self.page.wait_for_timeout(1000)
+            # Toujours retourner à la page d'accueil pour réinitialiser le champ de recherche
+            # Cela évite les problèmes lors de recherches multiples
+            await self.page.goto("https://app.caij.qc.ca/fr", timeout=30000)
+            await self.page.wait_for_load_state("networkidle", timeout=20000)
+            await self.page.wait_for_timeout(1500)
 
             # Fermer popup si présent
             try:
@@ -215,17 +215,17 @@ class CAIJSearchService:
             except:
                 pass
 
-            # Chercher le champ de recherche
+            # Chercher le champ de recherche (timeout augmenté pour recherches multiples)
             search_input = self.page.get_by_placeholder("Rechercher dans tout le contenu")
-            await search_input.wait_for(timeout=10000)
+            await search_input.wait_for(timeout=20000)
 
             # Remplir et soumettre
             await search_input.fill(request.query)
             await search_input.press("Enter")
 
-            # Attendre les résultats
+            # Attendre les résultats (timeout augmenté pour recherches multiples)
             await self.page.wait_for_timeout(3000)
-            await self.page.wait_for_selector('div[class*="result"]', timeout=10000)
+            await self.page.wait_for_selector('div[class*="result"]', timeout=20000)
 
             # Extraire les résultats
             results = await self._extract_results(request.max_results)

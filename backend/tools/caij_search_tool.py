@@ -28,27 +28,16 @@ async def get_caij_service() -> CAIJSearchService:
     return _caij_service
 
 
-@tool
-async def search_caij_jurisprudence(
-    query: str,
-    max_results: int = 10
-) -> str:
+async def _search_caij_implementation(query: str, max_results: int = 10) -> str:
     """
-    Rechercher de la jurisprudence québécoise sur CAIJ.
-
-    Utilise le Centre d'accès à l'information juridique du Québec (CAIJ) pour
-    rechercher des jugements, doctrine, lois annotées et autres ressources juridiques.
+    Internal implementation for CAIJ search (used by both tool and tests).
 
     Args:
-        query: Termes de recherche (ex: "responsabilité civile", "mariage", "bail commercial")
-        max_results: Nombre maximum de résultats à retourner (1-20, défaut: 10)
+        query: Search terms
+        max_results: Maximum number of results (1-20)
 
     Returns:
-        Résultats formatés avec titre, type, source, date, URL et extrait pour chaque document trouvé.
-
-    Examples:
-        >>> await search_caij_jurisprudence("nullité de mariage")
-        >>> await search_caij_jurisprudence("contrat de travail", max_results=5)
+        Formatted search results
     """
     try:
         # Valider paramètres
@@ -91,6 +80,31 @@ async def search_caij_jurisprudence(
 
     except Exception as e:
         return f"❌ Erreur lors de la recherche CAIJ: {str(e)}"
+
+
+@tool
+async def search_caij_jurisprudence(
+    query: str,
+    max_results: int = 10
+) -> str:
+    """
+    Rechercher de la jurisprudence québécoise sur CAIJ.
+
+    Utilise le Centre d'accès à l'information juridique du Québec (CAIJ) pour
+    rechercher des jugements, doctrine, lois annotées et autres ressources juridiques.
+
+    Args:
+        query: Termes de recherche (ex: "responsabilité civile", "mariage", "bail commercial")
+        max_results: Nombre maximum de résultats à retourner (1-20, défaut: 10)
+
+    Returns:
+        Résultats formatés avec titre, type, source, date, URL et extrait pour chaque document trouvé.
+
+    Examples:
+        >>> await search_caij_jurisprudence("nullité de mariage")
+        >>> await search_caij_jurisprudence("contrat de travail", max_results=5)
+    """
+    return await _search_caij_implementation(query, max_results)
 
 
 @tool

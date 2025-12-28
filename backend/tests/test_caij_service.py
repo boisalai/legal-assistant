@@ -13,7 +13,7 @@ import asyncio
 import pytest
 from services.caij_search_service import CAIJSearchService
 from models.caij_models import CAIJSearchRequest
-from tools.caij_search_tool import search_caij_jurisprudence
+from tools.caij_search_tool import _search_caij_implementation
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_caij_multiple_searches():
 @pytest.mark.asyncio
 async def test_caij_tool_integration():
     """Test d'intégration du tool Agno."""
-    result = await search_caij_jurisprudence("contrat de travail", max_results=3)
+    result = await _search_caij_implementation("contrat de travail", max_results=3)
 
     assert result is not None
     assert isinstance(result, str)
@@ -94,7 +94,7 @@ async def test_caij_tool_integration():
 @pytest.mark.asyncio
 async def test_caij_invalid_query():
     """Test avec requête invalide."""
-    result = await search_caij_jurisprudence("", max_results=5)
+    result = await _search_caij_implementation("", max_results=5)
 
     assert "Erreur" in result
     print("✅ Gestion d'erreur fonctionnelle")
