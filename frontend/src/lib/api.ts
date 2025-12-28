@@ -636,6 +636,11 @@ export const documentsApi = {
       throw new Error("L'extraction a été interrompue avant la fin. Vérifiez les logs du serveur.");
     }
 
+    // If extraction failed, throw error to trigger catch block
+    if (!result.success && result.error) {
+      throw new Error(result.error);
+    }
+
     return result;
   },
 
