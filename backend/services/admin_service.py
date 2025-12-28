@@ -227,6 +227,55 @@ class AdminService:
             )
             raise
 
+    async def delete_record(
+        self,
+        table_name: str,
+        record_id: str,
+    ) -> bool:
+        """
+        Supprime un enregistrement d'une table.
+
+        Args:
+            table_name: Nom de la table SurrealDB
+            record_id: ID de l'enregistrement (format: "table:id" ou juste "id")
+
+        Returns:
+            True si suppression réussie
+
+        Raises:
+            ValueError: Si le nom de table est invalide
+            Exception: Si erreur lors de la suppression
+        """
+        # Validation: Vérifier que la table est dans la liste connue
+        valid_tables = [t["name"] for t in KNOWN_TABLES]
+        if table_name not in valid_tables:
+            raise ValueError(f"Table invalide: {table_name}")
+
+        try:
+            # Ensure connection
+            if not self.db_service.db:
+                await self.db_service.connect()
+
+            # Si l'ID contient déjà le préfixe de table, l'utiliser tel quel
+            # Sinon, construire le full_id
+            if ":" in record_id:
+                full_id = record_id
+            else:
+                full_id = f"{table_name}:{record_id}"
+
+            # Exécuter la requête de suppression
+            query = f"DELETE {full_id}"
+            result = await self.db_service.db.query(query)
+
+            logger.info(f"✅ Record {full_id} deleted successfully")
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Erreur lors de la suppression de {record_id} dans {table_name}: {e}"
+            )
+            raise
+
 
 # Instance globale du service
 _admin_service: Optional[AdminService] = None

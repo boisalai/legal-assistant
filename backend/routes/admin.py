@@ -111,6 +111,49 @@ async def get_table_data(
         )
 
 
+@router.delete("/tables/{table_name}/{record_id}")
+async def delete_record(
+    table_name: str,
+    record_id: str,
+    user_id: str = Depends(require_admin),
+) -> dict:
+    """
+    Supprime un enregistrement d'une table.
+
+    Requiert rôle admin.
+
+    Args:
+        table_name: Nom de la table SurrealDB
+        record_id: ID de l'enregistrement (format: "table:id" ou juste "id")
+
+    Returns:
+        Dict avec message de succès
+
+    Raises:
+        400: Si nom de table invalide
+        401: Si non authentifié
+        403: Si non admin
+        500: Si erreur serveur
+    """
+    try:
+        admin_service = get_admin_service()
+        await admin_service.delete_record(table_name=table_name, record_id=record_id)
+        return {"message": f"Enregistrement {record_id} supprimé avec succès"}
+
+    except ValueError as e:
+        # Table invalide
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression de l'enregistrement: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la suppression: {str(e)}",
+        )
+
+
 # ============================================================================
 # ENDPOINTS PHASE 2: DÉTECTION D'ORPHELINS (À IMPLÉMENTER)
 # ============================================================================

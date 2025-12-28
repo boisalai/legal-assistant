@@ -24,13 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Table,
   TableBody,
   TableCell,
@@ -325,100 +318,98 @@ export default function AdminUsersPage() {
 
       {/* Error alert */}
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              <p>{error}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="border border-destructive rounded-md p-4">
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            <p>{error}</p>
+          </div>
+        </div>
       )}
 
+      {/* Search bar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">{t("users.list")}</h2>
+          <p className="text-muted-foreground text-sm">
+            {t("users.totalUsers", { count: total })}
+          </p>
+        </div>
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t("users.search")}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
       {/* Users table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{t("users.list")}</CardTitle>
-              <CardDescription>
-                {t("users.totalUsers", { count: total })}
-              </CardDescription>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t("users.search")}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {searchTerm ? t("users.noResults") : t("users.noUsers")}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("users.columns.name")}</TableHead>
-                  <TableHead>{t("users.columns.email")}</TableHead>
-                  <TableHead>{t("users.columns.role")}</TableHead>
-                  <TableHead>{t("users.columns.status")}</TableHead>
-                  <TableHead>{t("users.columns.createdAt")}</TableHead>
-                  <TableHead className="text-right">{t("users.columns.actions")}</TableHead>
+      {loading ? (
+        <div className="flex items-center justify-center py-12 border rounded-md">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="flex items-center justify-center py-12 border rounded-md">
+          <p className="text-muted-foreground">
+            {searchTerm ? t("users.noResults") : t("users.noUsers")}
+          </p>
+        </div>
+      ) : (
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.name")}</TableHead>
+                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.email")}</TableHead>
+                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.role")}</TableHead>
+                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.status")}</TableHead>
+                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.createdAt")}</TableHead>
+                <TableHead className="text-right bg-blue-50 font-bold text-black">{t("users.columns.actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium text-black">{user.name}</TableCell>
+                  <TableCell className="text-black">{user.email}</TableCell>
+                  <TableCell>
+                    <RoleBadge role={user.role} />
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge actif={user.actif} />
+                  </TableCell>
+                  <TableCell className="text-black">
+                    {user.created_at
+                      ? new Date(user.created_at).toLocaleDateString()
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-right text-black">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(user)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDeleteDialog(user)}
+                        disabled={user.id === currentUser?.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <RoleBadge role={user.role} />
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge actif={user.actif} />
-                    </TableCell>
-                    <TableCell>
-                      {user.created_at
-                        ? new Date(user.created_at).toLocaleDateString()
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(user)}
-                          disabled={user.id === currentUser?.id}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Create Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

@@ -3,7 +3,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Database, Loader2, AlertCircle, Eye } from "lucide-react";
+import {
+  Database,
+  Loader2,
+  AlertCircle,
+  Eye,
+  ArrowLeft,
+  MoreVertical,
+  Trash2,
+} from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -14,14 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -30,6 +30,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AppShell } from "@/components/layout";
 import { DataTable } from "@/components/cases/data-table";
 import { adminApi, authApi, type TableInfo } from "@/lib/api";
@@ -39,7 +55,7 @@ export default function AdminDatabasePage() {
   const router = useRouter();
 
   // State
-  const [tables, setTables] = useState<TableInfo[]>([]);
+  const [tables, setTables] = useState<(TableInfo & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +64,14 @@ export default function AdminDatabasePage() {
   const [tableData, setTableData] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+
+  // Delete confirmation state
+  const [recordToDelete, setRecordToDelete] = useState<{
+    tableName: string;
+    recordId: string;
+    rowIndex: number;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Handle view table
   const handleViewTable = async (table: TableInfo) => {
@@ -68,8 +92,46 @@ export default function AdminDatabasePage() {
     }
   };
 
-  // Table columns
-  const columns = useMemo<ColumnDef<TableInfo>[]>(
+  // Handle back to tables list
+  const handleBackToTables = () => {
+    setSelectedTable(null);
+    setTableData([]);
+    setDataError(null);
+  };
+
+  // Handle delete record
+  const handleDeleteRecord = async () => {
+    if (!recordToDelete) return;
+
+    setDeleting(true);
+    try {
+      await adminApi.database.deleteRecord(
+        recordToDelete.tableName,
+        recordToDelete.recordId
+      );
+
+      // Remove the record from the table data
+      setTableData((prev) =>
+        prev.filter((_, idx) => idx !== recordToDelete.rowIndex)
+      );
+
+      // Close the dialog
+      setRecordToDelete(null);
+
+      // Optionally reload the table data to ensure consistency
+      if (selectedTable) {
+        await handleViewTable(selectedTable);
+      }
+    } catch (err: any) {
+      console.error("Error deleting record:", err);
+      setDataError(err.message || "Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Table columns for tables list
+  const tablesColumns = useMemo<ColumnDef<TableInfo & { id: string }>[]>(
     () => [
       {
         accessorKey: "displayName",
@@ -89,13 +151,10 @@ export default function AdminDatabasePage() {
       {
         accessorKey: "rowCount",
         header: "Lignes",
-        cell: ({ row }) => (
-          <Badge variant="outline">
-            {row.original.rowCount !== undefined
-              ? row.original.rowCount.toLocaleString("fr-FR")
-              : "N/A"}
-          </Badge>
-        ),
+        cell: ({ row }) =>
+          row.original.rowCount !== undefined
+            ? row.original.rowCount.toLocaleString("fr-FR")
+            : "N/A",
       },
       {
         accessorKey: "estimatedSizeMb",
@@ -109,15 +168,7 @@ export default function AdminDatabasePage() {
         accessorKey: "hasOrphans",
         header: "État",
         cell: ({ row }) =>
-          row.original.hasOrphans ? (
-            <Badge variant="destructive" className="text-xs">
-              Orphelins
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="text-xs">
-              OK
-            </Badge>
-          ),
+          row.original.hasOrphans ? "Orphelins" : "OK",
       },
       {
         id: "actions",
@@ -169,7 +220,12 @@ export default function AdminDatabasePage() {
       setError(null);
       const data = await adminApi.database.listTables();
       console.log("📊 Tables data received:", data);
-      setTables(data);
+      // Add id field for DataTable compatibility
+      const tablesWithId = data.map((table) => ({
+        ...table,
+        id: table.name,
+      }));
+      setTables(tablesWithId);
     } catch (err: any) {
       console.error("Error fetching tables:", err);
       setError(err.message || "Erreur lors du chargement des tables");
@@ -218,102 +274,181 @@ export default function AdminDatabasePage() {
     <AppShell>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {t("database.title")}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {t("database.description")}
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {t("database.title")}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {t("database.description")}
+            </p>
+          </div>
+
+          {selectedTable && (
+            <Button
+              variant="outline"
+              onClick={handleBackToTables}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux tables
+            </Button>
+          )}
         </div>
 
-        {/* DataTable */}
-        {tables.length === 0 ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Database className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-4 text-sm text-gray-500">
-                  {t("database.noTables")}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Tables List OR Table Data View */}
+        {!selectedTable ? (
+          // Show tables list
+          tables.length === 0 ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Database className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-4 text-sm text-gray-500">
+                    {t("database.noTables")}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <DataTable columns={tablesColumns} data={tables} />
+          )
         ) : (
-          <DataTable columns={columns} data={tables} />
+          // Show selected table data
+          <div className="space-y-4">
+            {/* Table header info */}
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                {selectedTable.displayName}
+              </h2>
+              <p className="text-muted-foreground text-sm font-mono mt-1">
+                {selectedTable.name} — {selectedTable.rowCount?.toLocaleString("fr-FR")} ligne(s)
+              </p>
+            </div>
+
+            {/* Table content */}
+            {loadingData ? (
+              <div className="flex items-center justify-center py-12 border rounded-md">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : dataError ? (
+              <div className="flex items-center justify-center py-12 border rounded-md">
+                <div className="text-center">
+                  <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-2" />
+                  <p className="text-sm text-red-600">{dataError}</p>
+                </div>
+              </div>
+            ) : tableData.length === 0 ? (
+              <div className="flex items-center justify-center py-12 border rounded-md">
+                <p className="text-sm text-muted-foreground">Aucune donnée</p>
+              </div>
+            ) : (
+              <div className="border rounded-md overflow-auto max-h-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {Object.keys(tableData[0] || {}).map((key) => (
+                        <TableHead key={key} className="bg-blue-50 font-bold text-black">
+                          {key}
+                        </TableHead>
+                      ))}
+                      <TableHead className="w-[50px] bg-blue-50 font-bold text-black">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tableData.map((row, idx) => (
+                      <TableRow key={idx}>
+                        {Object.entries(row).map(([key, value]) => (
+                          <TableCell key={key} className="text-black max-w-xs truncate">
+                            {value === null
+                              ? <span className="text-muted-foreground italic">null</span>
+                              : typeof value === "object"
+                              ? JSON.stringify(value)
+                              : String(value)}
+                          </TableCell>
+                        ))}
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => {
+                                  const recordId = row.id;
+                                  if (recordId) {
+                                    setRecordToDelete({
+                                      tableName: selectedTable.name,
+                                      recordId: String(recordId),
+                                      rowIndex: idx,
+                                    });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Table Viewer Dialog */}
-        <Dialog
-          open={!!selectedTable}
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          open={!!recordToDelete}
           onOpenChange={(open) => {
-            if (!open) {
-              setSelectedTable(null);
-              setTableData([]);
-              setDataError(null);
-            }
+            if (!open) setRecordToDelete(null);
           }}
         >
-          <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-blue-600" />
-                {selectedTable?.displayName}
-              </DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                {selectedTable?.name} — {selectedTable?.rowCount?.toLocaleString("fr-FR")} ligne(s)
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-auto">
-              {loadingData ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                </div>
-              ) : dataError ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-2" />
-                    <p className="text-sm text-red-600">{dataError}</p>
-                  </div>
-                </div>
-              ) : tableData.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <p className="text-sm text-muted-foreground">Aucune donnée</p>
-                </div>
-              ) : (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {Object.keys(tableData[0] || {}).map((key) => (
-                          <TableHead key={key} className="font-mono text-xs">
-                            {key}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tableData.map((row, idx) => (
-                        <TableRow key={idx}>
-                          {Object.entries(row).map(([key, value]) => (
-                            <TableCell key={key} className="font-mono text-xs max-w-xs truncate">
-                              {value === null
-                                ? <span className="text-muted-foreground italic">null</span>
-                                : typeof value === "object"
-                                ? JSON.stringify(value)
-                                : String(value)}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer cet enregistrement ?
+                Cette action est irréversible.
+                <br />
+                <span className="font-mono text-xs mt-2 block">
+                  ID: {recordToDelete?.recordId}
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteRecord();
+                }}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Suppression...
+                  </>
+                ) : (
+                  "Supprimer"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppShell>
   );
