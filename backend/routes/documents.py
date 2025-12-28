@@ -1279,10 +1279,14 @@ async def transcribe_document_workflow(
 async def extract_pdf_to_markdown(
     course_id: str,
     doc_id: str,
+    force_reextract: bool = False,
     user_id: str = Depends(require_auth)
 ):
     """
     Extrait le texte d'un PDF et le formate en markdown avec sections détectées par LLM.
+
+    Args:
+        force_reextract: Si True, supprime le fichier markdown existant avant de réextraire
 
     Retourne un stream SSE avec les événements de progression:
     - progress: {step, message, percentage}
@@ -1347,23 +1351,15 @@ async def extract_pdf_to_markdown(
                     judgment_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                     markdown_path = judgment_dir / markdown_filename
 
-                    # Check if markdown file exists on disk
-                    if markdown_path.exists():
-                        await progress_queue.put({
-                            "type": "error",
-                            "data": {"message": f"Un fichier markdown '{markdown_filename}' existe déjà sur le disque pour ce PDF. Supprimez-le d'abord si vous voulez réextraire."}
-                        })
-                        return
-
                     # Check existing documents in database
                     docs_result = await service.query(
                         "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
                         {"course_id": course_id, "filename": markdown_filename}
                     )
 
+                    existing_docs = []
                     if docs_result and len(docs_result) > 0:
                         # Parse result
-                        existing_docs = []
                         first_item = docs_result[0]
                         if isinstance(first_item, dict):
                             if "result" in first_item:
@@ -1373,12 +1369,51 @@ async def extract_pdf_to_markdown(
                         elif isinstance(first_item, list):
                             existing_docs = first_item
 
-                        if existing_docs and len(existing_docs) > 0:
+                    # Handle existing markdown
+                    if markdown_path.exists() or (existing_docs and len(existing_docs) > 0):
+                        if not force_reextract:
+                            # Send "complete" event with error instead of "error" event
+                            # This ensures the frontend receives a proper completion signal
                             await progress_queue.put({
-                                "type": "error",
-                                "data": {"message": f"Un fichier markdown '{markdown_filename}' existe déjà en base de données pour ce PDF. Supprimez-le d'abord si vous voulez réextraire."}
+                                "type": "complete",
+                                "data": {
+                                    "success": False,
+                                    "error": f"Un fichier markdown '{markdown_filename}' existe déjà pour ce PDF."
+                                }
                             })
                             return
+
+                        # Delete existing file and database records if force_reextract=True
+                        await progress_queue.put({
+                            "type": "progress",
+                            "data": {"step": "cleanup", "message": "Suppression du markdown existant...", "percentage": 10}
+                        })
+
+                        # Delete file from disk
+                        if markdown_path.exists():
+                            try:
+                                markdown_path.unlink()
+                                logger.info(f"Deleted existing markdown file: {markdown_path}")
+                            except Exception as e:
+                                logger.warning(f"Failed to delete markdown file: {e}")
+
+                        # Delete database records
+                        if existing_docs and len(existing_docs) > 0:
+                            for existing_doc in existing_docs:
+                                try:
+                                    doc_id_str = str(existing_doc["id"])
+
+                                    # Delete embedding chunks first
+                                    await service.query(
+                                        "DELETE FROM embedding_chunk WHERE document_id = $doc_id",
+                                        {"doc_id": doc_id_str}
+                                    )
+
+                                    # Delete document record
+                                    await service.delete(doc_id_str)
+                                    logger.info(f"Deleted existing document record: {doc_id_str}")
+                                except Exception as e:
+                                    logger.warning(f"Failed to delete document record: {e}")
 
                     # Step 1: Extract text with MarkItDown
                     await progress_queue.put({
