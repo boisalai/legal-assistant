@@ -69,6 +69,7 @@ export interface Document {
     relative_path: string;      // Relative path from base directory
     parent_folder: string;      // Parent folder path
     link_id: string;            // Unique ID for this linked directory
+    base_path?: string;         // Base path of the linked directory
     last_sync: string;          // Last sync timestamp
     source_hash: string;        // SHA-256 hash of source
     source_mtime: number;       // Source file modification time

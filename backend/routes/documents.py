@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -196,11 +196,15 @@ async def list_documents(
 async def upload_document(
     course_id: str,
     file: UploadFile = File(...),
+    auto_extract_markdown: bool = Form(False),
     user_id: str = Depends(require_auth)
 ):
     """
     Upload un document pour un cours.
     Accepte: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
+
+    Args:
+        auto_extract_markdown: Si True, extrait automatiquement le contenu en markdown après l'upload (PDF uniquement)
     """
     # Validate file type
     if not file.filename or not is_allowed_file(file.filename):
@@ -264,6 +268,26 @@ async def upload_document(
         )
 
         logger.info(f"Document created: {document.id}")
+
+        # If auto_extract_markdown is enabled and file is PDF, trigger extraction in background
+        if auto_extract_markdown and ext.lower() == '.pdf':
+            logger.info(f"Auto-extracting markdown for document: {document.id}")
+
+            # Trigger extraction in background (non-blocking)
+            async def trigger_extraction():
+                try:
+                    import httpx
+                    # Make internal HTTP request to extraction endpoint
+                    # Note: This runs in background, so if it fails, user can manually retry
+                    async with httpx.AsyncClient(timeout=300.0) as client:
+                        url = f"http://localhost:{settings.api_port}/api/courses/{course_id}/documents/{document.id}/extract-to-markdown"
+                        await client.post(url, params={"force_reextract": False})
+                        logger.info(f"Markdown extraction triggered for {document.id}")
+                except Exception as e:
+                    logger.warning(f"Auto-extraction failed for {document.id}: {e}. User can retry manually.")
+
+            asyncio.create_task(trigger_extraction())
+
         return document
 
     except HTTPException:

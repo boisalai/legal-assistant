@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { X, FileUp, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { documentsApi } from "@/lib/api";
 
@@ -50,6 +52,7 @@ export function DocumentUploadModal({
 }: DocumentUploadModalProps) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [autoExtractMarkdown, setAutoExtractMarkdown] = useState(false);
 
   const onDrop = (acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map((file) => ({
@@ -88,7 +91,7 @@ export function DocumentUploadModal({
 
       try {
         // Upload the file
-        await documentsApi.upload(caseId, uploadFile.file);
+        await documentsApi.upload(caseId, uploadFile.file, autoExtractMarkdown);
 
         // Update status to success
         setFiles((prev) =>
@@ -243,6 +246,23 @@ export function DocumentUploadModal({
             </div>
           )}
         </div>
+
+        {/* Auto-extract markdown option */}
+        {files.length > 0 && (
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox
+              id="auto-extract"
+              checked={autoExtractMarkdown}
+              onCheckedChange={(checked) => setAutoExtractMarkdown(checked as boolean)}
+            />
+            <Label
+              htmlFor="auto-extract"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Extraire automatiquement en markdown
+            </Label>
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isUploading}>
