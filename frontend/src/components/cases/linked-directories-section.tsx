@@ -65,9 +65,12 @@ export function LinkedDirectoriesSection({
 
       if (!byLinkId.has(linkId)) {
         // Create new directory entry
-        const basePath = doc.linked_source.absolute_path
-          ? doc.linked_source.absolute_path.split("/").slice(0, -1).join("/")
-          : doc.file_path?.split("/").slice(0, -1).join("/") || "";
+        // Use base_path from linked_source if available (new documents)
+        // Otherwise fallback to calculating from absolute_path (old documents)
+        const basePath = doc.linked_source.base_path
+          || (doc.linked_source.absolute_path
+            ? doc.linked_source.absolute_path.split("/").slice(0, -1).join("/")
+            : doc.file_path?.split("/").slice(0, -1).join("/") || "");
 
         byLinkId.set(linkId, {
           linkId,
@@ -160,8 +163,6 @@ export function LinkedDirectoriesSection({
             <AlertDialogTitle>{t("courses.unlinkDirectory")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("courses.unlinkWarning", { count: directoryToUnlink?.totalFiles || 0 })}
-              <br />
-              <br />
               <span className="font-mono text-xs block p-2 bg-muted rounded mt-2">
                 {directoryToUnlink?.basePath}
               </span>
@@ -171,7 +172,11 @@ export function LinkedDirectoriesSection({
             <AlertDialogCancel onClick={() => setDirectoryToUnlink(null)}>
               {t("common.cancel")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnlink} disabled={unlinking}>
+            <AlertDialogAction
+              onClick={handleUnlink}
+              disabled={unlinking}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
               {unlinking ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

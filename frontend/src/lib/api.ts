@@ -644,12 +644,15 @@ export const documentsApi = {
     return result;
   },
 
-  async upload(caseId: string, file: File): Promise<Document> {
+  async upload(caseId: string, file: File, autoExtractMarkdown: boolean = false): Promise<Document> {
     // Clean ID (remove judgment: prefix if present)
     const cleanId = caseId.replace("course:", "").replace("judgment:", "");
 
     const formData = new FormData();
     formData.append("file", file);
+    if (autoExtractMarkdown) {
+      formData.append("auto_extract_markdown", "true");
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(cleanId)}/documents`, {
       method: "POST",

@@ -120,7 +120,12 @@ def scan_directory(directory_path: str) -> DirectoryScanResult:
     Returns:
         DirectoryScanResult avec les statistiques
     """
-    base_path = Path(directory_path)
+    import unicodedata
+
+    # Normaliser le chemin en NFD (forme décomposée) pour macOS
+    # macOS utilise NFD pour les noms de fichiers, mais les navigateurs envoient en NFC
+    normalized_path = unicodedata.normalize('NFD', directory_path)
+    base_path = Path(normalized_path)
 
     if not base_path.exists():
         raise ValueError(f"Le répertoire n'existe pas: {directory_path}")
@@ -317,6 +322,7 @@ async def link_directory_endpoint(
                             "relative_path": file_info.relative_path,
                             "parent_folder": file_info.parent_folder,
                             "link_id": link_id,
+                            "base_path": scan_result.base_path,
                             "last_sync": now,
                             "source_hash": file_hash,
                             "source_mtime": file_info.modified_time,
@@ -489,13 +495,17 @@ async def sync_linked_directories_endpoint(
         for link_id, docs in by_link_id.items():
             # Obtenir le chemin de base depuis le premier document
             first_doc_linked_source = normalize_linked_source(docs[0].get("linked_source"))
-            base_path = first_doc_linked_source.get("absolute_path", "")
-            if not base_path:
-                logger.warning(f"Chemin de base introuvable pour link_id {link_id}")
-                continue
 
-            # Extraire le chemin du répertoire parent
-            directory_path = str(Path(base_path).parent)
+            # Essayer d'abord le base_path stocké (nouveaux documents)
+            directory_path = first_doc_linked_source.get("base_path")
+
+            # Fallback pour les anciens documents (avant la correction)
+            if not directory_path:
+                absolute_path = first_doc_linked_source.get("absolute_path", "")
+                if not absolute_path:
+                    logger.warning(f"Chemin de base introuvable pour link_id {link_id}")
+                    continue
+                directory_path = str(Path(absolute_path).parent)
 
             # Re-scanner le répertoire
             try:
@@ -533,6 +543,7 @@ async def sync_linked_directories_endpoint(
                             "relative_path": file_info.relative_path,
                             "parent_folder": file_info.parent_folder,
                             "link_id": link_id,
+                            "base_path": scan_result.base_path,
                             "last_sync": now,
                             "source_hash": file_hash,
                             "source_mtime": file_info.modified_time,
