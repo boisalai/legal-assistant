@@ -17,7 +17,6 @@ export interface Course {
   pinned?: boolean;           // Optional pinned flag
 
   // Academic fields (optional - dual mode support)
-  session_id?: string;        // Link to academic session
   course_code?: string;       // Course code (e.g., "DRT-1151G")
   professor?: string;         // Professor name
   credits?: number;           // Number of credits (1-12)
