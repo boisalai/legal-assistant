@@ -72,7 +72,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
       cell: ({ row }) => {
         const doc = row.original;
         return (
-          <span className="font-normal truncate">{doc.filename}</span>
+          <span className="truncate">{doc.filename}</span>
         );
       },
     },
@@ -137,7 +137,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
         const doc = row.original;
         const folder = doc.linked_source?.parent_folder || "root";
         return (
-          <span className="text-sm text-black font-mono truncate max-w-xs">
+          <span className="text-sm text-black truncate max-w-xs">
             {folder === "root" ? "/" : folder}
           </span>
         );
@@ -203,7 +203,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="font-normal text-black">
+                    <TableCell key={cell.id} className="text-black">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -211,7 +211,7 @@ export function DirectoryFilesDataTable({ documents }: DirectoryFilesDataTablePr
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center font-normal text-black">
+                <TableCell colSpan={columns.length} className="h-24 text-center text-black">
                   Aucun fichier trouvé.
                 </TableCell>
               </TableRow>

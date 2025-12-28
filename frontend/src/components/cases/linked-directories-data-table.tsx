@@ -73,7 +73,7 @@ export function LinkedDirectoriesDataTable({
       cell: ({ row }) => {
         const directory = row.original;
         return (
-          <span className="font-mono text-sm truncate max-w-md" title={directory.basePath}>
+          <span className="text-sm truncate max-w-md" title={directory.basePath}>
             {directory.basePath}
           </span>
         );
@@ -156,7 +156,7 @@ export function LinkedDirectoriesDataTable({
                 data-state={row.getIsSelected() && "selected"}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="font-normal text-black">
+                  <TableCell key={cell.id} className="text-black">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
@@ -164,7 +164,7 @@ export function LinkedDirectoriesDataTable({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center font-normal text-black">
+              <TableCell colSpan={columns.length} className="h-24 text-center text-black">
                 Aucun répertoire lié.
               </TableCell>
             </TableRow>

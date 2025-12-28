@@ -959,7 +959,25 @@ export interface UpdateUserRequest {
   actif?: boolean;
 }
 
+// Database Admin interfaces
+export interface TableInfo {
+  name: string;
+  displayName: string;
+  rowCount: number;
+  estimatedSizeMb?: number;
+  hasOrphans: boolean;
+}
+
+export interface TableDataResponse {
+  tableName: string;
+  rows: Record<string, any>[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
 export const adminApi = {
+  // Users management (existing)
   async listUsers(skip: number = 0, limit: number = 50): Promise<UsersListResponse> {
     return fetchApi<UsersListResponse>(`/api/admin/users?skip=${skip}&limit=${limit}`);
   },
@@ -986,6 +1004,43 @@ export const adminApi = {
     await fetchApi<void>(`/api/admin/users/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+  },
+
+  // Database management (new)
+  database: {
+    async listTables(): Promise<TableInfo[]> {
+      return fetchApi<TableInfo[]>("/api/admin/tables");
+    },
+
+    async getTableData(
+      tableName: string,
+      params?: {
+        skip?: number;
+        limit?: number;
+        sort?: string;
+        order?: "asc" | "desc";
+      }
+    ): Promise<TableDataResponse> {
+      const queryParams = new URLSearchParams();
+      if (params?.skip !== undefined) queryParams.set("skip", params.skip.toString());
+      if (params?.limit !== undefined) queryParams.set("limit", params.limit.toString());
+      if (params?.sort) queryParams.set("sort", params.sort);
+      if (params?.order) queryParams.set("order", params.order);
+
+      const queryString = queryParams.toString();
+      const url = `/api/admin/tables/${encodeURIComponent(tableName)}${queryString ? `?${queryString}` : ""}`;
+
+      return fetchApi<TableDataResponse>(url);
+    },
+
+    async deleteRecord(tableName: string, recordId: string): Promise<void> {
+      await fetchApi<void>(
+        `/api/admin/tables/${encodeURIComponent(tableName)}/${encodeURIComponent(recordId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+    },
   },
 };
 

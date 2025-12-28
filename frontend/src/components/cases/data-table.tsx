@@ -200,7 +200,7 @@ export function DataTable<TData extends { id: string }, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="font-normal text-black">
+                    <TableCell key={cell.id} className="text-black">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -213,7 +213,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center font-normal text-black"
+                  className="h-24 text-center text-black"
                 >
                   {t("table.noCourses")}
                 </TableCell>
