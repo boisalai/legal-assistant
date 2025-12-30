@@ -323,3 +323,63 @@ export type EtapeSuivante = NextStep;
 export type Judgment = Course;
 export type Dossier = Course;
 export type Case = Course;  // Backward compatibility
+
+// ============================================
+// Flashcard Types
+// ============================================
+
+export type CardType = "definition" | "concept" | "case" | "question";
+export type CardStatus = "new" | "learning" | "mastered";
+export type ReviewResult = "again" | "correct" | "easy";
+
+export interface SourceDocument {
+  doc_id: string;
+  name: string;
+  relative_path?: string;
+}
+
+export interface FlashcardDeck {
+  id: string;
+  course_id: string;
+  name: string;
+  source_documents: SourceDocument[];
+  card_types: string[];
+  total_cards: number;
+  mastered_cards: number;
+  learning_cards: number;
+  new_cards: number;
+  progress_percent: number;
+  created_at: string;
+  last_studied?: string;
+}
+
+export interface Flashcard {
+  id: string;
+  deck_id: string;
+  document_id: string;
+  card_type: CardType;
+  front: string;
+  back: string;
+  source_excerpt?: string;
+  source_location?: string;
+  status: CardStatus;
+  review_count: number;
+  last_reviewed?: string;
+  created_at: string;
+}
+
+export interface StudySession {
+  deck_id: string;
+  deck_name: string;
+  cards: Flashcard[];
+  total_cards: number;
+  new_cards: number;
+  learning_cards: number;
+  review_cards: number;
+}
+
+export interface FlashcardGenerationProgress {
+  status: "starting" | "loading" | "generating" | "parsing" | "saving" | "completed" | "error";
+  message: string;
+  cards_generated?: number;
+}

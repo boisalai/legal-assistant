@@ -16,7 +16,10 @@ import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
 import { EditCourseModal } from "@/components/cases/edit-course-modal";
+import { CreateFlashcardDeckModal } from "@/components/cases/create-flashcard-deck-modal";
+import { FlashcardStudyPanel } from "@/components/cases/flashcard-study-panel";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
+import type { FlashcardDeck } from "@/types";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { coursesApi, documentsApi } from "@/lib/api";
@@ -44,6 +47,8 @@ export default function CourseDetailPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
+  const [createDeckModalOpen, setCreateDeckModalOpen] = useState(false);
+  const [studyDeck, setStudyDeck] = useState<FlashcardDeck | null>(null);
 
   // Assistant messages - lifted to parent to persist across preview open/close
   const [assistantMessages, setAssistantMessages] = useState<Message[]>([
@@ -177,6 +182,26 @@ export default function CourseDetailPage() {
     }
   };
 
+  // Flashcard handlers
+  const handleStudyDeck = (deck: FlashcardDeck) => {
+    setStudyDeck(deck);
+    setPreviewDocument(null);
+    setPreviewDirectory(null);
+  };
+
+  const handleCreateDeck = () => {
+    setCreateDeckModalOpen(true);
+  };
+
+  const handleCloseStudy = () => {
+    setStudyDeck(null);
+  };
+
+  const handleFlashcardsUpdated = async () => {
+    // Refresh deck list by triggering re-render
+    await fetchCaseDetails();
+  };
+
   if (loading) {
     return (
       <AppShell>
@@ -213,9 +238,15 @@ export default function CourseDetailPage() {
         {/* Split View */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <PanelGroup direction="horizontal" className="h-full">
-            {/* Left Panel: Case Details, Document Preview, or Directory Tree */}
+            {/* Left Panel: Case Details, Document Preview, Directory Tree, or Flashcard Study */}
             <Panel defaultSize={60} minSize={30} className="overflow-hidden">
-              {previewDocument ? (
+              {studyDeck ? (
+                <FlashcardStudyPanel
+                  deck={studyDeck}
+                  onClose={handleCloseStudy}
+                  onDeckUpdate={handleFlashcardsUpdated}
+                />
+              ) : previewDocument ? (
                 <DocumentPreviewPanel
                   document={previewDocument}
                   caseId={courseId}
@@ -303,6 +334,8 @@ export default function CourseDetailPage() {
                   onDocumentsChange={fetchCaseDetails}
                   deleting={deleting}
                   isAnalyzing={isAnalyzing}
+                  onStudyDeck={handleStudyDeck}
+                  onCreateDeck={handleCreateDeck}
                 />
               )}
             </Panel>
@@ -360,6 +393,15 @@ export default function CourseDetailPage() {
           onOpenChange={setEditModalOpen}
           course={courseData}
           onSuccess={fetchCaseDetails}
+        />
+
+        {/* Create Flashcard Deck Modal */}
+        <CreateFlashcardDeckModal
+          open={createDeckModalOpen}
+          onOpenChange={setCreateDeckModalOpen}
+          courseId={courseId}
+          documents={documents}
+          onSuccess={handleFlashcardsUpdated}
         />
       </div>
     </AppShell>
