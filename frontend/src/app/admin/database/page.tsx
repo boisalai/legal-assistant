@@ -348,59 +348,90 @@ export default function AdminDatabasePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {Object.keys(tableData[0] || {}).map((key) => (
-                        <TableHead key={key} className="bg-blue-50 font-bold text-black">
-                          {key}
-                        </TableHead>
-                      ))}
+                      {(() => {
+                        // Get all unique keys from all rows (in case some rows have different fields)
+                        const allKeys = new Set<string>();
+                        tableData.forEach(row => {
+                          Object.keys(row).forEach(key => allKeys.add(key));
+                        });
+
+                        // Sort keys: id first, then alphabetically
+                        const sortedKeys = Array.from(allKeys).sort((a, b) => {
+                          if (a === 'id') return -1;
+                          if (b === 'id') return 1;
+                          return a.localeCompare(b);
+                        });
+
+                        return sortedKeys.map((key) => (
+                          <TableHead key={key} className="bg-blue-50 font-bold text-black">
+                            {key}
+                          </TableHead>
+                        ));
+                      })()}
                       <TableHead className="w-[50px] bg-blue-50 font-bold text-black">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tableData.map((row, idx) => (
-                      <TableRow key={idx}>
-                        {Object.entries(row).map(([key, value]) => (
-                          <TableCell key={key} className="text-black max-w-xs truncate">
-                            {value === null
-                              ? <span className="text-muted-foreground italic">null</span>
-                              : typeof value === "object"
-                              ? JSON.stringify(value)
-                              : String(value)}
+                    {tableData.map((row, idx) => {
+                      // Get sorted keys for consistent column order
+                      const allKeys = new Set<string>();
+                      tableData.forEach(r => {
+                        Object.keys(r).forEach(key => allKeys.add(key));
+                      });
+                      const sortedKeys = Array.from(allKeys).sort((a, b) => {
+                        if (a === 'id') return -1;
+                        if (b === 'id') return 1;
+                        return a.localeCompare(b);
+                      });
+
+                      return (
+                        <TableRow key={idx}>
+                          {sortedKeys.map((key) => {
+                            const value = row[key];
+                            return (
+                              <TableCell key={key} className="text-black max-w-xs truncate">
+                                {value === null || value === undefined
+                                  ? <span className="text-muted-foreground italic">null</span>
+                                  : typeof value === "object"
+                                  ? JSON.stringify(value)
+                                  : String(value)}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => {
+                                    const recordId = row.id;
+                                    if (recordId) {
+                                      setRecordToDelete({
+                                        tableName: selectedTable.name,
+                                        recordId: String(recordId),
+                                        rowIndex: idx,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Supprimer
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
-                        ))}
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
-                                  const recordId = row.id;
-                                  if (recordId) {
-                                    setRecordToDelete({
-                                      tableName: selectedTable.name,
-                                      recordId: String(recordId),
-                                      rowIndex: idx,
-                                    });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
