@@ -6,20 +6,25 @@ Endpoints:
 - GET /api/courses/{course_id}/flashcard-decks - Lister les decks d'un cours
 - GET /api/flashcard-decks/{deck_id} - Détails d'un deck
 - DELETE /api/flashcard-decks/{deck_id} - Supprimer un deck
+- POST /api/flashcard-decks/{deck_id}/generate - Générer les fiches (streaming SSE)
 - GET /api/flashcard-decks/{deck_id}/cards - Lister les fiches d'un deck
 - GET /api/flashcard-decks/{deck_id}/study - Session de révision
 - PATCH /api/flashcards/{card_id}/review - Enregistrer résultat révision
 - POST /api/flashcards/{card_id}/tts - Générer audio TTS
 """
 
+import json
 import logging
 import uuid
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, status, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 
 from services.surreal_service import get_surreal_service
+from services.flashcard_service import get_flashcard_service
 from models.flashcard_models import (
     FlashcardDeckCreate,
     FlashcardDeckResponse,
@@ -66,9 +71,11 @@ async def get_deck_by_id(service, deck_id: str) -> Optional[dict]:
 
 async def get_deck_statistics(service, deck_id: str) -> dict:
     """Calcule les statistiques d'un deck."""
-    record_id = deck_id.replace("flashcard_deck:", "")
+    # Normaliser le deck_id (avec préfixe)
+    if not deck_id.startswith("flashcard_deck:"):
+        deck_id = f"flashcard_deck:{deck_id}"
 
-    # Compter les fiches par statut
+    # Compter les fiches par statut (deck_id est stocké comme string)
     result = await service.query(
         """
         SELECT
@@ -77,10 +84,10 @@ async def get_deck_statistics(service, deck_id: str) -> dict:
             count(status = 'learning') as learning_cards,
             count(status = 'mastered') as mastered_cards
         FROM flashcard
-        WHERE deck_id = type::thing('flashcard_deck', $record_id)
+        WHERE deck_id = $deck_id
         GROUP ALL
         """,
-        {"record_id": record_id}
+        {"deck_id": deck_id}
     )
 
     # SurrealDB retourne une liste de dicts directement
@@ -243,14 +250,16 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
 
     # Créer le deck
     deck_id = generate_hex_id()
+    now = datetime.now(timezone.utc)
 
     deck_data = {
         "course_id": f"course:{course_record_id}",
         "name": request.name,
         "source_documents": source_documents,
         "card_types": [ct.value for ct in request.card_types],
-        "card_count_requested": request.card_count
-        # created_at et last_studied ont des valeurs par défaut dans le schéma
+        "card_count_requested": request.card_count,
+        "created_at": now.isoformat(),
+        "last_studied": None
     }
 
     result = await service.query(
@@ -342,10 +351,13 @@ async def delete_flashcard_deck(deck_id: str):
 
     record_id = deck_id.replace("flashcard_deck:", "")
 
-    # Supprimer toutes les fiches du deck
+    # Normaliser le deck_id pour la comparaison string
+    full_deck_id = f"flashcard_deck:{record_id}"
+
+    # Supprimer toutes les fiches du deck (deck_id est stocké comme string)
     await service.query(
-        "DELETE flashcard WHERE deck_id = type::thing('flashcard_deck', $deck_id)",
-        {"deck_id": record_id}
+        "DELETE flashcard WHERE deck_id = $deck_id",
+        {"deck_id": full_deck_id}
     )
 
     # Supprimer le deck
@@ -382,11 +394,13 @@ async def list_flashcards(
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    record_id = deck_id.replace("flashcard_deck:", "")
+    # Normaliser le deck_id
+    if not deck_id.startswith("flashcard_deck:"):
+        deck_id = f"flashcard_deck:{deck_id}"
 
-    # Construire la requête avec filtres
-    query = "SELECT * FROM flashcard WHERE deck_id = type::thing('flashcard_deck', $deck_id)"
-    params = {"deck_id": record_id}
+    # Construire la requête avec filtres (deck_id est stocké comme string)
+    query = "SELECT * FROM flashcard WHERE deck_id = $deck_id"
+    params = {"deck_id": deck_id}
 
     if status_filter:
         query += " AND status = $status"
@@ -431,21 +445,32 @@ async def start_study_session(
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    record_id = deck_id.replace("flashcard_deck:", "")
+    # Normaliser le deck_id (avec préfixe)
+    if not deck_id.startswith("flashcard_deck:"):
+        deck_id = f"flashcard_deck:{deck_id}"
 
-    # Récupérer les fiches avec priorité
+    # Récupérer les fiches avec priorité (deck_id est stocké comme string)
+    # Note: SurrealDB ne supporte pas les expressions booléennes complexes dans ORDER BY
+    # On récupère toutes les fiches et on trie en Python
     result = await service.query(
         """
         SELECT * FROM flashcard
-        WHERE deck_id = type::thing('flashcard_deck', $deck_id)
-        ORDER BY
-            (status = 'new' OR status = null) DESC,
-            status = 'learning' DESC,
-            last_reviewed ASC
-        LIMIT $limit
+        WHERE deck_id = $deck_id
         """,
-        {"deck_id": record_id, "limit": limit}
+        {"deck_id": deck_id}
     )
+
+    # Trier côté Python avec priorité: new > learning > mastered
+    def card_sort_key(card):
+        status = card.get("status", "new") or "new"
+        # Priorité: new=0, learning=1, mastered=2
+        priority = {"new": 0, "learning": 1, "mastered": 2}.get(status, 3)
+        # Secondaire: last_reviewed (None en premier)
+        last_reviewed = card.get("last_reviewed") or ""
+        return (priority, last_reviewed)
+
+    if result:
+        result = sorted(result, key=card_sort_key)[:limit]
 
     cards = []
     new_count = 0
@@ -463,13 +488,14 @@ async def start_study_session(
                 learning_count += 1
 
     # Mettre à jour last_studied sur le deck
+    record_id = deck_id.replace("flashcard_deck:", "")
     await service.query(
         """
         UPDATE flashcard_deck
         SET last_studied = time::now()
-        WHERE id = type::thing('flashcard_deck', $deck_id)
+        WHERE id = type::thing('flashcard_deck', $record_id)
         """,
-        {"deck_id": record_id}
+        {"record_id": record_id}
     )
 
     return StudySessionResponse(
@@ -686,3 +712,91 @@ async def get_flashcard_audio(card_id: str, side: str):
         media_type="audio/mpeg",
         filename=f"flashcard_{record_id}_{side}.mp3"
     )
+
+
+# ============================================================================
+# Generation Endpoint
+# ============================================================================
+
+class GenerateRequest(BaseModel):
+    """Request for generating flashcards."""
+    model_id: Optional[str] = None
+
+
+@router.post(
+    "/api/flashcard-decks/{deck_id}/generate",
+    summary="Générer les fiches d'un deck"
+)
+async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] = None):
+    """
+    Génère les fiches de révision pour un deck existant.
+
+    Utilise le LLM pour analyser les documents sources et créer des fiches.
+    Retourne un stream SSE avec la progression.
+    """
+    service = get_surreal_service()
+
+    # Récupérer le deck
+    deck = await get_deck_by_id(service, deck_id)
+    if not deck:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Deck non trouvé: {deck_id}"
+        )
+
+    # Récupérer les informations du deck
+    source_docs = deck.get("source_documents", [])
+    card_types = deck.get("card_types", ["definition", "concept", "case", "question"])
+    card_count = deck.get("card_count_requested", 50)
+
+    # Si pas de source_documents, récupérer depuis la création
+    if not source_docs:
+        logger.warning(f"No source_documents in deck {deck_id}, using fallback")
+
+    # Extraire les doc_ids
+    source_doc_ids = []
+    if source_docs:
+        for doc in source_docs:
+            if isinstance(doc, dict):
+                source_doc_ids.append(doc.get("doc_id", ""))
+            elif isinstance(doc, str):
+                source_doc_ids.append(doc)
+
+    if not source_doc_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucun document source trouvé pour ce deck"
+        )
+
+    # Model ID
+    model_id = request.model_id if request else None
+
+    async def event_stream():
+        """Generate SSE events for progress updates."""
+        flashcard_service = get_flashcard_service()
+
+        try:
+            async for update in flashcard_service.generate_flashcards(
+                deck_id=deck_id,
+                source_document_ids=source_doc_ids,
+                card_types=card_types,
+                card_count=card_count,
+                model_id=model_id
+            ):
+                yield f"data: {json.dumps(update)}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error in generation stream: {e}")
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
