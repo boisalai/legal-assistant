@@ -42,10 +42,11 @@
 
 3. **Répertoires liés** ✨
    - Liaison de dossiers locaux avec indexation automatique
+   - **Synchronisation automatique** : Détection des nouveaux/modifiés/supprimés (toutes les 5 min)
    - Tracking des fichiers avec hash SHA-256 et mtime
    - Interface arborescente pour visualiser la structure
    - Groupement par link_id dans l'interface
-   - Support des mises à jour et réindexation
+   - Configurable via `AUTO_SYNC_INTERVAL` et `AUTO_SYNC_ENABLED`
 
 4. **Import Docusaurus**
    - Import de fichiers Markdown depuis documentation Docusaurus
@@ -98,7 +99,8 @@
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 **Modules clés :**
-- `backend/services/document_service.py` - 🆕 Service CRUD documents (centralise logique métier)
+- `backend/services/document_service.py` - Service CRUD documents (centralise logique métier)
+- `backend/services/auto_sync_service.py` - 🆕 Synchronisation automatique des répertoires liés
 - `backend/routes/documents.py` - API de gestion des documents (refactorisé)
 - `backend/routes/linked_directory.py` - API de liaison de répertoires
 - `backend/routes/docusaurus.py` - API d'import Docusaurus
@@ -109,30 +111,36 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `backend/tools/tutor_tools.py` - Outils Agno pour le tuteur IA
 - `backend/models/document_models.py` - Modèles Pydantic partagés
 - `backend/models/caij_models.py` - Modèles CAIJ avec mapping de rubriques
-- `backend/tests/test_documents_refactored.py` - 🆕 Tests d'intégration (13 tests, 100%)
+- `backend/utils/linked_directory_utils.py` - 🆕 Utilitaires partagés (scan, extraction)
+- `backend/tests/test_documents_refactored.py` - Tests d'intégration (13 tests, 100%)
 - `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
 - `frontend/src/components/cases/directory-tree-view.tsx` - Vue arborescente
 - `frontend/src/components/cases/youtube-download-modal.tsx` - Modal d'import YouTube
 
 ---
 
-## Session actuelle (2025-12-27) - Nettoyage et Audit Dette Technique ✅
+## Session actuelle (2025-12-30) - Synchronisation automatique des répertoires liés ✅
 
-**Objectif** : Nettoyer les fichiers temporaires et auditer la dette technique.
+**Objectif** : Implémenter la détection automatique des changements dans les répertoires liés.
 
 **Actions complétées** :
-- ✅ Suppression fichier debug `test_upload_debug.py`
-- ✅ Correction sécurité : Retrait clé API dans `.env.example` (non committée)
-- ✅ Audit duplication `DocumentResponse` : Déjà corrigée !
-- ✅ Vérification imports : Tous les fichiers utilisent `models/document_models.py`
-- ✅ Mise à jour `CLAUDE.md` : Recommandations obsolètes retirées
+- ✅ Création `backend/services/auto_sync_service.py` - Service singleton avec tâche de fond asyncio
+- ✅ Extraction des utilitaires dans `backend/utils/linked_directory_utils.py`
+- ✅ Intégration au cycle de vie du backend (démarrage/arrêt dans `main.py`)
+- ✅ Configuration dans `settings.py` : `AUTO_SYNC_INTERVAL` (défaut 300s) et `AUTO_SYNC_ENABLED`
+- ✅ Tests unitaires passent
 
-**Découvertes** :
-- La duplication `DocumentResponse` avait déjà été éliminée lors d'une session précédente
-- Aucune définition locale restante dans `routes/`
-- Pattern d'import correct appliqué partout
+**Fonctionnement** :
+- Le service scanne tous les répertoires liés de tous les cours toutes les 5 minutes
+- Détecte automatiquement : nouveaux fichiers, fichiers modifiés, fichiers supprimés
+- Indexe/réindexe les documents sans intervention manuelle
+- Logs uniquement quand des changements sont détectés
 
-**Prochaine session** : Phase 3.2 - Benchmarking et optimisation RAG
+**Configuration** (`.env`) :
+```bash
+AUTO_SYNC_INTERVAL=300  # Intervalle en secondes (défaut: 5 min)
+AUTO_SYNC_ENABLED=true  # Activer/désactiver le service
+```
 
 ---
 
