@@ -33,10 +33,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Course, Document, Checklist } from "@/types";
+import type { Course, Document, Checklist, FlashcardDeck } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
+import { FlashcardsSection } from "./flashcards-section";
 import { SyncProgressModal, SyncTask, SyncResult } from "./sync-progress-modal";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -66,6 +67,9 @@ interface CaseDetailsPanelProps {
   onDocumentsChange?: () => Promise<void>;
   deleting: boolean;
   isAnalyzing: boolean;
+  // Flashcard props
+  onStudyDeck?: (deck: FlashcardDeck) => void;
+  onCreateDeck?: () => void;
 }
 
 export function CaseDetailsPanel({
@@ -85,6 +89,8 @@ export function CaseDetailsPanel({
   onDocumentsChange,
   deleting,
   isAnalyzing,
+  onStudyDeck,
+  onCreateDeck,
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
@@ -586,6 +592,18 @@ export function CaseDetailsPanel({
             <span>{t("courses.synchronize")}</span>
           </Button>
         </div>
+
+      {/* Section Fiches de révision */}
+      {onStudyDeck && onCreateDeck && (
+        <div className="mb-4">
+          <FlashcardsSection
+            courseId={caseData.id}
+            documents={documents}
+            onStudyDeck={onStudyDeck}
+            onCreateDeck={onCreateDeck}
+          />
+        </div>
+      )}
 
       {/* Répertoires liés */}
       {(() => {

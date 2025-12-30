@@ -1108,6 +1108,201 @@ export const docusaurusApi = {
 
 import type { LinkedDirectoryScanResult, LinkedDirectoryProgressEvent } from "@/types";
 
+// ============================================
+// Flashcards API
+// ============================================
+
+import type { FlashcardDeck, Flashcard, StudySession, CardType, ReviewResult, FlashcardGenerationProgress } from "@/types";
+
+export interface FlashcardDeckListResponse {
+  decks: FlashcardDeck[];
+  total: number;
+}
+
+export interface FlashcardListResponse {
+  cards: Flashcard[];
+  total: number;
+}
+
+export interface ReviewResponse {
+  card_id: string;
+  new_status: string;
+  review_count: number;
+}
+
+export const flashcardsApi = {
+  // List flashcard decks for a course
+  async listDecks(courseId: string): Promise<FlashcardDeck[]> {
+    const cleanId = courseId.replace("course:", "");
+    const response = await fetchApi<FlashcardDeckListResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/flashcard-decks`
+    );
+    return response.decks;
+  },
+
+  // Get a single deck with statistics
+  async getDeck(deckId: string): Promise<FlashcardDeck> {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    return fetchApi<FlashcardDeck>(`/api/flashcard-decks/${encodeURIComponent(cleanId)}`);
+  },
+
+  // Create a new flashcard deck
+  async createDeck(
+    courseId: string,
+    data: {
+      name: string;
+      source_document_ids: string[];
+      card_types?: CardType[];
+      card_count?: number;
+    }
+  ): Promise<FlashcardDeck> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<FlashcardDeck>(
+      `/api/courses/${encodeURIComponent(cleanId)}/flashcard-decks`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  // Delete a flashcard deck
+  async deleteDeck(deckId: string): Promise<void> {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    await fetchApi<void>(`/api/flashcard-decks/${encodeURIComponent(cleanId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Generate flashcards with SSE progress
+  async generate(
+    deckId: string,
+    options: {
+      modelId?: string;
+      onProgress?: (progress: FlashcardGenerationProgress) => void;
+    } = {}
+  ): Promise<{ success: boolean; cards_generated?: number; error?: string }> {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/flashcard-decks/${encodeURIComponent(cleanId)}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ model_id: options.modelId }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Generation failed" }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    // Read SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let result: { success: boolean; cards_generated?: number; error?: string } = { success: false };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6)) as FlashcardGenerationProgress;
+              options.onProgress?.(data);
+
+              if (data.status === "completed") {
+                result = { success: true, cards_generated: data.cards_generated };
+              } else if (data.status === "error") {
+                result = { success: false, error: data.message };
+              }
+            } catch {
+              // Ignore JSON parse errors
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return result;
+  },
+
+  // List cards in a deck
+  async listCards(
+    deckId: string,
+    filters?: { status?: string; card_type?: string }
+  ): Promise<Flashcard[]> {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    const params = new URLSearchParams();
+    if (filters?.status) params.set("status", filters.status);
+    if (filters?.card_type) params.set("card_type", filters.card_type);
+
+    const queryString = params.toString();
+    const url = `/api/flashcard-decks/${encodeURIComponent(cleanId)}/cards${queryString ? `?${queryString}` : ""}`;
+
+    const response = await fetchApi<FlashcardListResponse>(url);
+    return response.cards;
+  },
+
+  // Start a study session
+  async startStudySession(deckId: string, limit: number = 20): Promise<StudySession> {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    return fetchApi<StudySession>(
+      `/api/flashcard-decks/${encodeURIComponent(cleanId)}/study?limit=${limit}`
+    );
+  },
+
+  // Review a card
+  async reviewCard(cardId: string, result: ReviewResult): Promise<ReviewResponse> {
+    const cleanId = cardId.replace("flashcard:", "");
+    return fetchApi<ReviewResponse>(
+      `/api/flashcards/${encodeURIComponent(cleanId)}/review`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ result }),
+      }
+    );
+  },
+
+  // Generate TTS for a card
+  async generateTTS(
+    cardId: string,
+    side: "front" | "back",
+    voice: string = "fr-CA-SylvieNeural"
+  ): Promise<{ audio_url: string; voice: string; duration?: number }> {
+    const cleanId = cardId.replace("flashcard:", "");
+    return fetchApi(
+      `/api/flashcards/${encodeURIComponent(cleanId)}/tts`,
+      {
+        method: "POST",
+        body: JSON.stringify({ side, voice }),
+      }
+    );
+  },
+
+  // Get audio URL for a card
+  getAudioUrl(cardId: string, side: "front" | "back"): string {
+    const cleanId = cardId.replace("flashcard:", "");
+    return `${API_BASE_URL}/api/flashcards/${cleanId}/audio/${side}`;
+  },
+};
+
 export const linkedDirectoryApi = {
   // Scan a directory and return statistics
   async scan(directoryPath: string): Promise<LinkedDirectoryScanResult> {
@@ -1238,6 +1433,7 @@ export const api = {
   health: healthApi,
   docusaurus: docusaurusApi,
   linkedDirectory: linkedDirectoryApi,
+  flashcards: flashcardsApi,
   // Backward compatibility
   cases: coursesApi,
 };
