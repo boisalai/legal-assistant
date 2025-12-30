@@ -28,7 +28,10 @@ uv sync --extra dev
 **SurrealDB doit être en cours d'exécution** sur `localhost:8002` :
 
 ```bash
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+# Depuis la racine du projet
+docker-compose up -d
+# OU en natif
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:backend/data/surrealdb/legal.db
 ```
 
 ## Exécution des tests

@@ -49,8 +49,10 @@ class Token(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
-    name: str
+    nom: str
+    prenom: str
     role: str = "student"
+    created_at: str
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -176,17 +178,21 @@ async def get_user_by_email(email: str) -> Optional[dict]:
 async def get_user_by_id(user_id: str) -> Optional[dict]:
     """Get user from SurrealDB by ID."""
     try:
+        logger.info(f"🔍 get_user_by_id called with: {user_id} (type: {type(user_id).__name__})")
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        result = await service.select(user_id)
+        # Use query instead of select because select() doesn't work with string IDs
+        result = await service.db.query(f"SELECT * FROM {user_id}")
+        logger.info(f"🔍 get_user_by_id result: {result} (type: {type(result).__name__})")
 
-        if result:
-            # result can be a list or a single item
-            if isinstance(result, list):
-                return result[0] if len(result) > 0 else None
-            return result
+        if result and len(result) > 0:
+            user = result[0]
+            logger.info(f"✅ User found: {user.get('email')}")
+            return user
+
+        logger.warning(f"⚠️ get_user_by_id returned None for user_id: {user_id}")
         return None
     except Exception as e:
         logger.error(f"Error getting user by id: {e}")
@@ -228,10 +234,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     # Get user ID (SurrealDB returns id as object or string)
     user_id = user.get("id")
+    logger.info(f"🔑 Raw user_id from DB: {user_id} (type: {type(user_id).__name__})")
+
     if isinstance(user_id, dict):
         user_id = f"{user_id.get('tb', 'user')}:{user_id.get('id', {}).get('String', '')}"
     elif hasattr(user_id, '__str__'):
         user_id = str(user_id)
+
+    logger.info(f"🔑 Processed user_id: {user_id} (type: {type(user_id).__name__})")
 
     # Create access token
     access_token = create_access_token(user_id)
@@ -239,7 +249,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     # Store session
     active_sessions[access_token] = user_id
 
-    logger.info(f"User logged in: {email}")
+    logger.info(f"User logged in: {email} with user_id: {user_id}")
 
     return Token(access_token=access_token)
 
@@ -445,12 +455,22 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
             detail="Utilisateur non trouvé"
         )
 
-    return UserResponse(
+    # Debug logging
+    logger.info(f"🔍 /api/auth/me - User from DB: {user}")
+    user_role = user.get("role", "notaire")
+    logger.info(f"🎭 Role extracted: '{user_role}' (type: {type(user_role).__name__})")
+
+    response = UserResponse(
         id=str(user.get("id", user_id)),
         email=user.get("email", ""),
-        name=user.get("nom", ""),
-        role=user.get("role", "notaire")
+        nom=user.get("nom", ""),
+        prenom=user.get("prenom", ""),
+        role=user_role,
+        created_at=str(user.get("created_at", ""))
     )
+    logger.info(f"📤 /api/auth/me - Response: {response.model_dump()}")
+
+    return response
 
 
 @router.post("/logout")

@@ -55,7 +55,12 @@ htmlcov/
 backend/data/uploads/*
 !backend/data/uploads/.gitkeep
 backend/data/surrealdb/
+backend/data/surreal.db.old/
 backend/data/agno_state/
+
+# Database backups (keep local, don't commit large files)
+backend/backups/*.surql
+backend/backups/*.surql.gz
 
 # Logs
 *.log

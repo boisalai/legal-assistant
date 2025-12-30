@@ -444,9 +444,23 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ## Démarrage rapide
 
+**Méthode recommandée** : Utiliser le script automatique
+
 ```bash
-# Terminal 1: SurrealDB
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+# Démarrer tout (SurrealDB + Backend + Frontend)
+./dev.sh
+
+# Arrêter tout : CTRL+C ou
+./dev-stop.sh
+```
+
+**Méthode alternative** : Démarrage manuel (3 terminaux)
+
+```bash
+# Terminal 1: SurrealDB (Docker)
+docker-compose up -d
+# OU en natif (depuis la racine du projet)
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:backend/data/surrealdb/legal.db
 
 # Terminal 2: Backend (démarre auto MLX si configuré)
 cd backend

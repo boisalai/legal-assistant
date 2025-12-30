@@ -136,6 +136,7 @@ from routes.settings import router as settings_router
 from routes.transcription import router as transcription_router
 from routes.extraction import router as extraction_router
 from routes.model_servers import router as model_servers_router
+from routes.admin import router as admin_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(courses_router, tags=["Courses"])
@@ -148,8 +149,9 @@ app.include_router(model_servers_router, tags=["Model Servers"])
 app.include_router(docusaurus_router, tags=["Docusaurus"])
 app.include_router(linked_directory_router, tags=["Linked Directory"])
 app.include_router(activity_router, tags=["Activity"])
+app.include_router(admin_router, tags=["Admin"])
 
-logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus")
+logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus, /api/admin")
 
 
 # ============================================================

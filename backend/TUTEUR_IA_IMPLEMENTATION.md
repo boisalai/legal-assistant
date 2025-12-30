@@ -556,7 +556,9 @@ L'étudiant peut demander naturellement :
 
 ```bash
 # Terminal 1: SurrealDB
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+docker-compose up -d
+# OU en natif (depuis la racine du projet)
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:backend/data/surrealdb/legal.db
 
 # Terminal 2: Backend
 cd backend
