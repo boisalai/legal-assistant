@@ -68,7 +68,8 @@
       "Bash(git restore:*)",
       "Skill(commit)",
       "Bash(/tmp/final_test.py:*)",
-      "Bash(__NEW_LINE__ uv run python /tmp/final_test.py)"
+      "Bash(__NEW_LINE__ uv run python /tmp/final_test.py)",
+      "Bash(timeout 15 uv run python:*)"
     ],
     "deny": [],
     "ask": []
