@@ -146,6 +146,16 @@ class Settings(BaseSettings):
         description="Stockage de l'etat Agno"
     )
 
+    # ===== Synchronisation automatique des répertoires liés =====
+    auto_sync_interval: int = Field(
+        default=300,
+        description="Intervalle de synchronisation automatique des répertoires liés (secondes)"
+    )
+    auto_sync_enabled: bool = Field(
+        default=True,
+        description="Activer la synchronisation automatique des répertoires liés"
+    )
+
     # Configuration de Pydantic Settings
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent.parent / ".env"),

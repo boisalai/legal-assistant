@@ -56,10 +56,29 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Could not connect to SurrealDB: {e}")
         logger.warning("API will start but database features may not work")
 
+    # Start auto-sync service for linked directories
+    if settings.auto_sync_enabled:
+        try:
+            from services.auto_sync_service import start_auto_sync
+            await start_auto_sync(interval_seconds=settings.auto_sync_interval)
+            logger.info(f"Auto-sync service started (interval: {settings.auto_sync_interval}s)")
+        except Exception as e:
+            logger.warning(f"Could not start auto-sync service: {e}")
+    else:
+        logger.info("Auto-sync service disabled")
+
     yield
 
     # === SHUTDOWN ===
     logger.info("Legal Assistant API - Shutting down...")
+
+    # Stop auto-sync service
+    try:
+        from services.auto_sync_service import stop_auto_sync
+        await stop_auto_sync()
+        logger.info("Auto-sync service stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping auto-sync service: {e}")
 
     # Shutdown all model servers (MLX, vLLM) if running
     try:
