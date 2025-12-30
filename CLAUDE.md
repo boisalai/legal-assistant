@@ -86,13 +86,23 @@
    - Rate limiting et authentification automatique
 
 10. **Tuteur IA pédagogique** ✨
-   - Mode tuteur automatique détectant le document ouvert
-   - Génération de résumés structurés avec objectifs d'apprentissage
-   - Création de cartes mentales (mind maps) thématiques
-   - Quiz interactifs avec explications détaillées
-   - Explications de concepts juridiques avec méthode socratique
-   - Détection automatique du contexte via activity tracking
-   - 4 outils Agno dédiés : `generate_summary`, `generate_mindmap`, `generate_quiz`, `explain_concept`
+    - Mode tuteur automatique détectant le document ouvert
+    - Génération de résumés structurés avec objectifs d'apprentissage
+    - Création de cartes mentales (mind maps) thématiques
+    - Quiz interactifs avec explications détaillées
+    - Explications de concepts juridiques avec méthode socratique
+    - Détection automatique du contexte via activity tracking
+    - 4 outils Agno dédiés : `generate_summary`, `generate_mindmap`, `generate_quiz`, `explain_concept`
+
+11. **Fiches de révision (Flashcards)** 🆕
+    - Génération automatique de fiches depuis documents markdown
+    - 4 types de fiches : **définition**, **concept**, **jurisprudence**, **question**
+    - Interface de révision avec animation flip recto/verso
+    - Système de progression : new → learning → mastered
+    - Raccourcis clavier : `Espace` (flip), `1/2/3` (À revoir/Correct/Facile)
+    - TTS audio avec voix canadienne-française (fr-CA-SylvieNeural)
+    - Sélection granulaire des documents sources (ex: modules 1-4 pour intra)
+    - Streaming SSE pour progression génération en temps réel
 
 ### Architecture technique
 
@@ -116,35 +126,77 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `frontend/src/components/cases/linked-directories-section.tsx` - Interface répertoires liés
 - `frontend/src/components/cases/directory-tree-view.tsx` - Vue arborescente
 - `frontend/src/components/cases/youtube-download-modal.tsx` - Modal d'import YouTube
+- `backend/routes/flashcards.py` - 🆕 API CRUD fiches de révision
+- `backend/services/flashcard_service.py` - 🆕 Génération LLM avec Agno Agent
+- `backend/models/flashcard_models.py` - 🆕 Modèles Pydantic flashcards
+- `frontend/src/components/cases/flashcards-section.tsx` - 🆕 Section liste des decks
+- `frontend/src/components/cases/create-flashcard-deck-modal.tsx` - 🆕 Modal création deck
+- `frontend/src/components/cases/flashcard-study-panel.tsx` - 🆕 Interface révision flip
 
 ---
 
-## Session actuelle (2025-12-30) - Synchronisation automatique des répertoires liés ✅
+## Session actuelle (2025-12-30) - Fiches de révision (Flashcards) ✅
 
-**Objectif** : Implémenter la détection automatique des changements dans les répertoires liés.
+**Objectif** : Système complet de fiches de révision pour études juridiques.
 
-**Actions complétées** :
-- ✅ Création `backend/services/auto_sync_service.py` - Service singleton avec tâche de fond asyncio
-- ✅ Extraction des utilitaires dans `backend/utils/linked_directory_utils.py`
-- ✅ Intégration au cycle de vie du backend (démarrage/arrêt dans `main.py`)
-- ✅ Configuration dans `settings.py` : `AUTO_SYNC_INTERVAL` (défaut 300s) et `AUTO_SYNC_ENABLED`
-- ✅ Tests unitaires passent
+### Phase 1 - Backend API ✅
 
-**Fonctionnement** :
-- Le service scanne tous les répertoires liés de tous les cours toutes les 5 minutes
-- Détecte automatiquement : nouveaux fichiers, fichiers modifiés, fichiers supprimés
-- Indexe/réindexe les documents sans intervention manuelle
-- Logs uniquement quand des changements sont détectés
+**Commits** : `ccdd83a` (Backend)
 
-**Configuration** (`.env`) :
-```bash
-AUTO_SYNC_INTERVAL=300  # Intervalle en secondes (défaut: 5 min)
-AUTO_SYNC_ENABLED=true  # Activer/désactiver le service
-```
+- ✅ Création `backend/models/flashcard_models.py` - 8 modèles Pydantic
+- ✅ Création `backend/routes/flashcards.py` - 9 endpoints CRUD + génération
+- ✅ Création `backend/services/flashcard_service.py` - Agent LLM avec Agno
+- ✅ Tables SurrealDB SCHEMALESS : `flashcard_deck`, `flashcard`
+
+**Endpoints API** :
+- `POST /api/flashcards/decks` - Créer un deck
+- `GET /api/flashcards/decks/{course_id}` - Lister les decks d'un cours
+- `GET /api/flashcards/deck/{deck_id}` - Détails d'un deck avec stats
+- `DELETE /api/flashcards/deck/{deck_id}` - Supprimer (cascade)
+- `POST /api/flashcards/deck/{deck_id}/generate` - Générer fiches (SSE)
+- `GET /api/flashcards/deck/{deck_id}/study` - Session d'étude
+- `POST /api/flashcards/card/{card_id}/review` - Enregistrer révision
+- `GET/POST /api/flashcards/card/{card_id}/tts/{side}` - Audio TTS
+
+### Phase 2 - Frontend UI ✅
+
+**Commit** : `6f83ca4` (Frontend)
+
+- ✅ Types TypeScript dans `frontend/src/types/index.ts`
+- ✅ API client dans `frontend/src/lib/api.ts` (flashcardsApi)
+- ✅ `flashcards-section.tsx` - Liste des decks avec progression
+- ✅ `create-flashcard-deck-modal.tsx` - Création avec sélection documents
+- ✅ `flashcard-study-panel.tsx` - Interface flip avec animation CSS 3D
+- ✅ Intégration dans `course-details-panel.tsx` et `page.tsx`
+
+**Fonctionnalités UI** :
+- Animation flip card (CSS 3D transform)
+- Raccourcis clavier : `Espace` (flip), `1/2/3` (révision)
+- Progression visuelle par deck
+- Badges de statut (Nouveau, En cours, Maîtrisé)
+- TTS audio (voix canadienne-française)
+
+### Bugs corrigés
+- ⚠️ SurrealDB : `deck_id` stocké comme string vs `type::thing()` queries
+- ⚠️ SurrealDB : `ORDER BY` ne supporte pas expressions booléennes complexes → tri Python
+- ⚠️ Git : Paths avec brackets nécessitent quotes (`'...[id]...'`)
 
 ---
 
 ## Sessions récentes (Résumé)
+
+### 2025-12-30 AM - Synchronisation automatique des répertoires liés ✅
+
+**Objectif** : Détection automatique des changements dans les répertoires liés.
+
+**Implémentation** :
+- `backend/services/auto_sync_service.py` - Service singleton avec tâche asyncio
+- `backend/utils/linked_directory_utils.py` - Utilitaires partagés (scan, extraction)
+- Intégration au cycle de vie backend (démarrage/arrêt dans `main.py`)
+
+**Fonctionnement** : Scanne tous les répertoires liés toutes les 5 minutes, détecte nouveaux/modifiés/supprimés.
+
+**Configuration** : `.env` → `AUTO_SYNC_INTERVAL=300`, `AUTO_SYNC_ENABLED=true`
 
 ### 2025-12-26 PM - Refactoring Phase 2 & Tests Phase 3.1 ✅
 
@@ -446,6 +498,7 @@ AUTO_SYNC_ENABLED=true  # Activer/désactiver le service
 **Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
 
 **Nouvelles fonctionnalités complétées** :
+- ✅ **Fiches de révision** (2025-12-30) - Génération LLM, flip cards, progression, TTS
 - ✅ **Tuteur IA pédagogique** (2025-12-26) - Résumés, mind maps, quiz, explications
 
 ---
