@@ -10,8 +10,10 @@ echo ""
 if ! nc -z localhost 8002 2>/dev/null; then
     echo "❌ Erreur: SurrealDB n'est pas en cours d'exécution sur le port 8002"
     echo ""
-    echo "Démarrez SurrealDB avec:"
-    echo "  surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db"
+    echo "Démarrez SurrealDB avec (depuis la racine du projet):"
+    echo "  docker-compose up -d"
+    echo "  # OU"
+    echo "  surreal start --user root --pass root --bind 0.0.0.0:8002 file:backend/data/surrealdb/legal.db"
     exit 1
 fi
 

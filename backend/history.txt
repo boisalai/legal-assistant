@@ -32,3 +32,4 @@ SELECT count() FROM course GROUP ALL; SELECT count() FROM embedding_chunk GROUP 
 SELECT * FROM course;
 SELECT * FROM document WHERE course_id = course:94921feb;
 SELECT * FROM course;
+SELECT * FROM user;

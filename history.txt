@@ -65,3 +65,20 @@ SELECT id, title, course_code, course_name FROM course WHERE title CONTAINS 'Int
 DEFINE FIELD pinned ON course TYPE bool DEFAULT false PERMISSIONS FULL;
 -- Migration complete!
 INFO FOR TABLE course;
+SELECT id, session_id FROM course LIMIT 5;
+SELECT * FROM course LIMIT 1;
+REMOVE FIELD session_id ON TABLE course;
+SELECT id, nom_fichier, source_type FROM document WHERE source_type = 'linked' LIMIT 5;
+SELECT id, nom_fichier, course_id, source_type FROM document WHERE course_id CONTAINS 'CAIJ' LIMIT 10;
+SELECT id, title FROM course LIMIT 10;
+SELECT id, nom_fichier, course_id, source_type FROM document WHERE source_type = 'linked' LIMIT 10;
+SELECT id, nom_fichier, source_type, linked_source FROM document LIMIT 5;
+INFO FOR DB;
+INFO FOR ROOT;
+SELECT * FROM user LIMIT 5;
+INFO FOR DB;
+SELECT * FROM course LIMIT 3;
+SELECT count() AS count FROM user GROUP ALL;
+SELECT count() AS count FROM course GROUP ALL;
+SELECT count() AS count FROM user GROUP ALL;
+SELECT count() AS count FROM course GROUP ALL;

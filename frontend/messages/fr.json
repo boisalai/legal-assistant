@@ -353,6 +353,8 @@
     "validation": "Données invalides"
   },
   "admin": {
+    "title": "Administration",
+    "description": "Gérez les utilisateurs et la base de données",
     "users": {
       "title": "Gestion des utilisateurs",
       "description": "Gérez les comptes utilisateurs de l'application",
@@ -397,6 +399,64 @@
         "create": "Créer",
         "save": "Enregistrer",
         "delete": "Supprimer"
+      }
+    },
+    "database": {
+      "title": "Base de données",
+      "description": "Consultez et gérez les tables de la base de données",
+      "tables": "Tables",
+      "totalTables": "{count} table(s)",
+      "viewData": "Voir les données",
+      "noTables": "Aucune table disponible",
+      "loading": "Chargement des tables...",
+      "rows": "{count} ligne(s)",
+      "table": {
+        "title": "Table : {name}",
+        "totalRows": "{total} ligne(s) au total",
+        "noData": "Aucune donnée",
+        "loading": "Chargement...",
+        "error": "Erreur lors du chargement des données"
+      },
+      "pagination": {
+        "page": "Page {current} sur {total}",
+        "rowsPerPage": "Lignes par page",
+        "showing": "Affichage de {from} à {to} sur {total}"
+      }
+    },
+    "maintenance": {
+      "title": "Maintenance",
+      "description": "Nettoyez les données orphelines de la base de données",
+      "analyze": "Analyser la base",
+      "analyzing": "Analyse en cours...",
+      "cleanup": "Nettoyer les orphelins",
+      "cleaning": "Nettoyage en cours...",
+      "orphans": {
+        "title": "Orphelins détectés",
+        "total": "{count} orphelin(s)",
+        "none": "Aucun orphelin détecté",
+        "byTable": "Par table",
+        "samples": "Échantillons",
+        "showSamples": "Voir les échantillons",
+        "hideSamples": "Masquer les échantillons"
+      },
+      "confirmation": {
+        "title": "Confirmation requise",
+        "description": "Cette action va supprimer {count} orphelin(s). Cette action est irréversible.",
+        "warning": "⚠️ Recommandé : Faites une sauvegarde de la base de données avant de continuer.",
+        "typeToConfirm": "Tapez \"{text}\" pour confirmer",
+        "execute": "Exécuter le nettoyage",
+        "cancel": "Annuler"
+      },
+      "result": {
+        "success": "Nettoyage réussi",
+        "successDescription": "{count} orphelin(s) supprimé(s)",
+        "error": "Erreur lors du nettoyage",
+        "errorDescription": "Une erreur est survenue : {error}"
+      },
+      "risk": {
+        "high": "Risque élevé",
+        "medium": "Risque moyen",
+        "low": "Risque faible"
       }
     },
     "roles": {

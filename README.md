@@ -134,13 +134,35 @@ npm run dev -- -p 3001
 # Frontend disponible sur http://localhost:3001
 ```
 
-### Démarrage avec 3 terminaux
+### Option 1 : Démarrage automatique (Recommandé) ⚡
+
+Le script `dev.sh` démarre tous les services en un seul terminal :
 
 ```bash
-# Terminal 1 - SurrealDB
+# Démarrer tout (SurrealDB, backend, frontend)
+./dev.sh
+
+# Arrêter tout
+# Appuyez sur CTRL+C
+# ou utilisez le script d'arrêt
+./dev-stop.sh
+```
+
+**Avantages** :
+- ✅ Un seul terminal
+- ✅ Arrêt propre avec CTRL+C
+- ✅ Logs dans `logs/backend.log` et `logs/frontend.log`
+- ✅ Vérification du démarrage de chaque service
+
+### Option 2 : Démarrage manuel (3 terminaux)
+
+Si vous préférez contrôler chaque service séparément :
+
+```bash
+# Terminal 1 - SurrealDB (Docker recommandé)
 docker-compose up -d
-# ou
-surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
+# OU en natif
+surreal start --user root --pass root --bind 0.0.0.0:8002 file:backend/data/surrealdb/legal.db
 
 # Terminal 2 - Backend
 cd backend && uv run python main.py

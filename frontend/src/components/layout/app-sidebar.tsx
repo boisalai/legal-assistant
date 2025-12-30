@@ -14,6 +14,7 @@ import {
   User,
   ChevronUp,
   Scale,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -68,18 +69,25 @@ export function AppSidebar() {
   const router = useRouter();
   const [userName, setUserName] = useState("User");
   const [userEmail, setUserEmail] = useState("user@example.com");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
         const user = await authApi.getCurrentUser();
+        console.log("🔍 AppSidebar: User received:", user);
+        console.log("🔍 AppSidebar: User role:", user.role);
         setUserName(`${user.prenom} ${user.nom}`.trim() || "User");
         setUserEmail(user.email || "user@example.com");
-      } catch {
+        setIsAdmin(user.role === "admin");
+        console.log("✅ AppSidebar: isAdmin set to:", user.role === "admin");
+      } catch (error) {
+        console.error("❌ AppSidebar: Error fetching user:", error);
         // Keep default values
       }
     };
     if (authApi.isAuthenticated()) {
+      console.log("🔍 AppSidebar: User is authenticated");
       fetchUserInfo();
     }
   }, []);
@@ -139,6 +147,25 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin Section - Only visible for admins */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/")}>
+                    <Link href="/admin/database">
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>{t("nav.admin")}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>

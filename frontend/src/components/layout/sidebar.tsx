@@ -19,6 +19,7 @@ import {
   User,
   CreditCard,
   Bell,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,16 +72,25 @@ export function Sidebar() {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
+        console.log("🔍 Sidebar: Fetching user info...");
         const user = await authApi.getCurrentUser();
+        console.log("🔍 Sidebar: User received:", user);
+        console.log("🔍 Sidebar: User role:", user.role);
+        console.log("🔍 Sidebar: Is admin?", user.role === "admin");
         setIsAdmin(user.role === "admin");
         setUserName(`${user.prenom} ${user.nom}`.trim() || "User");
         setUserEmail(user.email || "user@example.com");
-      } catch {
+        console.log("✅ Sidebar: isAdmin state set to:", user.role === "admin");
+      } catch (error) {
+        console.error("❌ Sidebar: Error fetching user:", error);
         setIsAdmin(false);
       }
     };
     if (authApi.isAuthenticated()) {
+      console.log("🔍 Sidebar: User is authenticated, fetching info...");
       fetchUserInfo();
+    } else {
+      console.log("❌ Sidebar: User is NOT authenticated");
     }
   }, []);
 
@@ -176,6 +186,37 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* DEBUG: Admin status indicator */}
+        <div className={cn("my-2 px-2 py-1 text-xs", collapsed ? "hidden" : "block")}>
+          <div className="bg-yellow-500 text-black p-2 rounded">
+            DEBUG: isAdmin = {String(isAdmin)}
+          </div>
+        </div>
+
+        {/* Admin Link - Only visible for admins */}
+        {isAdmin && (
+          <>
+            <div className={cn("my-2", collapsed ? "mx-2" : "mx-0")}>
+              <div className="h-px bg-sidebar-border" />
+            </div>
+            <Link
+              href="/admin/database"
+              className={cn(
+                "flex items-center gap-3 px-2 py-2 rounded-md text-sm font-medium transition-colors",
+                (pathname === "/admin/database" || pathname.startsWith("/admin/"))
+                  ? "bg-sidebar-accent text-sidebar-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                collapsed && "justify-center px-2"
+              )}
+              title={collapsed ? t("nav.admin") : undefined}
+              onClick={(e) => handleNavClick(e, "/admin/database")}
+            >
+              <ShieldCheck className="h-5 w-5 shrink-0" />
+              {!collapsed && <span>{t("nav.admin")}</span>}
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* Bottom Section - Model Selector + User Profile with Menu */}

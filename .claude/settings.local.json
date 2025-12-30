@@ -65,7 +65,10 @@
       "Bash(kill:*)",
       "Bash(git show:*)",
       "Bash(npm run type-check:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Skill(commit)",
+      "Bash(/tmp/final_test.py:*)",
+      "Bash(__NEW_LINE__ uv run python /tmp/final_test.py)"
     ],
     "deny": [],
     "ask": []
