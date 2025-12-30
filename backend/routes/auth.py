@@ -292,6 +292,10 @@ async def register(request: RegisterRequest):
             await service.connect()
 
         user_id = secrets.token_hex(8)
+
+        # Create user with timestamp
+        current_time = datetime.utcnow().isoformat()
+
         new_user = await service.create("user", {
             "email": email,
             "nom": name,
@@ -299,6 +303,8 @@ async def register(request: RegisterRequest):
             "password_hash": hash_password(password),
             "role": "student",
             "actif": True,
+            "created_at": current_time,
+            "updated_at": current_time,
         }, record_id=user_id)
 
         logger.info(f"New user registered: {email}")
@@ -315,8 +321,10 @@ async def register(request: RegisterRequest):
             user=UserResponse(
                 id=created_id,
                 email=email,
-                name=name,
-                role="student"
+                nom=name,
+                prenom="",
+                role="student",
+                created_at=new_user.get("created_at", "")
             )
         )
     except Exception as e:
