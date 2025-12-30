@@ -7,5 +7,15 @@ from .chat import router as chat_router
 from .docusaurus import router as docusaurus_router
 from .activity import router as activity_router
 from .linked_directory import router as linked_directory_router
+from .flashcards import router as flashcards_router
 
-__all__ = ["auth_router", "courses_router", "documents_router", "chat_router", "docusaurus_router", "activity_router", "linked_directory_router"]
+__all__ = [
+    "auth_router",
+    "courses_router",
+    "documents_router",
+    "chat_router",
+    "docusaurus_router",
+    "activity_router",
+    "linked_directory_router",
+    "flashcards_router",
+]
