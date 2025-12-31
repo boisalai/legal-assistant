@@ -48,7 +48,8 @@ export function FlashcardsSection({
   onStudyDeck,
   onCreateDeck,
 }: FlashcardsSectionProps) {
-  const t = useTranslations();
+  const t = useTranslations("flashcards");
+  const tCommon = useTranslations("common");
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingDeckId, setDeletingDeckId] = useState<string | null>(null);
@@ -78,9 +79,9 @@ export function FlashcardsSection({
     try {
       await flashcardsApi.deleteDeck(deckToDelete.id);
       setDecks((prev) => prev.filter((d) => d.id !== deckToDelete.id));
-      toast.success("Jeu supprimé");
+      toast.success(t("deleted"));
     } catch (error) {
-      toast.error("Erreur lors de la suppression");
+      toast.error(t("deleteError"));
     } finally {
       setDeletingDeckId(null);
       setDeckToDelete(null);
@@ -90,15 +91,15 @@ export function FlashcardsSection({
 
   const getStatusBadge = (deck: FlashcardDeck) => {
     if (deck.total_cards === 0) {
-      return <Badge variant="outline">Vide</Badge>;
+      return <Badge variant="outline">{t("status.empty")}</Badge>;
     }
     if (deck.progress_percent === 100) {
-      return <Badge className="bg-green-500">Maîtrisé</Badge>;
+      return <Badge className="bg-green-500">{t("status.mastered")}</Badge>;
     }
     if (deck.learning_cards > 0 || deck.mastered_cards > 0) {
-      return <Badge className="bg-blue-500">En cours</Badge>;
+      return <Badge className="bg-blue-500">{t("status.inProgress")}</Badge>;
     }
-    return <Badge variant="secondary">Nouveau</Badge>;
+    return <Badge variant="secondary">{t("status.new")}</Badge>;
   };
 
   // Check if we have markdown documents for flashcard generation
@@ -115,7 +116,7 @@ export function FlashcardsSection({
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <GraduationCap className="h-4 w-4" />
-          <h3 className="font-semibold text-sm">Fiches de révision</h3>
+          <h3 className="font-semibold text-sm">{t("title")}</h3>
         </div>
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -131,7 +132,7 @@ export function FlashcardsSection({
         <div className="flex items-center gap-2">
           <GraduationCap className="h-4 w-4" />
           <h3 className="font-semibold text-sm">
-            Fiches de révision ({decks.length})
+            {t("title")} ({decks.length})
           </h3>
         </div>
         <Button
@@ -141,14 +142,14 @@ export function FlashcardsSection({
           className="gap-1"
         >
           <Plus className="h-3 w-3" />
-          Nouveau jeu
+          {t("newSet")}
         </Button>
       </div>
 
       {/* No markdown docs warning */}
       {!hasMarkdownDocs && (
         <p className="text-sm text-muted-foreground">
-          Ajoutez des documents markdown pour créer des fiches de révision.
+          {t("noMarkdownDocs")}
         </p>
       )}
 
@@ -158,11 +159,11 @@ export function FlashcardsSection({
           <CardContent className="flex flex-col items-center justify-center py-8 text-center">
             <BookOpen className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-3">
-              Aucun jeu de révision pour ce cours.
+              {t("noSets")}
             </p>
             <Button size="sm" onClick={onCreateDeck} className="gap-1">
               <Sparkles className="h-3 w-3" />
-              Créer mon premier jeu
+              {t("createFirst")}
             </Button>
           </CardContent>
         </Card>
@@ -191,18 +192,18 @@ export function FlashcardsSection({
                 {deck.total_cards > 0 && (
                   <div className="space-y-1 mb-3">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Progression</span>
+                      <span>{t("progress")}</span>
                       <span>{Math.round(deck.progress_percent)}%</span>
                     </div>
                     <Progress value={deck.progress_percent} className="h-1.5" />
                     <div className="flex gap-3 text-xs text-muted-foreground">
                       <span className="text-green-600">
-                        {deck.mastered_cards} maîtrisées
+                        {deck.mastered_cards} {t("masteredCards")}
                       </span>
                       <span className="text-blue-600">
-                        {deck.learning_cards} en cours
+                        {deck.learning_cards} {t("learningCards")}
                       </span>
-                      <span>{deck.new_cards} nouvelles</span>
+                      <span>{deck.new_cards} {t("newCards")}</span>
                     </div>
                   </div>
                 )}
@@ -217,7 +218,7 @@ export function FlashcardsSection({
                     className="gap-1 flex-1"
                   >
                     <Play className="h-3 w-3" />
-                    {deck.total_cards === 0 ? "Générer d'abord" : "Réviser"}
+                    {deck.total_cards === 0 ? t("generateFirst") : t("study")}
                   </Button>
                   <Button
                     size="sm"
@@ -245,18 +246,17 @@ export function FlashcardsSection({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce jeu ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le jeu « {deckToDelete?.name} » et toutes ses fiches seront
-              définitivement supprimés.
+              {t("deleteDescription", { name: deckToDelete?.name || "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeckToDelete(null)}>
-              Annuler
+              {tCommon("cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteDeck}>
-              Supprimer
+              {tCommon("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

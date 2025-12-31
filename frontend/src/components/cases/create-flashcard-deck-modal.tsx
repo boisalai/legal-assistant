@@ -35,28 +35,7 @@ interface CreateFlashcardDeckModalProps {
   onSuccess: () => void;
 }
 
-const CARD_TYPES: { value: CardType; label: string; description: string }[] = [
-  {
-    value: "definition",
-    label: "Définitions",
-    description: "Termes juridiques et leurs définitions",
-  },
-  {
-    value: "concept",
-    label: "Concepts",
-    description: "Questions conceptuelles (conditions, éléments)",
-  },
-  {
-    value: "case",
-    label: "Jurisprudence",
-    description: "Arrêts et leurs ratios decidendi",
-  },
-  {
-    value: "question",
-    label: "Questions",
-    description: "Questions analytiques et mises en situation",
-  },
-];
+const CARD_TYPE_KEYS: CardType[] = ["definition", "concept", "case", "question"];
 
 export function CreateFlashcardDeckModal({
   open,
@@ -65,7 +44,8 @@ export function CreateFlashcardDeckModal({
   documents,
   onSuccess,
 }: CreateFlashcardDeckModalProps) {
-  const t = useTranslations();
+  const t = useTranslations("flashcards");
+  const tCommon = useTranslations("common");
 
   // Form state
   const [name, setName] = useState("");
@@ -133,15 +113,15 @@ export function CreateFlashcardDeckModal({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      toast.error("Veuillez entrer un nom pour le jeu");
+      toast.error(t("setNameRequired"));
       return;
     }
     if (selectedDocIds.length === 0) {
-      toast.error("Veuillez sélectionner au moins un document");
+      toast.error(t("selectDocument"));
       return;
     }
     if (selectedCardTypes.length === 0) {
-      toast.error("Veuillez sélectionner au moins un type de fiche");
+      toast.error(t("selectCardType"));
       return;
     }
 
@@ -157,7 +137,7 @@ export function CreateFlashcardDeckModal({
         card_count: cardCount,
       });
 
-      toast.success("Jeu créé, génération des fiches...");
+      toast.success(t("created"));
 
       // Step 2: Generate flashcards
       setIsCreating(false);
@@ -171,9 +151,7 @@ export function CreateFlashcardDeckModal({
 
       if (result.success) {
         setGenerationComplete(true);
-        toast.success(
-          `${result.cards_generated} fiches générées avec succès!`
-        );
+        toast.success(t("generated", { count: result.cards_generated || 0 }));
 
         // Close modal after short delay
         setTimeout(() => {
@@ -181,7 +159,7 @@ export function CreateFlashcardDeckModal({
           onSuccess();
         }, 1500);
       } else {
-        setGenerationError(result.error || "Erreur lors de la génération");
+        setGenerationError(result.error || t("generationError"));
       }
     } catch (error) {
       const message =
@@ -207,10 +185,10 @@ export function CreateFlashcardDeckModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
-            Créer un jeu de révision
+            {t("createTitle")}
           </DialogTitle>
           <DialogDescription>
-            Générez des fiches de révision à partir de vos documents de cours.
+            {t("createDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,8 +201,8 @@ export function CreateFlashcardDeckModal({
             <div className="text-center space-y-2">
               <p className="font-medium">
                 {isCreating
-                  ? "Création du jeu..."
-                  : generationProgress?.message || "Génération en cours..."}
+                  ? t("creating")
+                  : generationProgress?.message || t("generating")}
               </p>
               {generationProgress && (
                 <p className="text-sm text-muted-foreground">
@@ -269,7 +247,7 @@ export function CreateFlashcardDeckModal({
                   setIsGenerating(false);
                 }}
               >
-                Réessayer
+                {tCommon("retry")}
               </Button>
             </div>
           </div>
@@ -280,10 +258,10 @@ export function CreateFlashcardDeckModal({
           <div className="space-y-6 py-4">
             {/* Deck name */}
             <div className="space-y-2">
-              <Label htmlFor="deck-name">Nom du jeu</Label>
+              <Label htmlFor="deck-name">{t("setName")}</Label>
               <Input
                 id="deck-name"
-                placeholder="Ex: Révision Module 1-4 (Intra)"
+                placeholder={t("setNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -292,7 +270,7 @@ export function CreateFlashcardDeckModal({
             {/* Document selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Documents sources</Label>
+                <Label>{t("sourceDocuments")}</Label>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -300,14 +278,14 @@ export function CreateFlashcardDeckModal({
                   className="text-xs h-7"
                 >
                   {selectedDocIds.length === markdownDocs.length
-                    ? "Tout désélectionner"
-                    : "Tout sélectionner"}
+                    ? t("deselectAll")
+                    : t("selectAll")}
                 </Button>
               </div>
               <div className="border rounded-lg max-h-[200px] overflow-y-auto">
                 {markdownDocs.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground text-center">
-                    Aucun document markdown disponible
+                    {t("noMarkdownAvailable")}
                   </p>
                 ) : (
                   <div className="divide-y">
@@ -330,34 +308,32 @@ export function CreateFlashcardDeckModal({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {selectedDocIds.length} document
-                {selectedDocIds.length > 1 ? "s" : ""} sélectionné
-                {selectedDocIds.length > 1 ? "s" : ""}
+                {t("documentsSelected", { count: selectedDocIds.length })}
               </p>
             </div>
 
             {/* Card types */}
             <div className="space-y-2">
-              <Label>Types de fiches</Label>
+              <Label>{t("cardTypes")}</Label>
               <div className="grid grid-cols-2 gap-2">
-                {CARD_TYPES.map((type) => (
+                {CARD_TYPE_KEYS.map((typeKey) => (
                   <label
-                    key={type.value}
+                    key={typeKey}
                     className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCardTypes.includes(type.value)
+                      selectedCardTypes.includes(typeKey)
                         ? "border-primary bg-primary/5"
                         : "hover:bg-muted/50"
                     }`}
                   >
                     <Checkbox
-                      checked={selectedCardTypes.includes(type.value)}
-                      onCheckedChange={() => handleCardTypeToggle(type.value)}
+                      checked={selectedCardTypes.includes(typeKey)}
+                      onCheckedChange={() => handleCardTypeToggle(typeKey)}
                       className="mt-0.5"
                     />
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium">{type.label}</p>
+                      <p className="text-sm font-medium">{t(`types.${typeKey}`)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {type.description}
+                        {t(`types.${typeKey}Desc`)}
                       </p>
                     </div>
                   </label>
@@ -368,7 +344,7 @@ export function CreateFlashcardDeckModal({
             {/* Card count */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Nombre de fiches</Label>
+                <Label>{t("cardCount")}</Label>
                 <span className="text-sm font-medium">{cardCount}</span>
               </div>
               <Slider
@@ -380,8 +356,8 @@ export function CreateFlashcardDeckModal({
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>10 (rapide)</span>
-                <span>100 (exhaustif)</span>
+                <span>{t("cardCountMin")}</span>
+                <span>{t("cardCountMax")}</span>
               </div>
             </div>
           </div>
@@ -391,7 +367,7 @@ export function CreateFlashcardDeckModal({
         {!isCreating && !isGenerating && !generationComplete && !generationError && (
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Annuler
+              {tCommon("cancel")}
             </Button>
             <Button
               onClick={handleCreate}
@@ -399,7 +375,7 @@ export function CreateFlashcardDeckModal({
               className="gap-2"
             >
               <Sparkles className="h-4 w-4" />
-              Créer et générer
+              {t("createAndGenerate")}
             </Button>
           </DialogFooter>
         )}

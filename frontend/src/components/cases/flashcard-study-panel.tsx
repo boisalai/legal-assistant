@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,8 @@ export function FlashcardStudyPanel({
   onClose,
   onDeckUpdate,
 }: FlashcardStudyPanelProps) {
+  const t = useTranslations("flashcards");
+  const tCommon = useTranslations("common");
   const [session, setSession] = useState<StudySession | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -45,7 +48,7 @@ export function FlashcardStudyPanel({
         const studySession = await flashcardsApi.startStudySession(deck.id);
         setSession(studySession);
       } catch (error) {
-        toast.error("Erreur lors du chargement de la session");
+        toast.error(t("loadError"));
         console.error(error);
       } finally {
         setLoading(false);
@@ -78,11 +81,11 @@ export function FlashcardStudyPanel({
         setIsFlipped(false);
       } else {
         // Session complete
-        toast.success("Session terminée!");
+        toast.success(t("sessionComplete"));
         onDeckUpdate();
       }
     } catch (error) {
-      toast.error("Erreur lors de la révision");
+      toast.error(t("reviewError"));
     } finally {
       setIsReviewing(false);
     }
@@ -102,12 +105,12 @@ export function FlashcardStudyPanel({
       audio.onended = () => setPlayingAudio(null);
       audio.onerror = () => {
         setPlayingAudio(null);
-        toast.error("Erreur de lecture audio");
+        toast.error(t("audioError"));
       };
       await audio.play();
     } catch (error) {
       setPlayingAudio(null);
-      toast.error("Erreur lors de la génération audio");
+      toast.error(t("ttsError"));
     }
   };
 
@@ -159,15 +162,9 @@ export function FlashcardStudyPanel({
       case: "bg-amber-500",
       question: "bg-green-500",
     };
-    const labels: Record<string, string> = {
-      definition: "Définition",
-      concept: "Concept",
-      case: "Jurisprudence",
-      question: "Question",
-    };
     return (
       <Badge className={colors[type] || "bg-gray-500"}>
-        {labels[type] || type}
+        {t(`types.${type}`)}
       </Badge>
     );
   };
@@ -200,9 +197,9 @@ export function FlashcardStudyPanel({
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
           <BookOpen className="h-16 w-16 text-muted-foreground" />
           <p className="text-muted-foreground text-center">
-            Aucune fiche à réviser dans ce jeu.
+            {t("noCardsInSet")}
           </p>
-          <Button onClick={onClose}>Retour</Button>
+          <Button onClick={onClose}>{tCommon("back")}</Button>
         </div>
       </div>
     );
@@ -233,14 +230,14 @@ export function FlashcardStudyPanel({
         <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
           <div className="text-6xl">🎉</div>
           <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">Session terminée!</h3>
+            <h3 className="text-2xl font-bold mb-2">{t("sessionComplete")}</h3>
             <p className="text-muted-foreground">
-              Vous avez révisé {totalCards} fiche{totalCards > 1 ? "s" : ""}.
+              {t("cardsReviewed", { count: totalCards })}
             </p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={onClose}>
-              Retour au cours
+              {t("backToCourse")}
             </Button>
             <Button
               onClick={() => {
@@ -249,7 +246,7 @@ export function FlashcardStudyPanel({
                 setIsFlipped(false);
               }}
             >
-              Recommencer
+              {t("restart")}
             </Button>
           </div>
         </div>
@@ -263,7 +260,7 @@ export function FlashcardStudyPanel({
                 <div className="flex items-center gap-2">
                   {currentCard && getCardTypeBadge(currentCard.card_type)}
                   <span className="text-sm text-muted-foreground">
-                    Fiche {currentIndex + 1} / {totalCards}
+                    {t("cardOf", { current: currentIndex + 1, total: totalCards })}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -329,7 +326,7 @@ export function FlashcardStudyPanel({
                       </Button>
                     </div>
                     <p className="text-center text-xs text-muted-foreground mt-2">
-                      Cliquez pour retourner
+                      {t("clickToFlip")}
                     </p>
                   </div>
 
@@ -348,7 +345,7 @@ export function FlashcardStudyPanel({
                     </div>
                     {currentCard?.source_location && (
                       <p className="text-xs text-muted-foreground text-center mt-4 pt-4 border-t">
-                        Source: {currentCard.source_location}
+                        {t("source")}: {currentCard.source_location}
                       </p>
                     )}
                     <div className="flex justify-center pt-2">
@@ -385,7 +382,7 @@ export function FlashcardStudyPanel({
                   className="flex-1 max-w-[150px] gap-2 border-red-200 hover:bg-red-50 hover:border-red-300"
                 >
                   <RotateCcw className="h-4 w-4 text-red-500" />
-                  <span>À revoir</span>
+                  <span>{t("review.again")}</span>
                   <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
                     1
                   </kbd>
@@ -397,7 +394,7 @@ export function FlashcardStudyPanel({
                   className="flex-1 max-w-[150px] gap-2 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
                 >
                   <Check className="h-4 w-4 text-blue-500" />
-                  <span>Correct</span>
+                  <span>{t("review.correct")}</span>
                   <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
                     2
                   </kbd>
@@ -409,7 +406,7 @@ export function FlashcardStudyPanel({
                   className="flex-1 max-w-[150px] gap-2 border-green-200 hover:bg-green-50 hover:border-green-300"
                 >
                   <Zap className="h-4 w-4 text-green-500" />
-                  <span>Facile</span>
+                  <span>{t("review.easy")}</span>
                   <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
                     3
                   </kbd>
@@ -418,9 +415,9 @@ export function FlashcardStudyPanel({
             ) : (
               <div className="text-center">
                 <Button onClick={handleFlip} className="gap-2">
-                  Afficher la réponse
+                  {t("showAnswer")}
                   <kbd className="text-xs bg-primary-foreground/20 px-1.5 rounded">
-                    Espace
+                    ⎵
                   </kbd>
                 </Button>
               </div>
