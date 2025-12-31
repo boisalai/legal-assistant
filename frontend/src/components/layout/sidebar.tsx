@@ -72,25 +72,17 @@ export function Sidebar() {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        console.log("🔍 Sidebar: Fetching user info...");
         const user = await authApi.getCurrentUser();
-        console.log("🔍 Sidebar: User received:", user);
-        console.log("🔍 Sidebar: User role:", user.role);
-        console.log("🔍 Sidebar: Is admin?", user.role === "admin");
         setIsAdmin(user.role === "admin");
         setUserName(`${user.prenom} ${user.nom}`.trim() || "User");
         setUserEmail(user.email || "user@example.com");
-        console.log("✅ Sidebar: isAdmin state set to:", user.role === "admin");
-      } catch (error) {
-        console.error("❌ Sidebar: Error fetching user:", error);
+      } catch {
+        // Token was invalid or expired
         setIsAdmin(false);
       }
     };
     if (authApi.isAuthenticated()) {
-      console.log("🔍 Sidebar: User is authenticated, fetching info...");
       fetchUserInfo();
-    } else {
-      console.log("❌ Sidebar: User is NOT authenticated");
     }
   }, []);
 
