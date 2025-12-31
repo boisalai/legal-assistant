@@ -190,155 +190,231 @@ class FlashcardService:
             }
             return
 
-        # Combine all content - limit per document to ensure total stays manageable
-        # For small models like qwen2.5:7b, we need to keep content short
-        max_per_doc = 4000 // len(all_content) if all_content else 4000
-        truncated_content = []
-        for content in all_content:
-            if len(content) > max_per_doc:
-                truncated_content.append(content[:max_per_doc] + "\n[...]")
-            else:
-                truncated_content.append(content)
+        # Combine all content (no truncation - we'll chunk it)
+        combined_content = "\n\n---\n\n".join(all_content)
+        total_content_length = len(combined_content)
+        logger.info(f"Total content length: {total_content_length} chars")
 
-        combined_content = "\n\n---\n\n".join(truncated_content)
+        # Split content into manageable chunks for the LLM
+        # Each chunk should be ~5000 chars for reliable generation
+        chunk_size = 5000
+        chunks = self._split_content_into_chunks(combined_content, chunk_size)
+        total_chunks = len(chunks)
 
-        # Final safety check - keep under 6000 chars for reliable generation
-        max_content_length = 6000
-        if len(combined_content) > max_content_length:
-            combined_content = combined_content[:max_content_length] + "\n\n[... contenu tronqué ...]"
+        logger.info(f"Content split into {total_chunks} chunks")
 
-        logger.info(f"Combined content length: {len(combined_content)} chars")
+        # Calculate cards per chunk (minimum 3 per chunk for quality)
+        cards_per_chunk = max(3, min(10, card_count // max(1, total_chunks)))
+
+        # Calculate how many chunks we actually need
+        chunks_needed = min(total_chunks, (card_count + cards_per_chunk - 1) // cards_per_chunk)
+
+        logger.info(f"Will use {chunks_needed} chunks to generate {card_count} cards ({cards_per_chunk} per chunk)")
+
+        remaining_cards = card_count
 
         yield {
             "status": "generating",
-            "message": f"Génération de {card_count} fiches en cours..."
+            "message": f"Génération de {card_count} fiches en {chunks_needed} parties..."
         }
 
         # Format card types for prompt
         card_types_str = ", ".join(card_types)
 
-        # Build prompt
-        prompt = FLASHCARD_GENERATION_PROMPT.format(
-            card_count=card_count,
-            card_types=card_types_str,
-            content=combined_content
-        )
+        # Generate cards for each chunk (only process chunks we need)
+        all_cards = []
+        chunks_processed = 0
+        for chunk_idx, chunk_content in enumerate(chunks):
+            if remaining_cards <= 0:
+                break
 
-        try:
-            # For Ollama, call directly for better JSON compliance
-            # Agno's agent adds extra context that confuses the model
-            if "ollama" in model_id.lower():
-                response_text = await self._call_ollama_direct(
-                    model_id=model_id.replace("ollama:", ""),
-                    prompt=prompt,
-                    card_count=card_count
-                )
+            chunks_processed += 1
+
+            # Calculate how many cards for this chunk
+            if chunks_processed >= chunks_needed:
+                # Last needed chunk gets remaining cards
+                chunk_cards = remaining_cards
             else:
-                # Use Agno for other providers (Claude, etc.)
-                model = create_model(model_id)
-                agent = Agent(
-                    name="FlashcardGenerator",
-                    model=model,
-                    instructions="Tu génères des fiches de révision en JSON.",
-                    markdown=False
-                )
-                response = await agent.arun(prompt)
-                response_text = response.content if hasattr(response, "content") else str(response)
+                chunk_cards = min(cards_per_chunk, remaining_cards)
 
-            # Log the raw response for debugging
-            logger.info(f"LLM Response length: {len(response_text)} chars")
-            logger.info(f"LLM Response preview: {response_text[:1000]}...")
-            if len(response_text) > 1000:
-                logger.debug(f"LLM Full response: {response_text}")
+            remaining_cards -= chunk_cards
 
             yield {
-                "status": "parsing",
-                "message": "Analyse de la réponse..."
+                "status": "generating",
+                "message": f"Partie {chunks_processed}/{chunks_needed}: génération de {chunk_cards} fiches..."
             }
 
-            # Parse JSON from response
-            cards = self._parse_cards_json(response_text)
+            # Build prompt for this chunk
+            prompt = FLASHCARD_GENERATION_PROMPT.format(
+                card_count=chunk_cards,
+                card_types=card_types_str,
+                content=chunk_content
+            )
 
-            if not cards:
-                # Include preview of response in error for debugging
-                preview = response_text[:200] if response_text else "empty"
-                logger.error(f"Failed to parse cards from response: {preview}...")
-                yield {
-                    "status": "error",
-                    "message": f"Impossible de parser les fiches générées. Réponse: {preview[:100]}..."
-                }
-                return
-
-            yield {
-                "status": "saving",
-                "message": f"Sauvegarde de {len(cards)} fiches..."
-            }
-
-            # Save cards to database
-            service = get_surreal_service()
-            deck_record_id = deck_id.replace("flashcard_deck:", "")
-
-            saved_count = 0
-            for card in cards:
-                try:
-                    card_id = uuid.uuid4().hex[:8]
-
-                    # Determine source document
-                    source_doc_id = source_document_ids[0] if source_document_ids else ""
-
-                    card_data = {
-                        "deck_id": f"flashcard_deck:{deck_record_id}",
-                        "document_id": source_doc_id,
-                        "card_type": card.get("card_type", "question"),
-                        "front": card.get("front", ""),
-                        "back": card.get("back", ""),
-                        "source_excerpt": card.get("source_excerpt"),
-                        "source_location": card.get("source_location"),
-                        "status": "new",
-                        "review_count": 0,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "last_reviewed": None
-                    }
-
-                    await service.query(
-                        f"CREATE flashcard:{card_id} CONTENT $data",
-                        {"data": card_data}
-                    )
-                    saved_count += 1
-
-                except Exception as e:
-                    logger.error(f"Error saving card: {e}")
-
-            # Update deck with source documents info
             try:
-                await service.query(
-                    """
-                    UPDATE flashcard_deck
-                    SET source_documents = $source_docs,
-                        card_types = $card_types
-                    WHERE id = type::thing('flashcard_deck', $deck_id)
-                    """,
-                    {
-                        "deck_id": deck_record_id,
-                        "source_docs": source_docs_info,
-                        "card_types": card_types
-                    }
-                )
+                # For Ollama, call directly for better JSON compliance
+                if "ollama" in model_id.lower():
+                    response_text = await self._call_ollama_direct(
+                        model_id=model_id.replace("ollama:", ""),
+                        prompt=prompt,
+                        card_count=chunk_cards
+                    )
+                else:
+                    # Use Agno for other providers (Claude, etc.)
+                    model = create_model(model_id)
+                    agent = Agent(
+                        name="FlashcardGenerator",
+                        model=model,
+                        instructions="Tu génères des fiches de révision en JSON.",
+                        markdown=False
+                    )
+                    response = await agent.arun(prompt)
+                    response_text = response.content if hasattr(response, "content") else str(response)
+
+                # Log the raw response for debugging
+                logger.info(f"Chunk {chunk_idx + 1} response length: {len(response_text)} chars")
+                logger.debug(f"Chunk {chunk_idx + 1} response preview: {response_text[:500]}...")
+
+                # Parse JSON from response
+                chunk_parsed_cards = self._parse_cards_json(response_text)
+
+                if chunk_parsed_cards:
+                    all_cards.extend(chunk_parsed_cards)
+                    logger.info(f"Chunk {chunk_idx + 1}: {len(chunk_parsed_cards)} cards parsed")
+                else:
+                    logger.warning(f"Chunk {chunk_idx + 1}: No cards parsed from response")
+
             except Exception as e:
-                logger.warning(f"Could not update deck metadata: {e}")
+                logger.error(f"Error generating cards for chunk {chunk_idx + 1}: {e}")
+                # Continue with next chunk
 
-            yield {
-                "status": "completed",
-                "message": f"Génération terminée: {saved_count} fiches créées",
-                "cards_generated": saved_count
-            }
+        yield {
+            "status": "parsing",
+            "message": f"Analyse terminée: {len(all_cards)} fiches extraites"
+        }
 
-        except Exception as e:
-            logger.error(f"Error generating flashcards: {e}")
+        cards = all_cards
+
+        if not cards:
+            logger.error("No cards generated from any chunk")
             yield {
                 "status": "error",
-                "message": f"Erreur lors de la génération: {str(e)}"
+                "message": "Impossible de générer des fiches depuis le contenu fourni"
             }
+            return
+
+        yield {
+            "status": "saving",
+            "message": f"Sauvegarde de {len(cards)} fiches..."
+        }
+
+        # Save cards to database
+        service = get_surreal_service()
+        deck_record_id = deck_id.replace("flashcard_deck:", "")
+
+        saved_count = 0
+        for card in cards:
+            try:
+                card_id = uuid.uuid4().hex[:8]
+
+                # Determine source document
+                source_doc_id = source_document_ids[0] if source_document_ids else ""
+
+                card_data = {
+                    "deck_id": f"flashcard_deck:{deck_record_id}",
+                    "document_id": source_doc_id,
+                    "card_type": card.get("card_type", "question"),
+                    "front": card.get("front", ""),
+                    "back": card.get("back", ""),
+                    "source_excerpt": card.get("source_excerpt"),
+                    "source_location": card.get("source_location"),
+                    "status": "new",
+                    "review_count": 0,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "last_reviewed": None
+                }
+
+                await service.query(
+                    f"CREATE flashcard:{card_id} CONTENT $data",
+                    {"data": card_data}
+                )
+                saved_count += 1
+
+            except Exception as e:
+                logger.error(f"Error saving card: {e}")
+
+        # Update deck with source documents info
+        try:
+            await service.query(
+                """
+                UPDATE flashcard_deck
+                SET source_documents = $source_docs,
+                    card_types = $card_types
+                WHERE id = type::thing('flashcard_deck', $deck_id)
+                """,
+                {
+                    "deck_id": deck_record_id,
+                    "source_docs": source_docs_info,
+                    "card_types": card_types
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Could not update deck metadata: {e}")
+
+        yield {
+            "status": "completed",
+            "message": f"Génération terminée: {saved_count} fiches créées",
+            "cards_generated": saved_count
+        }
+
+    def _split_content_into_chunks(self, content: str, chunk_size: int = 5000) -> List[str]:
+        """
+        Split content into chunks of approximately chunk_size characters.
+
+        Tries to split at paragraph boundaries to maintain context.
+
+        Args:
+            content: The full content to split
+            chunk_size: Target size for each chunk
+
+        Returns:
+            List of content chunks
+        """
+        if len(content) <= chunk_size:
+            return [content]
+
+        chunks = []
+        current_pos = 0
+
+        while current_pos < len(content):
+            # Find the end position for this chunk
+            end_pos = min(current_pos + chunk_size, len(content))
+
+            if end_pos < len(content):
+                # Try to find a good break point (paragraph or sentence)
+                # Look for double newline (paragraph break)
+                break_pos = content.rfind("\n\n", current_pos, end_pos)
+
+                if break_pos == -1 or break_pos <= current_pos:
+                    # Try single newline
+                    break_pos = content.rfind("\n", current_pos, end_pos)
+
+                if break_pos == -1 or break_pos <= current_pos:
+                    # Try period followed by space
+                    break_pos = content.rfind(". ", current_pos, end_pos)
+                    if break_pos != -1:
+                        break_pos += 1  # Include the period
+
+                if break_pos != -1 and break_pos > current_pos:
+                    end_pos = break_pos
+
+            chunk = content[current_pos:end_pos].strip()
+            if chunk:
+                chunks.append(chunk)
+
+            current_pos = end_pos
+
+        return chunks if chunks else [content]
 
     async def _call_ollama_direct(
         self,
