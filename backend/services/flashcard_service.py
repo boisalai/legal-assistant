@@ -23,28 +23,30 @@ from services.tts_service import TTSService
 logger = logging.getLogger(__name__)
 
 
-# Prompt template for flashcard generation - simplified for better JSON compliance
-FLASHCARD_GENERATION_PROMPT = """Génère exactement {card_count} fiches de révision en JSON pour un étudiant en droit.
+# Prompt template for flashcard generation - optimized for local models
+FLASHCARD_GENERATION_PROMPT = """Tu dois générer exactement {card_count} fiches de révision en JSON.
 
-FORMAT JSON REQUIS (copie exactement cette structure):
-{{"cards": [{{"card_type": "definition", "front": "Question", "back": "Réponse"}}]}}
+IMPORTANT: Tu dois retourner un objet JSON avec une clé "cards" contenant un tableau de {card_count} fiches.
 
-Types possibles: {card_types}
+Exemple de format attendu (avec 3 fiches):
+{{"cards": [
+  {{"card_type": "definition", "front": "Question 1?", "back": "Réponse 1"}},
+  {{"card_type": "concept", "front": "Question 2?", "back": "Réponse 2"}},
+  {{"card_type": "definition", "front": "Question 3?", "back": "Réponse 3"}}
+]}}
 
-Règles:
-- definition: terme juridique → définition
-- concept: question sur conditions/éléments → explication
-- case: jurisprudence → ratio decidendi
-- question: question analytique → réponse argumentée
+Types de fiches: {card_types}
 
-CONTENU SOURCE:
+Contenu source (résumé):
 {content}
 
-INSTRUCTIONS:
-- front = question courte et claire
-- back = réponse en 1-3 phrases maximum
-- Réponds UNIQUEMENT avec le JSON
-- Commence par {{ et termine par }}
+RÈGLES STRICTES:
+1. Génère EXACTEMENT {card_count} fiches, pas plus, pas moins
+2. Chaque fiche DOIT avoir: card_type, front (question), back (réponse)
+3. front = question claire et concise
+4. back = réponse en 1-2 phrases
+5. Réponds UNIQUEMENT avec le JSON, rien d'autre
+6. Le JSON doit commencer par {{ et finir par }}
 
 JSON:"""
 
@@ -188,13 +190,24 @@ class FlashcardService:
             }
             return
 
-        # Combine all content
-        combined_content = "\n\n---\n\n".join(all_content)
+        # Combine all content - limit per document to ensure total stays manageable
+        # For small models like qwen2.5:7b, we need to keep content short
+        max_per_doc = 4000 // len(all_content) if all_content else 4000
+        truncated_content = []
+        for content in all_content:
+            if len(content) > max_per_doc:
+                truncated_content.append(content[:max_per_doc] + "\n[...]")
+            else:
+                truncated_content.append(content)
 
-        # Truncate if too long (keep ~15000 chars for context)
-        max_content_length = 15000
+        combined_content = "\n\n---\n\n".join(truncated_content)
+
+        # Final safety check - keep under 6000 chars for reliable generation
+        max_content_length = 6000
         if len(combined_content) > max_content_length:
             combined_content = combined_content[:max_content_length] + "\n\n[... contenu tronqué ...]"
+
+        logger.info(f"Combined content length: {len(combined_content)} chars")
 
         yield {
             "status": "generating",
@@ -354,6 +367,11 @@ class FlashcardService:
 
         logger.info(f"Calling Ollama directly: {model_id} (timeout={timeout}s)")
 
+        # Calculate num_predict based on card count (each card ~200 tokens)
+        num_predict = max(4000, card_count * 400)
+
+        logger.info(f"Ollama request: model={model_id}, num_predict={num_predict}, prompt_len={len(prompt)}")
+
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 "http://localhost:11434/api/generate",
@@ -362,8 +380,9 @@ class FlashcardService:
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.2,  # Low for consistent JSON
-                        "num_predict": 8000  # Enough for 10+ detailed cards
+                        "temperature": 0.3,  # Slightly higher for variety
+                        "num_predict": num_predict,
+                        "num_ctx": 8192  # Increase context window
                     }
                 }
             )
