@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   CheckCircle2,
@@ -89,15 +90,15 @@ export function SyncProgressModal({
   const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>
+    <AlertDialog open={open} onOpenChange={isComplete ? onOpenChange : undefined}>
+      <AlertDialogContent className="sm:max-w-[600px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>
             {!isComplete && "Synchronisation en cours..."}
             {isComplete && !hasError && "Synchronisation terminée"}
             {isComplete && hasError && "Erreur de synchronisation"}
-          </DialogTitle>
-          <DialogDescription>
+          </AlertDialogTitle>
+          <AlertDialogDescription>
             {!isComplete && `${completedTasks} sur ${totalTasks} tâches effectuées`}
             {isComplete && !hasError && result && (
               <>
@@ -110,8 +111,8 @@ export function SyncProgressModal({
               </>
             )}
             {isComplete && hasError && "Certaines tâches ont échoué"}
-          </DialogDescription>
-        </DialogHeader>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
         {/* Progress bar */}
         {!isComplete && (
@@ -165,16 +166,18 @@ export function SyncProgressModal({
 
         {/* Footer */}
         {isComplete && (
-          <div className="flex justify-end gap-2">
+          <AlertDialogFooter>
             {autoClose && (
-              <p className="text-sm text-muted-foreground mr-auto">
+              <p className="text-sm text-muted-foreground mr-auto self-center">
                 Fermeture automatique...
               </p>
             )}
-            <Button onClick={() => onOpenChange(false)}>Fermer</Button>
-          </div>
+            <AlertDialogAction onClick={() => onOpenChange(false)}>
+              Fermer
+            </AlertDialogAction>
+          </AlertDialogFooter>
         )}
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

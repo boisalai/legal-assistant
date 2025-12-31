@@ -506,6 +506,8 @@
     "cardCount": "Nombre de fiches",
     "cardCountMin": "10 (rapide)",
     "cardCountMax": "100 (exhaustif)",
+    "generateAudio": "Générer un audio récapitulatif",
+    "generateAudioDesc": "Crée un fichier audio présentant toutes les questions avec leurs réponses (ex: « Question 1 : ... Réponse : ... »)",
     "createAndGenerate": "Créer et générer",
     "creating": "Création du jeu...",
     "generating": "Génération en cours...",
@@ -541,7 +543,8 @@
     "loadError": "Erreur lors du chargement de la session",
     "reviewError": "Erreur lors de la révision",
     "audioError": "Erreur de lecture audio",
-    "ttsError": "Erreur lors de la génération audio"
+    "ttsError": "Erreur lors de la génération audio",
+    "listenSummary": "Écouter l'audio récapitulatif"
   },
   "table": {
     "filterByName": "Filtrer par nom...",

@@ -1164,6 +1164,7 @@ export const flashcardsApi = {
       source_document_ids: string[];
       card_types?: CardType[];
       card_count?: number;
+      generate_audio?: boolean;
     }
   ): Promise<FlashcardDeck> {
     const cleanId = courseId.replace("course:", "");
@@ -1310,6 +1311,12 @@ export const flashcardsApi = {
   getAudioUrl(cardId: string, side: "front" | "back"): string {
     const cleanId = cardId.replace("flashcard:", "");
     return `${API_BASE_URL}/api/flashcards/${cleanId}/audio/${side}`;
+  },
+
+  // Get summary audio URL for a deck
+  getSummaryAudioUrl(deckId: string): string {
+    const cleanId = deckId.replace("flashcard_deck:", "");
+    return `${API_BASE_URL}/api/flashcard-decks/${cleanId}/summary-audio`;
   },
 };
 

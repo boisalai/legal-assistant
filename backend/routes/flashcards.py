@@ -139,6 +139,10 @@ def format_deck_response(deck: dict, stats: dict) -> FlashcardDeckResponse:
     if hasattr(deck_id, "__str__"):
         deck_id = str(deck_id)
 
+    # Check if summary audio exists
+    summary_audio_path = deck.get("summary_audio_path")
+    has_summary_audio = bool(summary_audio_path)
+
     return FlashcardDeckResponse(
         id=deck_id,
         course_id=str(deck.get("course_id", "")),
@@ -151,7 +155,8 @@ def format_deck_response(deck: dict, stats: dict) -> FlashcardDeckResponse:
         new_cards=stats.get("new_cards", 0),
         progress_percent=stats.get("progress_percent", 0.0),
         created_at=created_at,
-        last_studied=last_studied
+        last_studied=last_studied,
+        has_summary_audio=has_summary_audio
     )
 
 
@@ -258,6 +263,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
         "source_documents": source_documents,
         "card_types": [ct.value for ct in request.card_types],
         "card_count_requested": request.card_count,
+        "generate_audio": request.generate_audio,
         "created_at": now.isoformat(),
         "last_studied": None
     }
@@ -648,11 +654,12 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
         audio_path = os.path.join(temp_dir, audio_filename)
 
         # Générer l'audio
-        tts_result = await tts_service.synthesize(
+        tts_result = await tts_service.text_to_speech(
             text=text,
             output_path=audio_path,
             voice=request.voice,
-            language="fr"
+            language="fr",
+            clean_markdown=False  # Le texte des flashcards n'est pas du markdown
         )
 
         if not tts_result.success:
@@ -714,6 +721,45 @@ async def get_flashcard_audio(card_id: str, side: str):
     )
 
 
+@router.get(
+    "/api/flashcard-decks/{deck_id}/summary-audio",
+    summary="Récupérer l'audio récapitulatif d'un deck"
+)
+async def get_deck_summary_audio(deck_id: str):
+    """Retourne le fichier audio récapitulatif d'un deck (toutes les Q&R)."""
+    service = get_surreal_service()
+
+    deck = await get_deck_by_id(service, deck_id)
+    if not deck:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Deck non trouvé: {deck_id}"
+        )
+
+    audio_path = deck.get("summary_audio_path")
+    if not audio_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucun audio récapitulatif généré pour ce deck"
+        )
+
+    import os
+    if not os.path.exists(audio_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier audio non trouvé sur le serveur"
+        )
+
+    deck_name = deck.get("name", "revision")
+    safe_name = deck_name.replace(" ", "_")[:30]
+
+    return FileResponse(
+        audio_path,
+        media_type="audio/mpeg",
+        filename=f"{safe_name}_revision.mp3"
+    )
+
+
 # ============================================================================
 # Generation Endpoint
 # ============================================================================
@@ -748,6 +794,9 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
     source_docs = deck.get("source_documents", [])
     card_types = deck.get("card_types", ["definition", "concept", "case", "question"])
     card_count = deck.get("card_count_requested", 50)
+    generate_audio = deck.get("generate_audio", False)
+    deck_name = deck.get("name", "Révision")
+    course_id = deck.get("course_id", "")
 
     # Si pas de source_documents, récupérer depuis la création
     if not source_docs:
@@ -774,6 +823,8 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
     async def event_stream():
         """Generate SSE events for progress updates."""
         flashcard_service = get_flashcard_service()
+        generation_success = False
+        cards_generated = 0
 
         try:
             async for update in flashcard_service.generate_flashcards(
@@ -784,6 +835,31 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
                 model_id=model_id
             ):
                 yield f"data: {json.dumps(update)}\n\n"
+
+                # Track completion status
+                if update.get("status") == "completed":
+                    generation_success = True
+                    cards_generated = update.get("cards_generated", 0)
+
+            # Generate summary audio if requested and generation was successful
+            if generate_audio and generation_success and cards_generated > 0:
+                yield f"data: {json.dumps({'status': 'audio', 'message': 'Génération de l audio récapitulatif...'})}\n\n"
+
+                try:
+                    audio_path = await flashcard_service.generate_summary_audio(
+                        deck_id=deck_id,
+                        deck_name=deck_name,
+                        course_id=course_id
+                    )
+
+                    if audio_path:
+                        yield f"data: {json.dumps({'status': 'audio_complete', 'message': 'Audio récapitulatif généré', 'audio_path': audio_path})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'status': 'audio_error', 'message': 'Erreur lors de la génération audio'})}\n\n"
+
+                except Exception as audio_error:
+                    logger.error(f"Error generating summary audio: {audio_error}")
+                    yield f"data: {json.dumps({'status': 'audio_error', 'message': str(audio_error)})}\n\n"
 
         except Exception as e:
             logger.error(f"Error in generation stream: {e}")

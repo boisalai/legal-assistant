@@ -49,6 +49,7 @@ export default function CourseDetailPage() {
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
   const [createDeckModalOpen, setCreateDeckModalOpen] = useState(false);
   const [studyDeck, setStudyDeck] = useState<FlashcardDeck | null>(null);
+  const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
   const [assistantMessages, setAssistantMessages] = useState<Message[]>([
@@ -198,8 +199,8 @@ export default function CourseDetailPage() {
   };
 
   const handleFlashcardsUpdated = async () => {
-    // Refresh deck list by triggering re-render
-    await fetchCaseDetails();
+    // Refresh deck list by incrementing refresh key
+    setFlashcardsRefreshKey((prev) => prev + 1);
   };
 
   if (loading) {
@@ -336,6 +337,7 @@ export default function CourseDetailPage() {
                   isAnalyzing={isAnalyzing}
                   onStudyDeck={handleStudyDeck}
                   onCreateDeck={handleCreateDeck}
+                  flashcardsRefreshKey={flashcardsRefreshKey}
                 />
               )}
             </Panel>

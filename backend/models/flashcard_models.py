@@ -51,6 +51,7 @@ class FlashcardDeckCreate(BaseModel):
         default=[CardType.DEFINITION, CardType.CONCEPT, CardType.CASE, CardType.QUESTION]
     )
     card_count: int = Field(default=50, ge=5, le=200)
+    generate_audio: bool = Field(default=False, description="Générer un audio récapitulatif")
 
 
 class FlashcardDeckResponse(BaseModel):
@@ -67,6 +68,7 @@ class FlashcardDeckResponse(BaseModel):
     progress_percent: float = 0.0
     created_at: str
     last_studied: Optional[str] = None
+    has_summary_audio: bool = False
 
 
 class FlashcardDeckListResponse(BaseModel):

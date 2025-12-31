@@ -351,6 +351,7 @@ export interface FlashcardDeck {
   progress_percent: number;
   created_at: string;
   last_studied?: string;
+  has_summary_audio?: boolean;
 }
 
 export interface Flashcard {

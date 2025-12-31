@@ -30,6 +30,7 @@ import {
   Loader2,
   Sparkles,
   GraduationCap,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
@@ -40,6 +41,7 @@ interface FlashcardsSectionProps {
   documents: Document[];
   onStudyDeck: (deck: FlashcardDeck) => void;
   onCreateDeck: () => void;
+  refreshKey?: number;
 }
 
 export function FlashcardsSection({
@@ -47,6 +49,7 @@ export function FlashcardsSection({
   documents,
   onStudyDeck,
   onCreateDeck,
+  refreshKey,
 }: FlashcardsSectionProps) {
   const t = useTranslations("flashcards");
   const tCommon = useTranslations("common");
@@ -56,7 +59,7 @@ export function FlashcardsSection({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deckToDelete, setDeckToDelete] = useState<FlashcardDeck | null>(null);
 
-  // Fetch decks on mount
+  // Fetch decks on mount and when refreshKey changes
   useEffect(() => {
     const fetchDecks = async () => {
       try {
@@ -70,7 +73,7 @@ export function FlashcardsSection({
     };
 
     fetchDecks();
-  }, [courseId]);
+  }, [courseId, refreshKey]);
 
   const handleDeleteDeck = async () => {
     if (!deckToDelete) return;
@@ -220,6 +223,23 @@ export function FlashcardsSection({
                     <Play className="h-3 w-3" />
                     {deck.total_cards === 0 ? t("generateFirst") : t("study")}
                   </Button>
+                  {deck.has_summary_audio && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const audioUrl = flashcardsApi.getSummaryAudioUrl(deck.id);
+                        const audio = new Audio(audioUrl);
+                        audio.play().catch(() => {
+                          toast.error(t("audioError"));
+                        });
+                      }}
+                      title={t("listenSummary")}
+                    >
+                      <Headphones className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"

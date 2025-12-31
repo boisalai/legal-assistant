@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +28,7 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
@@ -56,7 +63,8 @@ export function CreateFlashcardDeckModal({
     "case",
     "question",
   ]);
-  const [cardCount, setCardCount] = useState(30);
+  const [cardCount, setCardCount] = useState(50);
+  const [generateAudio, setGenerateAudio] = useState(false);
 
   // Generation state
   const [isCreating, setIsCreating] = useState(false);
@@ -66,13 +74,19 @@ export function CreateFlashcardDeckModal({
   const [generationComplete, setGenerationComplete] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  // Filter markdown documents only
-  const markdownDocs = documents.filter(
-    (doc) =>
-      doc.filename?.endsWith(".md") ||
-      doc.filename?.endsWith(".markdown") ||
-      doc.filename?.endsWith(".txt")
-  );
+  // Filter markdown documents only and sort alphabetically
+  const markdownDocs = documents
+    .filter(
+      (doc) =>
+        doc.filename?.endsWith(".md") ||
+        doc.filename?.endsWith(".markdown") ||
+        doc.filename?.endsWith(".txt")
+    )
+    .sort((a, b) => {
+      const nameA = a.linked_source?.relative_path || a.filename || "";
+      const nameB = b.linked_source?.relative_path || b.filename || "";
+      return nameA.localeCompare(nameB, "fr", { sensitivity: "base" });
+    });
 
   // Reset state when modal opens
   useEffect(() => {
@@ -80,7 +94,8 @@ export function CreateFlashcardDeckModal({
       setName("");
       setSelectedDocIds([]);
       setSelectedCardTypes(["definition", "concept", "case", "question"]);
-      setCardCount(30);
+      setCardCount(50);
+      setGenerateAudio(false);
       setIsCreating(false);
       setIsGenerating(false);
       setGenerationProgress(null);
@@ -135,6 +150,7 @@ export function CreateFlashcardDeckModal({
         source_document_ids: selectedDocIds,
         card_types: selectedCardTypes,
         card_count: cardCount,
+        generate_audio: generateAudio,
       });
 
       toast.success(t("created"));
@@ -181,7 +197,7 @@ export function CreateFlashcardDeckModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
@@ -255,7 +271,7 @@ export function CreateFlashcardDeckModal({
 
         {/* Form */}
         {!isCreating && !isGenerating && !generationComplete && !generationError && (
-          <div className="space-y-6 py-4">
+          <div className="space-y-5 py-2 overflow-y-auto flex-1">
             {/* Deck name */}
             <div className="space-y-2">
               <Label htmlFor="deck-name">{t("setName")}</Label>
@@ -315,57 +331,67 @@ export function CreateFlashcardDeckModal({
             {/* Card types */}
             <div className="space-y-2">
               <Label>{t("cardTypes")}</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                 {CARD_TYPE_KEYS.map((typeKey) => (
                   <label
                     key={typeKey}
-                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCardTypes.includes(typeKey)
-                        ? "border-primary bg-primary/5"
-                        : "hover:bg-muted/50"
-                    }`}
+                    className="flex items-center gap-2 cursor-pointer hover:text-foreground"
                   >
                     <Checkbox
                       checked={selectedCardTypes.includes(typeKey)}
                       onCheckedChange={() => handleCardTypeToggle(typeKey)}
-                      className="mt-0.5"
                     />
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium">{t(`types.${typeKey}`)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t(`types.${typeKey}Desc`)}
-                      </p>
-                    </div>
+                    <span className="text-sm">{t(`types.${typeKey}`)}</span>
                   </label>
                 ))}
               </div>
             </div>
 
             {/* Card count */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>{t("cardCount")}</Label>
-                <span className="text-sm font-medium">{cardCount}</span>
-              </div>
-              <Slider
-                value={[cardCount]}
-                onValueChange={(v) => setCardCount(v[0])}
-                min={10}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{t("cardCountMin")}</span>
-                <span>{t("cardCountMax")}</span>
-              </div>
+            <div className="space-y-2">
+              <Label>{t("cardCount")}</Label>
+              <Select
+                value={cardCount.toString()}
+                onValueChange={(v) => setCardCount(parseInt(v, 10))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 fiches</SelectItem>
+                  <SelectItem value="20">20 fiches</SelectItem>
+                  <SelectItem value="50">50 fiches</SelectItem>
+                  <SelectItem value="100">100 fiches</SelectItem>
+                  <SelectItem value="200">200 fiches</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Generate audio option */}
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  checked={generateAudio}
+                  onCheckedChange={(checked) => setGenerateAudio(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t("generateAudio")}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("generateAudioDesc")}
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
         )}
 
         {/* Footer */}
         {!isCreating && !isGenerating && !generationComplete && !generationError && (
-          <DialogFooter>
+          <DialogFooter className="shrink-0 pt-4 border-t mt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               {tCommon("cancel")}
             </Button>
