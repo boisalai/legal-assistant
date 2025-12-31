@@ -300,15 +300,15 @@ export function FlashcardStudyPanel({
                 >
                   {/* Front */}
                   <div
-                    className="bg-card border rounded-xl p-8 min-h-[300px] flex flex-col backface-hidden"
+                    className="bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden"
                     style={{ backfaceVisibility: "hidden" }}
                   >
-                    <div className="flex-1 flex items-center justify-center">
+                    <div className="flex-1 flex items-center justify-center overflow-auto py-2">
                       <p className="text-xl text-center leading-relaxed">
                         {currentCard?.front}
                       </p>
                     </div>
-                    <div className="flex justify-center pt-4 border-t mt-4">
+                    <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -324,31 +324,31 @@ export function FlashcardStudyPanel({
                           <Volume2 className="h-4 w-4" />
                         )}
                       </Button>
+                      <p className="text-center text-xs text-muted-foreground mt-1">
+                        {t("clickToFlip")}
+                      </p>
                     </div>
-                    <p className="text-center text-xs text-muted-foreground mt-2">
-                      {t("clickToFlip")}
-                    </p>
                   </div>
 
                   {/* Back */}
                   <div
-                    className="absolute inset-0 bg-card border rounded-xl p-8 min-h-[300px] flex flex-col backface-hidden rotate-y-180"
+                    className="absolute inset-0 bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden rotate-y-180"
                     style={{
                       backfaceVisibility: "hidden",
                       transform: "rotateY(180deg)",
                     }}
                   >
-                    <div className="flex-1 flex items-center justify-center">
+                    <div className="flex-1 flex items-center justify-center overflow-auto py-2">
                       <p className="text-lg text-center leading-relaxed whitespace-pre-wrap">
                         {currentCard?.back}
                       </p>
                     </div>
-                    {currentCard?.source_location && (
-                      <p className="text-xs text-muted-foreground text-center mt-4 pt-4 border-t">
-                        {t("source")}: {currentCard.source_location}
-                      </p>
-                    )}
-                    <div className="flex justify-center pt-2">
+                    <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
+                      {currentCard?.source_location && (
+                        <p className="text-xs text-muted-foreground text-center mb-2">
+                          {t("source")}: {currentCard.source_location}
+                        </p>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

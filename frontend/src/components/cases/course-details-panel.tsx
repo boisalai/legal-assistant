@@ -70,6 +70,7 @@ interface CaseDetailsPanelProps {
   // Flashcard props
   onStudyDeck?: (deck: FlashcardDeck) => void;
   onCreateDeck?: () => void;
+  flashcardsRefreshKey?: number;
 }
 
 export function CaseDetailsPanel({
@@ -91,6 +92,7 @@ export function CaseDetailsPanel({
   isAnalyzing,
   onStudyDeck,
   onCreateDeck,
+  flashcardsRefreshKey,
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
@@ -601,6 +603,7 @@ export function CaseDetailsPanel({
             documents={documents}
             onStudyDeck={onStudyDeck}
             onCreateDeck={onCreateDeck}
+            refreshKey={flashcardsRefreshKey}
           />
         </div>
       )}

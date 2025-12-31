@@ -437,6 +437,8 @@
     "cardCount": "Number of cards",
     "cardCountMin": "10 (quick)",
     "cardCountMax": "100 (comprehensive)",
+    "generateAudio": "Generate summary audio",
+    "generateAudioDesc": "Creates an audio file presenting all questions with their answers (e.g.: \"Question 1: ... Answer: ...\")",
     "createAndGenerate": "Create and generate",
     "creating": "Creating set...",
     "generating": "Generating...",
@@ -472,7 +474,8 @@
     "loadError": "Error loading session",
     "reviewError": "Error during review",
     "audioError": "Audio playback error",
-    "ttsError": "Error generating audio"
+    "ttsError": "Error generating audio",
+    "listenSummary": "Listen to summary audio"
   },
   "table": {
     "filterByName": "Filter by name...",
