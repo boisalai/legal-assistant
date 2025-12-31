@@ -483,6 +483,10 @@
     "createTitle": "Créer un jeu de révision",
     "createDescription": "Générez des fiches de révision à partir de vos documents de cours.",
     "setName": "Nom du jeu",
+    "columns": {
+      "docs": "# docs",
+      "cards": "# fiches"
+    },
     "setNamePlaceholder": "Ex: Révision Module 1-4 (Intra)",
     "setNameRequired": "Veuillez entrer un nom pour le jeu",
     "sourceDocuments": "Documents sources",
@@ -529,6 +533,7 @@
       "easy": "Facile"
     },
     "status": {
+      "label": "Statut",
       "empty": "Vide",
       "mastered": "Maîtrisé",
       "inProgress": "En cours",

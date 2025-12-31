@@ -414,6 +414,10 @@
     "createTitle": "Create a flashcard set",
     "createDescription": "Generate flashcards from your course documents.",
     "setName": "Set name",
+    "columns": {
+      "docs": "# docs",
+      "cards": "# cards"
+    },
     "setNamePlaceholder": "E.g.: Review Modules 1-4 (Midterm)",
     "setNameRequired": "Please enter a name for the set",
     "sourceDocuments": "Source documents",
@@ -460,6 +464,7 @@
       "easy": "Easy"
     },
     "status": {
+      "label": "Status",
       "empty": "Empty",
       "mastered": "Mastered",
       "inProgress": "In progress",
