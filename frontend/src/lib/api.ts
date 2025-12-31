@@ -39,6 +39,16 @@ async function fetchApi<T>(
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - clear invalid token and redirect to login
+    if (response.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("auth_token");
+      // Redirect to login if not already on login/auth pages
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith("/login") && !currentPath.startsWith("/register") && !currentPath.startsWith("/reset-password")) {
+        window.location.href = "/login";
+        return new Promise(() => {}) as Promise<T>; // Never resolves, page is redirecting
+      }
+    }
     const error = await response.json().catch(() => ({ detail: "Unknown error" }));
     throw new Error(error.detail || error.error?.message || `HTTP ${response.status}`);
   }

@@ -40,24 +40,10 @@ export function LinkedDirectoriesSection({
 
   // Group documents by link_id
   const linkedDirectories = useMemo(() => {
-    console.log("LinkedDirectoriesSection: Grouping documents", {
-      totalDocs: documents.length,
-      sampleDoc: documents[0]
-    });
-
     const byLinkId = new Map<string, LinkedDirectory>();
 
     documents.forEach((doc) => {
-      console.log("Processing doc:", {
-        id: doc.id,
-        name: doc.filename,
-        source_type: doc.source_type,
-        has_linked_source: !!doc.linked_source,
-        linked_source: doc.linked_source
-      });
-
       if (doc.source_type !== "linked" || !doc.linked_source) {
-        console.log("Skipping doc (not linked or no linked_source):", doc.id);
         return;
       }
 
@@ -88,13 +74,7 @@ export function LinkedDirectoriesSection({
       dir.totalSize += doc.size || 0;
     });
 
-    const result = Array.from(byLinkId.values());
-    console.log("LinkedDirectoriesSection: Final result", {
-      directoriesCount: result.length,
-      directories: result
-    });
-
-    return result;
+    return Array.from(byLinkId.values());
   }, [documents]);
 
   // View directory tree
@@ -130,17 +110,9 @@ export function LinkedDirectoriesSection({
     }
   };
 
-  console.log("LinkedDirectoriesSection: About to render", {
-    linkedDirectoriesCount: linkedDirectories.length,
-    willReturnNull: linkedDirectories.length === 0
-  });
-
   if (linkedDirectories.length === 0) {
-    console.log("❌ LinkedDirectoriesSection: Returning null (no directories)");
     return null;
   }
-
-  console.log("✅ LinkedDirectoriesSection: Rendering card with", linkedDirectories.length, "directories");
 
   return (
     <>

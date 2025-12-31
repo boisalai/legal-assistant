@@ -111,8 +111,7 @@ export function LinkDirectoryModal({
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log("Nettoyage effectué:", result);
+        await response.json();
       }
     } catch (err) {
       console.error("Erreur lors du nettoyage:", err);

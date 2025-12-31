@@ -82,7 +82,6 @@ export default function AdminDatabasePage() {
       const data = await adminApi.database.getTableData(table.name, {
         limit: 50,
       });
-      console.log(`📊 Data for table ${table.name}:`, data);
       setTableData(data.rows);
     } catch (err: any) {
       console.error("Error fetching table data:", err);
@@ -219,7 +218,6 @@ export default function AdminDatabasePage() {
       setLoading(true);
       setError(null);
       const data = await adminApi.database.listTables();
-      console.log("📊 Tables data received:", data);
       // Add id field for DataTable compatibility
       const tablesWithId = data.map((table) => ({
         ...table,

@@ -75,19 +75,15 @@ export function AppSidebar() {
     const fetchUserInfo = async () => {
       try {
         const user = await authApi.getCurrentUser();
-        console.log("🔍 AppSidebar: User received:", user);
-        console.log("🔍 AppSidebar: User role:", user.role);
         setUserName(`${user.prenom} ${user.nom}`.trim() || "User");
         setUserEmail(user.email || "user@example.com");
         setIsAdmin(user.role === "admin");
-        console.log("✅ AppSidebar: isAdmin set to:", user.role === "admin");
-      } catch (error) {
-        console.error("❌ AppSidebar: Error fetching user:", error);
-        // Keep default values
+      } catch {
+        // Token was invalid or expired - this is expected behavior
+        // The token has been cleared by fetchApi, just keep default values
       }
     };
     if (authApi.isAuthenticated()) {
-      console.log("🔍 AppSidebar: User is authenticated");
       fetchUserInfo();
     }
   }, []);

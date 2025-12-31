@@ -608,26 +608,8 @@ export function CaseDetailsPanel({
       {/* Répertoires liés */}
       {(() => {
         const linkedDocs = documents.filter((doc) => doc.source_type === "linked");
-        const docusaurusDocs = documents.filter((doc) => doc.source_type === "docusaurus");
-
-        // Debug: afficher les source_types trouvés
-        console.log("Documents source types:", {
-          linked: linkedDocs.length,
-          docusaurus: docusaurusDocs.length,
-          total: documents.length,
-          allSourceTypes: documents.map(d => d.source_type)
-        });
-
-        console.log("LinkedDirectoriesSection condition check:", {
-          hasLinkedDocs: linkedDocs.length > 0,
-          linkedDocsCount: linkedDocs.length,
-          hasOnDocumentsChange: !!onDocumentsChange,
-          onDocumentsChangeType: typeof onDocumentsChange,
-          willRender: linkedDocs.length > 0 && !!onDocumentsChange
-        });
 
         if (linkedDocs.length > 0 && onDocumentsChange) {
-          console.log("✅ Rendering LinkedDirectoriesSection with", linkedDocs.length, "documents");
           return (
             <div className="mb-4">
               <LinkedDirectoriesSection
@@ -639,7 +621,6 @@ export function CaseDetailsPanel({
             </div>
           );
         }
-        console.log("❌ NOT rendering LinkedDirectoriesSection");
         return null;
       })()}
 
