@@ -78,7 +78,7 @@ export function FlashcardsSection({
     try {
       await flashcardsApi.deleteDeck(deckToDelete.id);
       setDecks((prev) => prev.filter((d) => d.id !== deckToDelete.id));
-      toast.success("Deck supprimé");
+      toast.success("Jeu supprimé");
     } catch (error) {
       toast.error("Erreur lors de la suppression");
     } finally {
@@ -141,7 +141,7 @@ export function FlashcardsSection({
           className="gap-1"
         >
           <Plus className="h-3 w-3" />
-          Nouveau deck
+          Nouveau jeu
         </Button>
       </div>
 
@@ -158,11 +158,11 @@ export function FlashcardsSection({
           <CardContent className="flex flex-col items-center justify-center py-8 text-center">
             <BookOpen className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-3">
-              Aucun deck de révision pour ce cours.
+              Aucun jeu de révision pour ce cours.
             </p>
             <Button size="sm" onClick={onCreateDeck} className="gap-1">
               <Sparkles className="h-3 w-3" />
-              Créer mon premier deck
+              Créer mon premier jeu
             </Button>
           </CardContent>
         </Card>
@@ -245,9 +245,9 @@ export function FlashcardsSection({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce deck ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer ce jeu ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le deck « {deckToDelete?.name} » et toutes ses fiches seront
+              Le jeu « {deckToDelete?.name} » et toutes ses fiches seront
               définitivement supprimés.
             </AlertDialogDescription>
           </AlertDialogHeader>
