@@ -200,7 +200,7 @@ export function FlashcardStudyPanel({
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
           <BookOpen className="h-16 w-16 text-muted-foreground" />
           <p className="text-muted-foreground text-center">
-            Aucune fiche à réviser dans ce deck.
+            Aucune fiche à réviser dans ce jeu.
           </p>
           <Button onClick={onClose}>Retour</Button>
         </div>

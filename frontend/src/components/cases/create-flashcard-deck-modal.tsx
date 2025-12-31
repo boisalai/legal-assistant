@@ -133,7 +133,7 @@ export function CreateFlashcardDeckModal({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      toast.error("Veuillez entrer un nom pour le deck");
+      toast.error("Veuillez entrer un nom pour le jeu");
       return;
     }
     if (selectedDocIds.length === 0) {
@@ -157,7 +157,7 @@ export function CreateFlashcardDeckModal({
         card_count: cardCount,
       });
 
-      toast.success("Deck créé, génération des fiches...");
+      toast.success("Jeu créé, génération des fiches...");
 
       // Step 2: Generate flashcards
       setIsCreating(false);
@@ -207,7 +207,7 @@ export function CreateFlashcardDeckModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
-            Créer un deck de révision
+            Créer un jeu de révision
           </DialogTitle>
           <DialogDescription>
             Générez des fiches de révision à partir de vos documents de cours.
@@ -223,7 +223,7 @@ export function CreateFlashcardDeckModal({
             <div className="text-center space-y-2">
               <p className="font-medium">
                 {isCreating
-                  ? "Création du deck..."
+                  ? "Création du jeu..."
                   : generationProgress?.message || "Génération en cours..."}
               </p>
               {generationProgress && (
@@ -280,7 +280,7 @@ export function CreateFlashcardDeckModal({
           <div className="space-y-6 py-4">
             {/* Deck name */}
             <div className="space-y-2">
-              <Label htmlFor="deck-name">Nom du deck</Label>
+              <Label htmlFor="deck-name">Nom du jeu</Label>
               <Input
                 id="deck-name"
                 placeholder="Ex: Révision Module 1-4 (Intra)"
