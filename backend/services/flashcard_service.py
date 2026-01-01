@@ -221,8 +221,9 @@ class FlashcardService:
 
         logger.info(f"Content split into {total_chunks} chunks")
 
-        # Calculate cards per chunk (minimum 3 per chunk for quality)
-        cards_per_chunk = max(3, min(10, card_count // max(1, total_chunks)))
+        # Calculate cards per chunk (minimum 3, max 20 per chunk for quality)
+        # Max increased to 20 to allow better coverage with powerful models like Claude
+        cards_per_chunk = max(3, min(20, card_count // max(1, total_chunks)))
 
         # Calculate how many chunks we actually need
         chunks_needed = min(total_chunks, (card_count + cards_per_chunk - 1) // cards_per_chunk)
