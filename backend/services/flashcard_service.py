@@ -4,10 +4,14 @@ Flashcard Generation Service for Legal Assistant.
 Generates flashcards from course documents using LLM.
 """
 
+import asyncio
 import json
 import logging
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +53,20 @@ RÈGLES STRICTES:
 6. Le JSON doit commencer par {{ et finir par }}
 
 JSON:"""
+
+
+# French voices for alternating in summary audio (avoiding monotony)
+# Using a mix of Canadian, French, Belgian and Swiss voices
+FRENCH_VOICES_FOR_ALTERNATING = [
+    "fr-CA-SylvieNeural",      # Female - Canada
+    "fr-CA-ThierryNeural",     # Male - Canada
+    "fr-CA-AntoineNeural",     # Male - Canada
+    "fr-FR-DeniseNeural",      # Female - France
+    "fr-FR-HenriNeural",       # Male - France
+    "fr-BE-CharlineNeural",    # Female - Belgium
+    "fr-CH-ArianeNeural",      # Female - Switzerland
+    "fr-FR-EloiseNeural",      # Female - France
+]
 
 
 class FlashcardService:
@@ -628,10 +646,12 @@ class FlashcardService:
         course_id: str
     ) -> Optional[str]:
         """
-        Generate a summary audio file for all cards in a deck.
+        Generate a summary audio file for all cards in a deck with alternating voices.
 
         The audio presents all questions with their answers in format:
         "Question 1 : [front] Réponse : [back]. Question 2 : ..."
+
+        Each question uses a different voice from the pool to avoid monotony.
 
         Args:
             deck_id: ID of the deck
@@ -641,6 +661,7 @@ class FlashcardService:
         Returns:
             Path to the generated audio file, or None on error
         """
+        temp_dir = None
         try:
             service = get_surreal_service()
 
@@ -662,21 +683,7 @@ class FlashcardService:
                 logger.warning(f"No cards found for deck {deck_id}")
                 return None
 
-            # Build the script text
-            script_parts = [f"Révision du jeu : {deck_name}.\n\n"]
-
-            for i, card in enumerate(result, 1):
-                front = card.get("front", "").strip()
-                back = card.get("back", "").strip()
-
-                if front and back:
-                    script_parts.append(f"Question {i} : {front}\n")
-                    script_parts.append(f"Réponse : {back}\n\n")
-
-            script_parts.append("Fin de la révision.")
-            script_text = "".join(script_parts)
-
-            logger.info(f"Generated script with {len(result)} questions ({len(script_text)} chars)")
+            logger.info(f"Generating summary audio for {len(result)} cards with alternating voices")
 
             # Generate audio using TTS service
             tts_service = TTSService()
@@ -688,23 +695,116 @@ class FlashcardService:
             audio_dir = Path(settings.upload_dir) / "courses" / course_record_id / "flashcards"
             audio_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate filename
+            # Create temp directory for audio segments
+            temp_dir = tempfile.mkdtemp(prefix="flashcard_audio_")
+            segment_files = []
+
+            # Generate intro segment
+            intro_text = f"Révision du jeu : {deck_name}."
+            intro_path = os.path.join(temp_dir, "000_intro.mp3")
+            intro_result = await tts_service.text_to_speech(
+                text=intro_text,
+                output_path=intro_path,
+                voice=FRENCH_VOICES_FOR_ALTERNATING[0],
+                language="fr",
+                clean_markdown=False
+            )
+            if intro_result.success:
+                segment_files.append(intro_path)
+
+            # Generate audio segments for each Q&A with alternating voices
+            num_voices = len(FRENCH_VOICES_FOR_ALTERNATING)
+
+            for i, card in enumerate(result, 1):
+                front = card.get("front", "").strip()
+                back = card.get("back", "").strip()
+
+                if not front or not back:
+                    continue
+
+                # Select voice for this question (rotate through voices)
+                voice = FRENCH_VOICES_FOR_ALTERNATING[i % num_voices]
+
+                # Generate question segment
+                question_text = f"Question {i}. {front}"
+                question_path = os.path.join(temp_dir, f"{i:03d}_q.mp3")
+                q_result = await tts_service.text_to_speech(
+                    text=question_text,
+                    output_path=question_path,
+                    voice=voice,
+                    language="fr",
+                    clean_markdown=False
+                )
+                if q_result.success:
+                    segment_files.append(question_path)
+
+                # Generate answer segment (same voice for coherence)
+                answer_text = f"Réponse. {back}"
+                answer_path = os.path.join(temp_dir, f"{i:03d}_a.mp3")
+                a_result = await tts_service.text_to_speech(
+                    text=answer_text,
+                    output_path=answer_path,
+                    voice=voice,
+                    language="fr",
+                    clean_markdown=False
+                )
+                if a_result.success:
+                    segment_files.append(answer_path)
+
+            # Generate outro segment
+            outro_text = "Fin de la révision."
+            outro_path = os.path.join(temp_dir, "999_outro.mp3")
+            outro_result = await tts_service.text_to_speech(
+                text=outro_text,
+                output_path=outro_path,
+                voice=FRENCH_VOICES_FOR_ALTERNATING[0],
+                language="fr",
+                clean_markdown=False
+            )
+            if outro_result.success:
+                segment_files.append(outro_path)
+
+            if len(segment_files) < 2:
+                logger.error("Not enough audio segments generated")
+                return None
+
+            logger.info(f"Generated {len(segment_files)} audio segments, concatenating with ffmpeg")
+
+            # Create concat file for ffmpeg
+            concat_file = os.path.join(temp_dir, "concat.txt")
+            with open(concat_file, "w") as f:
+                for seg_file in segment_files:
+                    # Escape single quotes in path for ffmpeg
+                    escaped_path = seg_file.replace("'", "'\\''")
+                    f.write(f"file '{escaped_path}'\n")
+
+            # Generate final filename
             safe_name = re.sub(r'[^\w\s-]', '', deck_name).strip().replace(' ', '_')[:50]
             audio_filename = f"{deck_record_id}_{safe_name}_revision.mp3"
             audio_path = audio_dir / audio_filename
 
-            # Generate TTS
-            tts_result = await tts_service.text_to_speech(
-                text=script_text,
-                output_path=str(audio_path),
-                voice="fr-CA-SylvieNeural",  # Canadian French voice
-                language="fr",
-                clean_markdown=False  # Already plain text
-            )
+            # Concatenate with ffmpeg
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",  # Overwrite output
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c", "copy",  # Copy codec (no re-encoding)
+                str(audio_path)
+            ]
 
-            if not tts_result.success:
-                logger.error(f"TTS generation failed: {tts_result.error}")
+            proc = await asyncio.create_subprocess_exec(
+                *ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            stdout, stderr = await proc.communicate()
+
+            if proc.returncode != 0:
+                logger.error(f"ffmpeg concatenation failed: {stderr.decode()}")
                 return None
+
+            logger.info(f"Summary audio generated with alternating voices: {audio_path}")
 
             # Store audio path in deck
             await service.query(
@@ -719,8 +819,6 @@ class FlashcardService:
                 }
             )
 
-            logger.info(f"Summary audio generated: {audio_path}")
-
             # Create a document record for the audio file so it appears in the documents list
             await self._create_audio_document(
                 course_id=course_id,
@@ -734,6 +832,14 @@ class FlashcardService:
         except Exception as e:
             logger.error(f"Error generating summary audio: {e}", exc_info=True)
             return None
+
+        finally:
+            # Clean up temp directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up temp dir: {cleanup_error}")
 
     async def _create_audio_document(
         self,
