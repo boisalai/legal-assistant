@@ -36,6 +36,7 @@ class DocumentResponse(BaseModel):
     linked_source: Optional[Dict[str, Any]] = None
     docusaurus_source: Optional[DocusaurusSource] = None
     indexed: Optional[bool] = None
+    module_id: Optional[str] = None  # ID du module auquel ce document est assigné
 
 
 class DocumentListResponse(BaseModel):

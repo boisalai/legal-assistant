@@ -21,7 +21,14 @@ import {
   RefreshCw,
   FileText,
   Youtube,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +45,7 @@ import type { LinkedDirectory } from "./linked-directories-data-table";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
 import { FlashcardsSection } from "./flashcards-section";
+import { ModulesSection } from "./modules-section";
 import { SyncProgressModal, SyncTask, SyncResult } from "./sync-progress-modal";
 import { documentsApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -70,6 +78,7 @@ interface CaseDetailsPanelProps {
   // Flashcard props
   onStudyDeck?: (deck: FlashcardDeck) => void;
   onCreateDeck?: () => void;
+  onListenFlashcardAudio?: (deck: FlashcardDeck) => void;
   flashcardsRefreshKey?: number;
 }
 
@@ -92,6 +101,7 @@ export function CaseDetailsPanel({
   isAnalyzing,
   onStudyDeck,
   onCreateDeck,
+  onListenFlashcardAudio,
   flashcardsRefreshKey,
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
@@ -425,14 +435,25 @@ export function CaseDetailsPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Case Header */}
-      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold">
-            {caseData.course_code
-              ? `${caseData.course_code} ${caseData.title || "Sans titre"}`
-              : caseData.title || "Sans titre"}
-          </h2>
-        </div>
+      <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
+        <h2 className="text-xl font-bold">
+          {caseData.course_code
+            ? `${caseData.course_code} ${caseData.title || "Sans titre"}`
+            : caseData.title || "Sans titre"}
+        </h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit ? onEdit() : setIsEditing(true)}>
+              <Edit2 className="h-4 w-4 mr-2" />
+              {t("common.edit")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Contenu principal avec padding */}
@@ -537,63 +558,14 @@ export function CaseDetailsPanel({
           </div>
         )}
 
-        {/* Boutons d'action */}
-        <div className="flex items-center py-2 gap-2 flex-wrap">
-          <Button
-            size="sm"
-            onClick={() => onEdit ? onEdit() : setIsEditing(true)}
-            disabled={isEditing}
-            className="gap-2"
-          >
-            <Edit2 className="h-4 w-4" />
-            <span>{t("common.edit")}</span>
-          </Button>
-          <Button
-            size="sm"
-            onClick={onLinkFile}
-            className="gap-2"
-          >
-            <Folder className="h-4 w-4" />
-            <span>{t("courses.linkDirectory")}</span>
-          </Button>
-          <Button
-            size="sm"
-            onClick={onUploadDocuments}
-            className="gap-2"
-          >
-            <FileUp className="h-4 w-4" />
-            <span>{t("documents.addDocuments")}</span>
-          </Button>
-          <Button
-            size="sm"
-            onClick={onRecordAudio}
-            className="gap-2"
-          >
-            <Mic className="h-4 w-4" />
-            <span>{t("courses.recordAudio")}</span>
-          </Button>
-          <Button
-            size="sm"
-            onClick={onYouTubeImport}
-            className="gap-2"
-          >
-            <Youtube className="h-4 w-4" />
-            <span>{t("courses.youtube")}</span>
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleSyncDocuments}
-            disabled={syncModalOpen && !syncComplete}
-            className="gap-2"
-          >
-            {syncModalOpen && !syncComplete ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            <span>{t("courses.synchronize")}</span>
-          </Button>
-        </div>
+      {/* Section Modules */}
+      <div className="mb-4">
+        <ModulesSection
+          courseId={caseData.id}
+          documents={documents}
+          onDocumentsChange={onDocumentsChange}
+        />
+      </div>
 
       {/* Section Fiches de révision */}
       {onStudyDeck && onCreateDeck && (
@@ -603,36 +575,47 @@ export function CaseDetailsPanel({
             documents={documents}
             onStudyDeck={onStudyDeck}
             onCreateDeck={onCreateDeck}
+            onListenAudio={onListenFlashcardAudio}
             refreshKey={flashcardsRefreshKey}
           />
         </div>
       )}
 
       {/* Répertoires liés */}
-      {(() => {
-        const linkedDocs = documents.filter((doc) => doc.source_type === "linked");
-
-        if (linkedDocs.length > 0 && onDocumentsChange) {
-          return (
-            <div className="mb-4">
-              <LinkedDirectoriesSection
-                caseId={caseData.id}
-                documents={linkedDocs}
-                onDocumentsChange={onDocumentsChange}
-                onPreviewDirectory={onPreviewDirectory}
-              />
-            </div>
-          );
-        }
-        return null;
-      })()}
+      <div className="mb-4">
+        <LinkedDirectoriesSection
+          caseId={caseData.id}
+          documents={documents.filter((doc) => doc.source_type === "linked")}
+          onDocumentsChange={onDocumentsChange || (() => {})}
+          onPreviewDirectory={onPreviewDirectory}
+          onLinkDirectory={onLinkFile}
+          onSync={handleSyncDocuments}
+          isSyncing={syncModalOpen && !syncComplete}
+        />
+      </div>
 
       {/* Liste des documents */}
       <div className="space-y-2">
-        <h3 className="font-semibold text-sm flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          {t("documents.title")} ({documents.filter((doc) => doc.source_type !== "linked").length})
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-base flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            {t("documents.title")} ({documents.filter((doc) => doc.source_type !== "linked").length})
+          </h3>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={onUploadDocuments} className="gap-1">
+              <FileUp className="h-3 w-3" />
+              {t("documents.addDocuments")}
+            </Button>
+            <Button size="sm" onClick={onRecordAudio} className="gap-1">
+              <Mic className="h-3 w-3" />
+              {t("courses.recordAudio")}
+            </Button>
+            <Button size="sm" onClick={onYouTubeImport} className="gap-1">
+              <Youtube className="h-3 w-3" />
+              {t("courses.youtube")}
+            </Button>
+          </div>
+        </div>
 
         {/* DataTable with filters */}
         <DocumentsDataTable
@@ -716,7 +699,10 @@ export function CaseDetailsPanel({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-              <AlertDialogAction onClick={onDelete}>
+              <AlertDialogAction
+                onClick={onDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 {t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>

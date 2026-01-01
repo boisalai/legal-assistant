@@ -8,6 +8,7 @@ from .docusaurus import router as docusaurus_router
 from .activity import router as activity_router
 from .linked_directory import router as linked_directory_router
 from .flashcards import router as flashcards_router
+from .modules import router as modules_router
 
 __all__ = [
     "auth_router",
@@ -18,4 +19,5 @@ __all__ = [
     "activity_router",
     "linked_directory_router",
     "flashcards_router",
+    "modules_router",
 ]

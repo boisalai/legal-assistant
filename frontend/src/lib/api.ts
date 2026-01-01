@@ -1,7 +1,21 @@
 // API client for Legal Assistant
 // Handles communication with FastAPI backend
 
-import type { Course, AuthToken, User, Document, AnalysisResult, Checklist } from "@/types";
+import type {
+  Course,
+  AuthToken,
+  User,
+  Document,
+  AnalysisResult,
+  Checklist,
+  Module,
+  ModuleWithProgress,
+  ModuleListResponse,
+  ModuleListWithProgressResponse,
+  AutoDetectResponse,
+  ModuleCreate,
+  ModuleUpdate,
+} from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -1436,6 +1450,156 @@ export const linkedDirectoryApi = {
 };
 
 // ============================================
+// Modules API
+// ============================================
+
+export const modulesApi = {
+  // List modules for a course
+  async list(courseId: string): Promise<Module[]> {
+    const cleanId = courseId.replace("course:", "");
+    const response = await fetchApi<ModuleListResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/modules`
+    );
+    return response.modules;
+  },
+
+  // List modules with progress
+  async listWithProgress(courseId: string, userId?: string): Promise<ModuleListWithProgressResponse> {
+    const cleanId = courseId.replace("course:", "");
+    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return fetchApi<ModuleListWithProgressResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/modules/progress${params}`
+    );
+  },
+
+  // Get course progress summary
+  async getCourseProgress(courseId: string, userId?: string): Promise<ModuleListWithProgressResponse> {
+    const cleanId = courseId.replace("course:", "");
+    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return fetchApi<ModuleListWithProgressResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/progress${params}`
+    );
+  },
+
+  // Get a single module
+  async get(moduleId: string): Promise<Module> {
+    const cleanId = moduleId.replace("module:", "");
+    return fetchApi<Module>(`/api/modules/${encodeURIComponent(cleanId)}`);
+  },
+
+  // Get module with progress
+  async getWithProgress(moduleId: string, userId?: string): Promise<ModuleWithProgress> {
+    const cleanId = moduleId.replace("module:", "");
+    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return fetchApi<ModuleWithProgress>(
+      `/api/modules/${encodeURIComponent(cleanId)}/progress${params}`
+    );
+  },
+
+  // Create a new module
+  async create(courseId: string, data: ModuleCreate): Promise<Module> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<Module>(
+      `/api/courses/${encodeURIComponent(cleanId)}/modules`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  // Update a module
+  async update(moduleId: string, data: ModuleUpdate): Promise<Module> {
+    const cleanId = moduleId.replace("module:", "");
+    return fetchApi<Module>(
+      `/api/modules/${encodeURIComponent(cleanId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  // Delete a module
+  async delete(moduleId: string): Promise<void> {
+    const cleanId = moduleId.replace("module:", "");
+    await fetchApi<void>(`/api/modules/${encodeURIComponent(cleanId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Auto-detect modules from document names
+  async autoDetect(courseId: string): Promise<AutoDetectResponse> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<AutoDetectResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/modules/auto-detect`,
+      { method: "POST" }
+    );
+  },
+
+  // Create modules from auto-detection
+  async createFromDetection(
+    courseId: string,
+    assignDocuments: boolean = true
+  ): Promise<{ created_count: number; modules: Module[] }> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<{ created_count: number; modules: Module[] }>(
+      `/api/courses/${encodeURIComponent(cleanId)}/modules/from-detection`,
+      {
+        method: "POST",
+        body: JSON.stringify({ assign_documents: assignDocuments }),
+      }
+    );
+  },
+
+  // Get documents in a module
+  async getDocuments(moduleId: string): Promise<{ module_id: string; documents: Document[]; total: number }> {
+    const cleanId = moduleId.replace("module:", "");
+    return fetchApi<{ module_id: string; documents: Document[]; total: number }>(
+      `/api/modules/${encodeURIComponent(cleanId)}/documents`
+    );
+  },
+
+  // Assign documents to a module
+  async assignDocuments(
+    moduleId: string,
+    documentIds: string[]
+  ): Promise<{ module_id: string; assigned_count: number; document_ids: string[] }> {
+    const cleanId = moduleId.replace("module:", "");
+    return fetchApi<{ module_id: string; assigned_count: number; document_ids: string[] }>(
+      `/api/modules/${encodeURIComponent(cleanId)}/documents`,
+      {
+        method: "POST",
+        body: JSON.stringify({ document_ids: documentIds }),
+      }
+    );
+  },
+
+  // Unassign documents from a module
+  async unassignDocuments(
+    moduleId: string,
+    documentIds: string[]
+  ): Promise<{ module_id: string; unassigned_count: number; document_ids: string[] }> {
+    const cleanId = moduleId.replace("module:", "");
+    return fetchApi<{ module_id: string; unassigned_count: number; document_ids: string[] }>(
+      `/api/modules/${encodeURIComponent(cleanId)}/documents`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({ document_ids: documentIds }),
+      }
+    );
+  },
+
+  // Get unassigned documents in a course
+  async getUnassignedDocuments(courseId: string): Promise<{ documents: Document[]; total: number }> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<{ documents: Document[]; total: number }>(
+      `/api/courses/${encodeURIComponent(cleanId)}/documents/unassigned`
+    );
+  },
+};
+
+// ============================================
 // Export all APIs
 // ============================================
 
@@ -1451,6 +1615,7 @@ export const api = {
   docusaurus: docusaurusApi,
   linkedDirectory: linkedDirectoryApi,
   flashcards: flashcardsApi,
+  modules: modulesApi,
   // Backward compatibility
   cases: coursesApi,
 };
