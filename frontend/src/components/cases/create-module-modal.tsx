@@ -46,7 +46,6 @@ export function CreateModuleModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [orderIndex, setOrderIndex] = useState(0);
-  const [examWeight, setExamWeight] = useState<number | undefined>(undefined);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,7 +64,6 @@ export function CreateModuleModal({
         setName(module.name);
         setDescription(module.description || "");
         setOrderIndex(module.order_index);
-        setExamWeight(module.exam_weight);
         // Get documents assigned to this module
         const assignedDocs = documents.filter(
           (doc) => doc.module_id === module.id
@@ -75,7 +73,6 @@ export function CreateModuleModal({
         setName("");
         setDescription("");
         setOrderIndex(0);
-        setExamWeight(undefined);
         setSelectedDocIds([]);
       }
       setPendingFiles([]);
@@ -160,7 +157,6 @@ export function CreateModuleModal({
           name: name.trim(),
           description: description.trim() || undefined,
           order_index: orderIndex,
-          exam_weight: examWeight,
         });
 
         // Update document assignments
@@ -192,7 +188,6 @@ export function CreateModuleModal({
           name: name.trim(),
           description: description.trim() || undefined,
           order_index: orderIndex,
-          exam_weight: examWeight,
         });
 
         // Assign selected documents
@@ -272,45 +267,19 @@ export function CreateModuleModal({
             />
           </div>
 
-          {/* Order Index and Exam Weight */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="order-index">{t("orderIndex")}</Label>
-              <Input
-                id="order-index"
-                type="number"
-                min={0}
-                value={orderIndex}
-                onChange={(e) => setOrderIndex(parseInt(e.target.value) || 0)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("orderIndexHint")}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="exam-weight">{t("examWeight")}</Label>
-              <Input
-                id="exam-weight"
-                type="number"
-                min={0}
-                max={100}
-                step={5}
-                value={examWeight !== undefined ? examWeight * 100 : ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "") {
-                    setExamWeight(undefined);
-                  } else {
-                    setExamWeight(Math.min(100, Math.max(0, parseInt(val))) / 100);
-                  }
-                }}
-                placeholder="20"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("examWeightHint")}
-              </p>
-            </div>
+          {/* Order Index */}
+          <div className="space-y-2">
+            <Label htmlFor="order-index">{t("orderIndex")}</Label>
+            <Input
+              id="order-index"
+              type="number"
+              min={0}
+              value={orderIndex}
+              onChange={(e) => setOrderIndex(parseInt(e.target.value) || 0)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("orderIndexHint")}
+            </p>
           </div>
 
           {/* Document Assignment */}
