@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -44,7 +43,6 @@ export function CreateModuleModal({
   const tCommon = useTranslations("common");
 
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [orderIndex, setOrderIndex] = useState(0);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +60,6 @@ export function CreateModuleModal({
     if (open) {
       if (module) {
         setName(module.name);
-        setDescription(module.description || "");
         setOrderIndex(module.order_index);
         // Get documents assigned to this module
         const assignedDocs = documents.filter(
@@ -71,7 +68,6 @@ export function CreateModuleModal({
         setSelectedDocIds(assignedDocs.map((d) => d.id));
       } else {
         setName("");
-        setDescription("");
         setOrderIndex(0);
         setSelectedDocIds([]);
       }
@@ -173,7 +169,6 @@ export function CreateModuleModal({
         // Update existing module
         savedModule = await modulesApi.update(module.id, {
           name: name.trim(),
-          description: description.trim() || undefined,
           order_index: orderIndex,
         });
 
@@ -204,7 +199,6 @@ export function CreateModuleModal({
         // Create new module
         savedModule = await modulesApi.create(courseId, {
           name: name.trim(),
-          description: description.trim() || undefined,
           order_index: orderIndex,
         });
 
@@ -270,19 +264,6 @@ export function CreateModuleModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("namePlaceholder")}
-              className="focus-visible:ring-inset"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="module-description">{t("description")}</Label>
-            <Textarea
-              id="module-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("descriptionPlaceholder")}
-              rows={2}
               className="focus-visible:ring-inset"
             />
           </div>

@@ -112,7 +112,6 @@ async def bulk_create_modules(course_id: str, request: ModuleBulkCreateRequest):
         module_data = ModuleCreate(
             name=item.name,
             order_index=item.order_index,
-            description=item.description,
             exam_weight=item.exam_weight
         )
         try:

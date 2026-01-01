@@ -395,7 +395,6 @@ export interface Module {
   course_id: string;
   name: string;
   order_index: number;
-  description?: string;
   exam_weight?: number;
   created_at: string;
   updated_at?: string;
@@ -410,13 +409,11 @@ export interface ModuleListResponse {
 export interface ModuleCreate {
   name: string;
   order_index?: number;
-  description?: string;
   exam_weight?: number;
 }
 
 export interface ModuleUpdate {
   name?: string;
   order_index?: number;
-  description?: string;
   exam_weight?: number;
 }

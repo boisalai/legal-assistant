@@ -72,7 +72,6 @@ class ModuleService:
             "course_id": f"course:{course_record_id}",
             "name": data.name,
             "order_index": data.order_index,
-            "description": data.description,
             "exam_weight": data.exam_weight,
             "created_at": now,
             "updated_at": now,
@@ -185,8 +184,6 @@ class ModuleService:
             update_fields["name"] = data.name
         if data.order_index is not None:
             update_fields["order_index"] = data.order_index
-        if data.description is not None:
-            update_fields["description"] = data.description
         if data.exam_weight is not None:
             update_fields["exam_weight"] = data.exam_weight
 
