@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkedDirectoriesDataTable, type LinkedDirectory } from "./linked-directories-data-table";
-import { documentsApi } from "@/lib/api";
+import { linkedDirectoryApi } from "@/lib/api";
 import type { Document } from "@/types";
 
 interface LinkedDirectoriesSectionProps {
@@ -103,10 +103,8 @@ export function LinkedDirectoriesSection({
     setUnlinking(true);
 
     try {
-      // Delete all documents with this link_id
-      for (const doc of directoryToUnlink.documents) {
-        await documentsApi.delete(caseId, doc.id);
-      }
+      // Use dedicated backend endpoint to unlink all documents at once
+      await linkedDirectoryApi.unlink(caseId, directoryToUnlink.linkId);
 
       onDocumentsChange();
       setUnlinkDialogOpen(false);
@@ -145,13 +143,11 @@ export function LinkedDirectoriesSection({
             )}
           </div>
         </div>
-        {linkedDirectories.length > 0 && (
-          <LinkedDirectoriesDataTable
-            directories={linkedDirectories}
-            onViewTree={handleViewTree}
-            onUnlink={handleUnlinkClick}
-          />
-        )}
+        <LinkedDirectoriesDataTable
+          directories={linkedDirectories}
+          onViewTree={handleViewTree}
+          onUnlink={handleUnlinkClick}
+        />
       </div>
 
       {/* Unlink confirmation dialog */}
@@ -160,10 +156,10 @@ export function LinkedDirectoriesSection({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("courses.unlinkDirectory")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("courses.unlinkWarning", { count: directoryToUnlink?.totalFiles || 0 })}
-              <span className="font-mono text-xs block p-2 bg-muted rounded mt-2">
-                {directoryToUnlink?.basePath}
-              </span>
+              {t("courses.unlinkWarning", {
+                count: directoryToUnlink?.totalFiles || 0,
+                path: directoryToUnlink?.basePath || ""
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
