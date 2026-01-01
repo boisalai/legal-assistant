@@ -732,7 +732,10 @@ export function CaseDetailsPanel({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDocToDelete(null)}>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className={docToDelete?.file_path?.includes('data/uploads/') ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+            >
               {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer' : 'Retirer'}
             </AlertDialogAction>
           </AlertDialogFooter>

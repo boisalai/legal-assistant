@@ -114,7 +114,7 @@
     "synchronize": "Synchronize",
     "linkedDirectories": "Linked directories",
     "unlinkDirectory": "Unlink this directory?",
-    "unlinkWarning": "All files from this directory ({count} files) will be removed from this course.",
+    "unlinkWarning": "The {count} files from \"{path}\" will be removed.",
     "unlink": "Unlink",
     "unlinking": "Removing...",
     "directoryContent": "Linked directory content",

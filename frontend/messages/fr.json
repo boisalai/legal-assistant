@@ -123,7 +123,7 @@
     "synchronize": "Synchroniser",
     "linkedDirectories": "Répertoires liés",
     "unlinkDirectory": "Délier ce répertoire ?",
-    "unlinkWarning": "Tous les fichiers de ce répertoire ({count} fichiers) seront retirés de ce dossier.",
+    "unlinkWarning": "Les {count} fichiers du répertoire « {path} » seront retirés.",
     "unlink": "Délier",
     "unlinking": "Suppression...",
     "directoryContent": "Contenu du répertoire lié",

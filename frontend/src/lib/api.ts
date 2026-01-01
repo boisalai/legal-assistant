@@ -1472,6 +1472,18 @@ export const linkedDirectoryApi = {
       reader.releaseLock();
     }
   },
+
+  // Unlink a directory from a case
+  async unlink(
+    caseId: string,
+    linkId: string
+  ): Promise<{ success: boolean; documents_deleted: number; embeddings_deleted: number; message: string }> {
+    const cleanId = caseId.replace("course:", "").replace("case:", "");
+    return fetchApi<{ success: boolean; documents_deleted: number; embeddings_deleted: number; message: string }>(
+      `/api/courses/${encodeURIComponent(cleanId)}/link-directory/${encodeURIComponent(linkId)}`,
+      { method: "DELETE" }
+    );
+  },
 };
 
 // ============================================
