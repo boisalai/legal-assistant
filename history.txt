@@ -1,41 +1,4 @@
 #V2
-SELECT id, name, created_at, updated_at FROM document WHERE case_id = 'case:a66381db' LIMIT 5;
-SELECT id, name, case_id, created_at, updated_at FROM document LIMIT 3;
-INFO FOR DB;
-SELECT id, name, created_at, updated_at FROM document LIMIT 3;
-SELECT id, name, source_type, created_at, updated_at FROM document WHERE source_type = 'linked' LIMIT 5;
--- Migration 002: Academic Schema for Legal Study Assistant
--- Description: Adds support for academic organization (sessions, courses, modules)
--- Date: 2024-12-12
--- Author: Legal Study Assistant Migration
--- =========================================
--- 1. CREATE SESSION TABLE
--- =========================================
--- Sessions académiques (ex: "Automne 2024", "Hiver 2025")
-DEFINE TABLE session SCHEMAFULL;
--- Fields
-DEFINE FIELD title ON session TYPE string
-SELECT id, title, course_code, professor, credits, type_transaction, nom_dossier FROM course;
-SELECT * FROM course;
-INFO FOR DB;
-SELECT * FROM case;
-SELECT COUNT() FROM case GROUP ALL;
-SELECT * FROM document WHERE string::starts_with(string::lowercase(course_id), 'case:');
--- Delete all records from the case table
-DELETE FROM case;
--- Verify deletion
-SELECT COUNT() FROM case GROUP ALL;
-SELECT * FROM summary;
-SELECT * FROM analysis_result;
--- Remove the case table completely
-REMOVE TABLE case;
--- Verify tables
-INFO FOR DB;
-SELECT id, title, course_code, professor FROM course;
-SELECT count() as total FROM embedding WHERE case_id = 'course:938c0203' GROUP ALL;
-SELECT id, nom_fichier, indexed, source_type, type_fichier FROM document 
-SELECT id, nom_fichier, indexed, source_type, type_fichier FROM document WHERE course_id = 'course:4de2c06d' AND source_type = 'linked' LIMIT 5;
-SELECT id, nom_fichier, source_type, type_fichier, file_path FROM document WHERE course_id = 'course:4de2c06d' LIMIT 10;
 SELECT * FROM course WHERE id = 'course:4de2c06d';
 SELECT COUNT() as total FROM document GROUP ALL;
 SELECT * FROM course WHERE id = 'course:4de2c06d';
@@ -82,3 +45,57 @@ SELECT count() AS count FROM user GROUP ALL;
 SELECT count() AS count FROM course GROUP ALL;
 SELECT count() AS count FROM user GROUP ALL;
 SELECT count() AS count FROM course GROUP ALL;
+SELECT * FROM course WHERE name CONTAINS "DRT-1151G" OR name CONTAINS "DRT1151";
+SELECT * FROM course;
+-- Définition de la table flashcard_deck
+DEFINE TABLE flashcard_deck SCHEMAFULL;
+DEFINE FIELD course_id ON flashcard_deck TYPE string;
+DEFINE FIELD name ON flashcard_deck TYPE string;
+DEFINE FIELD source_documents ON flashcard_deck TYPE array;
+DEFINE FIELD card_types ON flashcard_deck TYPE array;
+DEFINE FIELD card_count_requested ON flashcard_deck TYPE int DEFAULT 50;
+DEFINE FIELD created_at ON flashcard_deck TYPE datetime DEFAULT time::now();
+DEFINE FIELD last_studied ON flashcard_deck TYPE option<datetime>;
+-- Index pour recherche par cours
+DEFINE INDEX idx_flashcard_deck_course ON flashcard_deck FIELDS course_id;
+-- Définition de la table flashcard
+DEFINE TABLE flashcard SCHEMAFULL;
+DEFINE FIELD deck_id ON flashcard TYPE string;
+DEFINE FIELD document_id ON flashcard TYPE string;
+DEFINE FIELD card_type ON flashcard TYPE string;
+DEFINE FIELD front ON flashcard TYPE string;
+DEFINE FIELD back ON flashcard TYPE string;
+DEFINE FIELD source_excerpt ON flashcard TYPE option<string>;
+DEFINE FIELD source_location ON flashcard TYPE option<string>;
+DEFINE FIELD status ON flashcard TYPE string DEFAULT "new";
+DEFINE FIELD review_count ON flashcard TYPE int DEFAULT 0;
+DEFINE FIELD last_reviewed ON flashcard TYPE option<datetime>;
+DEFINE FIELD created_at ON flashcard TYPE datetime DEFAULT time::now();
+-- Index pour recherche par deck
+DEFINE INDEX idx_flashcard_deck ON flashcard FIELDS deck_id;
+-- Index pour recherche par statut (pour session de révision)
+DEFINE INDEX idx_flashcard_status ON flashcard FIELDS deck_id, status;
+-- Vérification
+INFO FOR TABLE flashcard_deck;
+INFO FOR TABLE flashcard;
+SELECT id, name, course_id, created_at FROM flashcard_deck ORDER BY created_at DESC;
+SELECT * FROM flashcard_deck LIMIT 3;
+SELECT * FROM flashcard LIMIT 5;
+SELECT * FROM flashcard WHERE deck_id = "flashcard_deck:60ad6f56";
+DELETE flashcard WHERE deck_id = "flashcard_deck:60ad6f56";
+SELECT id, name, card_count_requested, source_documents FROM flashcard_deck WHERE name = "Modules 1 à 3";
+SELECT id, front, back, card_type FROM flashcard WHERE deck_id CONTAINS "Modules";
+SELECT id, front, back, card_type FROM flashcard WHERE deck_id = "flashcard_deck:d93c545c";
+DELETE flashcard WHERE deck_id = "flashcard_deck:d93c545c";
+SELECT id, card_type, front, back FROM flashcard WHERE deck_id = "flashcard_deck:d93c545c";
+SELECT count() as total FROM flashcard WHERE deck_id = "flashcard_deck:d93c545c" GROUP ALL;
+SELECT * FROM module LIMIT 10;
+SELECT * FROM module WHERE id = type::thing('module', '48053518');
+SELECT id, name FROM module;
+SELECT * FROM module:48053518;
+LET $record_id = '48053518';
+SELECT * FROM module WHERE id = type::thing('module', $record_id);
+LET $full_id = 'module:48053518';
+SELECT * FROM module WHERE id = $full_id;
+SELECT id, meta::id(id) as raw_id FROM module WHERE name = 'Module 7';
+SELECT * FROM module WHERE id = type::thing('module', 48053518);

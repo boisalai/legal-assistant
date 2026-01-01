@@ -346,6 +346,8 @@ async def get_flashcard_deck(deck_id: str):
 )
 async def delete_flashcard_deck(deck_id: str):
     """Supprime un deck et toutes ses fiches."""
+    import os
+
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -365,6 +367,25 @@ async def delete_flashcard_deck(deck_id: str):
         "DELETE flashcard WHERE deck_id = $deck_id",
         {"deck_id": full_deck_id}
     )
+
+    # Supprimer le document audio associé s'il existe
+    summary_audio_doc_id = deck.get("summary_audio_document_id")
+    if summary_audio_doc_id:
+        doc_record_id = summary_audio_doc_id.replace("document:", "")
+        await service.query(
+            "DELETE document WHERE id = type::thing('document', $doc_id)",
+            {"doc_id": doc_record_id}
+        )
+        logger.info(f"Document audio supprimé: {summary_audio_doc_id}")
+
+    # Supprimer le fichier audio du disque s'il existe
+    summary_audio_path = deck.get("summary_audio_path")
+    if summary_audio_path and os.path.exists(summary_audio_path):
+        try:
+            os.remove(summary_audio_path)
+            logger.info(f"Fichier audio supprimé: {summary_audio_path}")
+        except Exception as e:
+            logger.warning(f"Erreur lors de la suppression du fichier audio: {e}")
 
     # Supprimer le deck
     await service.query(

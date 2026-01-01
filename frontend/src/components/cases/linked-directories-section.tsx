@@ -15,7 +15,9 @@ import {
 import {
   Folder,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { LinkedDirectoriesDataTable, type LinkedDirectory } from "./linked-directories-data-table";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@/types";
@@ -25,6 +27,9 @@ interface LinkedDirectoriesSectionProps {
   documents: Document[];
   onDocumentsChange: () => void;
   onPreviewDirectory?: (directory: LinkedDirectory) => void;
+  onLinkDirectory?: () => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export function LinkedDirectoriesSection({
@@ -32,6 +37,9 @@ export function LinkedDirectoriesSection({
   documents,
   onDocumentsChange,
   onPreviewDirectory,
+  onLinkDirectory,
+  onSync,
+  isSyncing,
 }: LinkedDirectoriesSectionProps) {
   const t = useTranslations();
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
@@ -110,22 +118,40 @@ export function LinkedDirectoriesSection({
     }
   };
 
-  if (linkedDirectories.length === 0) {
-    return null;
-  }
-
   return (
     <>
       <div className="space-y-2">
-        <h3 className="font-semibold text-sm flex items-center gap-2">
-          <Folder className="h-4 w-4" />
-          {t("courses.linkedDirectories")} ({linkedDirectories.length})
-        </h3>
-        <LinkedDirectoriesDataTable
-          directories={linkedDirectories}
-          onViewTree={handleViewTree}
-          onUnlink={handleUnlinkClick}
-        />
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-base flex items-center gap-2">
+            <Folder className="h-4 w-4" />
+            {t("courses.linkedDirectories")} ({linkedDirectories.length})
+          </h3>
+          <div className="flex items-center gap-2">
+            {onLinkDirectory && (
+              <Button size="sm" onClick={onLinkDirectory} className="gap-1">
+                <Folder className="h-3 w-3" />
+                {t("courses.linkDirectory")}
+              </Button>
+            )}
+            {onSync && (
+              <Button size="sm" onClick={onSync} disabled={isSyncing} className="gap-1">
+                {isSyncing ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                {t("courses.synchronize")}
+              </Button>
+            )}
+          </div>
+        </div>
+        {linkedDirectories.length > 0 && (
+          <LinkedDirectoriesDataTable
+            directories={linkedDirectories}
+            onViewTree={handleViewTree}
+            onUnlink={handleUnlinkClick}
+          />
+        )}
       </div>
 
       {/* Unlink confirmation dialog */}

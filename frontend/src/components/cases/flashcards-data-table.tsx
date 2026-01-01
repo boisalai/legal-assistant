@@ -72,7 +72,7 @@ export function FlashcardsDataTable({
       cell: ({ row }) => {
         const deck = row.original;
         return (
-          <span className="text-sm font-medium truncate max-w-xs" title={deck.name}>
+          <span className="text-[14px] text-[#000000] truncate max-w-xs" title={deck.name}>
             {deck.name}
           </span>
         );
@@ -82,14 +82,14 @@ export function FlashcardsDataTable({
       id: "docs",
       header: () => t("columns.docs"),
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.source_documents.length}</span>
+        <span className="text-[14px] text-[#000000]">{row.original.source_documents.length}</span>
       ),
     },
     {
       id: "cards",
       header: () => t("columns.cards"),
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.total_cards}</span>
+        <span className="text-[14px] text-[#000000]">{row.original.total_cards}</span>
       ),
     },
     {
@@ -98,15 +98,41 @@ export function FlashcardsDataTable({
       cell: ({ row }) => {
         const deck = row.original;
         if (deck.total_cards === 0) {
-          return <span className="text-xs text-muted-foreground">-</span>;
+          return <span className="text-[14px] text-[#000000]">-</span>;
         }
         return (
           <div className="w-24 space-y-1">
             <Progress value={deck.progress_percent} className="h-1.5" />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[14px] text-[#000000]">
               {Math.round(deck.progress_percent)}%
             </span>
           </div>
+        );
+      },
+    },
+    {
+      accessorKey: "created_at",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            {t("columns.createdAt")}
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const date = new Date(row.original.created_at);
+        return (
+          <span className="text-[14px] text-[#000000]">
+            {date.toLocaleDateString("fr-CA", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
         );
       },
     },

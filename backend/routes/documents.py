@@ -1366,8 +1366,24 @@ async def generate_tts(
                 detail="Document non trouvé"
             )
 
-        # Get extracted text
+        # Get text content - try extracted_text first, then read from file for markdown
         text_content = document.extracted_text
+
+        if not text_content:
+            # For markdown files, try to read directly from file
+            file_path = document.file_path
+            if not file_path and document.linked_source:
+                file_path = document.linked_source.get("absolute_path")
+
+            if file_path and Path(file_path).exists():
+                ext = Path(file_path).suffix.lower()
+                if ext in [".md", ".markdown", ".txt"]:
+                    try:
+                        text_content = Path(file_path).read_text(encoding="utf-8")
+                        logger.info(f"Read content from file: {file_path} ({len(text_content)} chars)")
+                    except Exception as e:
+                        logger.error(f"Error reading file {file_path}: {e}")
+
         if not text_content:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1424,9 +1440,9 @@ async def generate_tts(
             "is_tts": True,
             "source_document": doc_id,  # Garder pour compatibilité
             "source_document_id": doc_id,  # Nouveau champ
-            "is_derived": True,
+            "is_derived": False,  # Show in documents list for download
             "derivation_type": "tts",
-            "source_type": "upload",
+            "source_type": "tts_audio",
             "metadata": {
                 "voice": tts_result.voice,
                 "language": tts_result.language,

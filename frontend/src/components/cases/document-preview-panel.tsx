@@ -208,7 +208,7 @@ export function DocumentPreviewPanel({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
+      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0 min-h-[65px]">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <h2 className="text-xl font-bold truncate">{document.filename}</h2>
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -223,8 +223,8 @@ export function DocumentPreviewPanel({
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-4">
-          {/* TTS Button - Only show if document has extracted text */}
-          {document.extracted_text && !isAudio && (
+          {/* TTS Button - Show for markdown files or documents with extracted text */}
+          {(isMarkdown || document.extracted_text) && !isAudio && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

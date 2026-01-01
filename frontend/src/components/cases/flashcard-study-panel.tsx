@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Headphones,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
@@ -40,6 +42,8 @@ export function FlashcardStudyPanel({
   const [isReviewing, setIsReviewing] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<"front" | "back" | null>(null);
   const [completedCards, setCompletedCards] = useState<Set<string>>(new Set());
+  const [isPlayingSummary, setIsPlayingSummary] = useState(false);
+  const summaryAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load study session
   useEffect(() => {
@@ -114,6 +118,53 @@ export function FlashcardStudyPanel({
     }
   };
 
+  const handlePlaySummaryAudio = async () => {
+    if (!deck.has_summary_audio) {
+      toast.error(t("noSummaryAudio"));
+      return;
+    }
+
+    if (isPlayingSummary && summaryAudioRef.current) {
+      // Stop playing
+      summaryAudioRef.current.pause();
+      summaryAudioRef.current.currentTime = 0;
+      setIsPlayingSummary(false);
+      return;
+    }
+
+    try {
+      const audioUrl = flashcardsApi.getSummaryAudioUrl(deck.id);
+      const audio = new Audio(audioUrl);
+      summaryAudioRef.current = audio;
+
+      audio.onended = () => {
+        setIsPlayingSummary(false);
+        summaryAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setIsPlayingSummary(false);
+        summaryAudioRef.current = null;
+        toast.error(t("audioError"));
+      };
+
+      setIsPlayingSummary(true);
+      await audio.play();
+    } catch (error) {
+      setIsPlayingSummary(false);
+      toast.error(t("audioError"));
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (summaryAudioRef.current) {
+        summaryAudioRef.current.pause();
+        summaryAudioRef.current = null;
+      }
+    };
+  }, []);
+
   const handlePrevious = () => {
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
@@ -172,7 +223,7 @@ export function FlashcardStudyPanel({
   if (loading) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b bg-background flex items-center justify-between">
+        <div className="p-4 border-b bg-background flex items-center justify-between min-h-[65px]">
           <h2 className="text-xl font-bold">{deck.name}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -188,7 +239,7 @@ export function FlashcardStudyPanel({
   if (!session || session.cards.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b bg-background flex items-center justify-between">
+        <div className="p-4 border-b bg-background flex items-center justify-between min-h-[65px]">
           <h2 className="text-xl font-bold">{deck.name}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -210,18 +261,31 @@ export function FlashcardStudyPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b bg-background shrink-0">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 pt-3 pb-1 border-b bg-background shrink-0 min-h-[65px]">
+        <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold truncate">{deck.name}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {deck.has_summary_audio && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePlaySummaryAudio}
+                title={isPlayingSummary ? t("stopAudio") : t("playAllAudio")}
+              >
+                {isPlayingSummary ? (
+                  <Square className="h-5 w-5 text-red-500" />
+                ) : (
+                  <Headphones className="h-5 w-5" />
+                )}
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <Progress value={progressPercent} className="flex-1 h-2" />
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {completedCards.size}/{totalCards}
-          </span>
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal"
 import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import { CreateFlashcardDeckModal } from "@/components/cases/create-flashcard-deck-modal";
 import { FlashcardStudyPanel } from "@/components/cases/flashcard-study-panel";
+import { FlashcardAudioPanel } from "@/components/cases/flashcard-audio-panel";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import type { FlashcardDeck } from "@/types";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
@@ -49,6 +50,7 @@ export default function CourseDetailPage() {
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
   const [createDeckModalOpen, setCreateDeckModalOpen] = useState(false);
   const [studyDeck, setStudyDeck] = useState<FlashcardDeck | null>(null);
+  const [audioDeck, setAudioDeck] = useState<FlashcardDeck | null>(null);
   const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
@@ -186,6 +188,7 @@ export default function CourseDetailPage() {
   // Flashcard handlers
   const handleStudyDeck = (deck: FlashcardDeck) => {
     setStudyDeck(deck);
+    setAudioDeck(null);
     setPreviewDocument(null);
     setPreviewDirectory(null);
   };
@@ -196,6 +199,17 @@ export default function CourseDetailPage() {
 
   const handleCloseStudy = () => {
     setStudyDeck(null);
+  };
+
+  const handleListenFlashcardAudio = (deck: FlashcardDeck) => {
+    setAudioDeck(deck);
+    setStudyDeck(null);
+    setPreviewDocument(null);
+    setPreviewDirectory(null);
+  };
+
+  const handleCloseAudio = () => {
+    setAudioDeck(null);
   };
 
   const handleFlashcardsUpdated = async () => {
@@ -239,13 +253,19 @@ export default function CourseDetailPage() {
         {/* Split View */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <PanelGroup direction="horizontal" className="h-full">
-            {/* Left Panel: Case Details, Document Preview, Directory Tree, or Flashcard Study */}
+            {/* Left Panel: Case Details, Document Preview, Directory Tree, Flashcard Study, or Flashcard Audio */}
             <Panel defaultSize={60} minSize={30} className="overflow-hidden">
               {studyDeck ? (
                 <FlashcardStudyPanel
                   deck={studyDeck}
                   onClose={handleCloseStudy}
                   onDeckUpdate={handleFlashcardsUpdated}
+                />
+              ) : audioDeck ? (
+                <FlashcardAudioPanel
+                  deck={audioDeck}
+                  courseId={courseId}
+                  onClose={handleCloseAudio}
                 />
               ) : previewDocument ? (
                 <DocumentPreviewPanel
@@ -256,7 +276,7 @@ export default function CourseDetailPage() {
               ) : previewDirectory ? (
                 <div className="flex flex-col h-full overflow-hidden">
                   {/* Header - matching AssistantPanel style */}
-                  <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
+                  <div className="p-4 border-b bg-background flex items-center justify-between shrink-0 min-h-[65px]">
                     <div className="flex flex-col gap-1 flex-1 min-w-0">
                       <h2 className="text-xl font-bold">{t("courses.directoryContent")}</h2>
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -337,6 +357,7 @@ export default function CourseDetailPage() {
                   isAnalyzing={isAnalyzing}
                   onStudyDeck={handleStudyDeck}
                   onCreateDeck={handleCreateDeck}
+                  onListenFlashcardAudio={handleListenFlashcardAudio}
                   flashcardsRefreshKey={flashcardsRefreshKey}
                 />
               )}
