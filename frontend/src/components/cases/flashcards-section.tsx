@@ -28,6 +28,7 @@ interface FlashcardsSectionProps {
   documents: Document[];
   onStudyDeck: (deck: FlashcardDeck) => void;
   onCreateDeck: () => void;
+  onListenAudio?: (deck: FlashcardDeck) => void;
   refreshKey?: number;
 }
 
@@ -36,6 +37,7 @@ export function FlashcardsSection({
   documents,
   onStudyDeck,
   onCreateDeck,
+  onListenAudio,
   refreshKey,
 }: FlashcardsSectionProps) {
   const t = useTranslations("flashcards");
@@ -80,11 +82,17 @@ export function FlashcardsSection({
   };
 
   const handleListenAudio = (deck: FlashcardDeck) => {
-    const audioUrl = flashcardsApi.getSummaryAudioUrl(deck.id);
-    const audio = new Audio(audioUrl);
-    audio.play().catch(() => {
-      toast.error(t("audioError"));
-    });
+    // Use parent handler if provided, otherwise play directly
+    if (onListenAudio) {
+      onListenAudio(deck);
+    } else {
+      // Fallback: play audio directly
+      const audioUrl = flashcardsApi.getSummaryAudioUrl(deck.id);
+      const audio = new Audio(audioUrl);
+      audio.play().catch(() => {
+        toast.error(t("audioError"));
+      });
+    }
   };
 
   const handleDeleteClick = (deck: FlashcardDeck) => {
@@ -104,10 +112,10 @@ export function FlashcardsSection({
   if (loading) {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
+        <h3 className="font-semibold text-base flex items-center gap-2">
           <GraduationCap className="h-4 w-4" />
-          <h3 className="font-semibold text-sm">{t("title")}</h3>
-        </div>
+          {t("title")}
+        </h3>
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -125,7 +133,7 @@ export function FlashcardsSection({
       <div className="space-y-2">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
+          <h3 className="font-semibold text-base flex items-center gap-2">
             <GraduationCap className="h-4 w-4" />
             {t("title")} ({decks.length})
           </h3>

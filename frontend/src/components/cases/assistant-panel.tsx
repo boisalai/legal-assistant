@@ -274,7 +274,7 @@ export function AssistantPanel({
   return (
     <div className="flex flex-col h-full border-l overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
+      <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
         <h2 className="text-xl font-bold">Assistant IA</h2>
       </div>
 

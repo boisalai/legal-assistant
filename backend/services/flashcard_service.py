@@ -720,10 +720,102 @@ class FlashcardService:
             )
 
             logger.info(f"Summary audio generated: {audio_path}")
+
+            # Create a document record for the audio file so it appears in the documents list
+            await self._create_audio_document(
+                course_id=course_id,
+                deck_name=deck_name,
+                audio_path=str(audio_path),
+                deck_id=deck_id
+            )
+
             return str(audio_path)
 
         except Exception as e:
             logger.error(f"Error generating summary audio: {e}", exc_info=True)
+            return None
+
+    async def _create_audio_document(
+        self,
+        course_id: str,
+        deck_name: str,
+        audio_path: str,
+        deck_id: str
+    ) -> Optional[str]:
+        """
+        Create a document record for the flashcard audio file.
+
+        This makes the audio appear in the course's document list,
+        allowing users to download it for offline listening.
+
+        Args:
+            course_id: Course ID
+            deck_name: Name of the flashcard deck
+            audio_path: Path to the audio file
+            deck_id: Deck ID for reference
+
+        Returns:
+            Created document ID or None on error
+        """
+        try:
+            service = get_surreal_service()
+
+            # Normalize IDs
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
+
+            # Get file size
+            file_size = Path(audio_path).stat().st_size
+
+            # Generate document ID
+            doc_id = uuid.uuid4().hex[:16]
+
+            # Create filename
+            safe_name = re.sub(r'[^\w\s-]', '', deck_name).strip().replace(' ', '_')[:30]
+            filename = f"Révision audio - {safe_name}.mp3"
+
+            doc_data = {
+                "course_id": course_id,
+                "nom_fichier": filename,
+                "type_fichier": "mp3",
+                "type_mime": "audio/mpeg",
+                "taille": file_size,
+                "file_path": audio_path,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "source_type": "flashcard_audio",
+                "is_derived": False,  # Not derived - standalone audio for flashcards
+                "indexed": False,
+                "flashcard_deck_id": deck_id  # Reference to the deck
+            }
+
+            result = await service.query(
+                f"CREATE document:{doc_id} CONTENT $data",
+                {"data": doc_data}
+            )
+
+            if result and len(result) > 0:
+                logger.info(f"Created audio document document:{doc_id} for deck {deck_id}")
+
+                # Store document ID in deck for reference
+                deck_record_id = deck_id.replace("flashcard_deck:", "")
+                await service.query(
+                    """
+                    UPDATE flashcard_deck
+                    SET summary_audio_document_id = $doc_id
+                    WHERE id = type::thing('flashcard_deck', $deck_id)
+                    """,
+                    {
+                        "deck_id": deck_record_id,
+                        "doc_id": f"document:{doc_id}"
+                    }
+                )
+
+                return f"document:{doc_id}"
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error creating audio document: {e}", exc_info=True)
             return None
 
 
