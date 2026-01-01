@@ -240,8 +240,8 @@ class TestDocumentRegistration:
             assert data["id"].startswith("document:")
             assert data["course_id"] == course_id
             assert data["file_path"] == tmp_path
-            # API returns French field names due to serialization_alias
-            assert "nom_fichier" in data
+            # API now returns English field names
+            assert "filename" in data
 
         finally:
             # Cleanup: remove temporary file
@@ -411,8 +411,8 @@ class TestRefactoredEndpointsIntegration:
         )
         assert get_response.status_code == status.HTTP_200_OK
         doc_data = get_response.json()
-        # API returns French field names due to serialization_alias
-        assert doc_data["texte_extrait"] is not None
+        # API now returns English field names
+        assert doc_data["extracted_text"] is not None
 
         # 4. Get derived documents (refactored)
         derived_response = await client.get(
