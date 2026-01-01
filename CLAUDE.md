@@ -94,7 +94,7 @@
     - Détection automatique du contexte via activity tracking
     - 4 outils Agno dédiés : `generate_summary`, `generate_mindmap`, `generate_quiz`, `explain_concept`
 
-11. **Fiches de révision (Flashcards)** 🆕
+11. **Fiches de révision (Flashcards)**
     - Génération automatique de fiches depuis documents markdown
     - 4 types de fiches : **définition**, **concept**, **jurisprudence**, **question**
     - Interface de révision avec animation flip recto/verso
@@ -103,6 +103,13 @@
     - TTS audio avec voix canadienne-française (fr-CA-SylvieNeural)
     - Sélection granulaire des documents sources (ex: modules 1-4 pour intra)
     - Streaming SSE pour progression génération en temps réel
+
+12. **Workflow Module-First** 🆕
+    - Interface accordéon pour modules expansibles
+    - Création de modules avec upload intégré (drag & drop)
+    - Sélecteur de module cible dans tous les modals d'import
+    - Section "Non assignés" pour documents orphelins
+    - Endpoint direct : `POST /api/modules/{module_id}/documents/upload`
 
 ### Architecture technique
 
@@ -129,13 +136,63 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `backend/routes/flashcards.py` - 🆕 API CRUD fiches de révision
 - `backend/services/flashcard_service.py` - 🆕 Génération LLM avec Agno Agent
 - `backend/models/flashcard_models.py` - 🆕 Modèles Pydantic flashcards
-- `frontend/src/components/cases/flashcards-section.tsx` - 🆕 Section liste des decks
-- `frontend/src/components/cases/create-flashcard-deck-modal.tsx` - 🆕 Modal création deck
-- `frontend/src/components/cases/flashcard-study-panel.tsx` - 🆕 Interface révision flip
+- `frontend/src/components/cases/flashcards-section.tsx` - Section liste des decks
+- `frontend/src/components/cases/create-flashcard-deck-modal.tsx` - Modal création deck
+- `frontend/src/components/cases/flashcard-study-panel.tsx` - Interface révision flip
+- `frontend/src/components/cases/module-accordion-item.tsx` - 🆕 Accordéon module expansible
+- `frontend/src/components/cases/upload-to-module-modal.tsx` - 🆕 Upload vers module
 
 ---
 
-## Session actuelle (2025-12-30) - Fiches de révision (Flashcards) ✅
+## Session actuelle (2025-12-31) - Workflow Module-First ✅
+
+**Objectif** : Refonte complète de l'interface pour suivre un workflow "Module-First".
+
+### Ancien workflow
+1. Ajouter des documents
+2. Créer des modules
+3. Assigner les documents aux modules
+
+### Nouveau workflow ✅
+1. Créer des modules en premier
+2. Ajouter des documents directement aux modules
+
+### Backend - Support module_id ✅
+
+**Commit** : `08780e3`
+
+**Modifications API** :
+- `backend/services/document_service.py` - Paramètre `module_id` dans `create_document()`
+- `backend/routes/documents.py` - Paramètre `module_id` dans upload
+- `backend/routes/modules.py` - Nouvel endpoint `POST /api/modules/{module_id}/documents/upload`
+- `backend/routes/linked_directory.py` - Support `module_id` dans liaison de répertoires
+- `backend/routes/docusaurus.py` - Support `module_id` dans import Docusaurus
+- `backend/routes/transcription.py` - Support `module_id` dans import YouTube
+
+### Frontend - Interface Accordion ✅
+
+**Nouveaux composants** :
+- `module-accordion-item.tsx` - Item accordéon avec liste de documents expansible
+- `upload-to-module-modal.tsx` - Modal d'upload vers un module spécifique
+
+**Modifications** :
+- `modules-section.tsx` - Refactorisé de DataTable vers accordéon
+- `create-module-modal.tsx` - Zone d'upload intégrée avec drag & drop
+- `link-directory-modal.tsx` - Sélecteur de module cible
+- `import-docusaurus-modal.tsx` - Sélecteur de module cible
+- `youtube-download-modal.tsx` - Sélecteur de module cible
+- `api.ts` - Support `moduleId` dans toutes les API d'import
+
+**Fonctionnalités UI** :
+- Modules en accordéons extensibles
+- Section "Non assignés" pour documents orphelins
+- Sélecteur de module dans tous les modals d'import
+- Upload direct lors de la création de module
+- Progression et badges par module
+
+---
+
+## Session précédente (2025-12-30) - Fiches de révision (Flashcards) ✅
 
 **Objectif** : Système complet de fiches de révision pour études juridiques.
 
@@ -498,6 +555,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 **Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
 
 **Nouvelles fonctionnalités complétées** :
+- ✅ **Workflow Module-First** (2025-12-31) - Accordéon, upload intégré, sélecteur module
 - ✅ **Fiches de révision** (2025-12-30) - Génération LLM, flip cards, progression, TTS
 - ✅ **Tuteur IA pédagogique** (2025-12-26) - Résumés, mind maps, quiz, explications
 

@@ -62,20 +62,38 @@ Assistant d'études juridiques pour étudiants en droit avec IA conversationnell
 - Mode adaptatif : document spécifique vs cours complet
 - 4 outils Agno dédiés à l'apprentissage
 
+### 📝 Fiches de révision (Flashcards)
+- **Génération automatique** de fiches depuis documents markdown
+- 4 types de fiches : définition, concept, jurisprudence, question
+- **Interface flip card** avec animation CSS 3D
+- Système de progression : new → learning → mastered
+- Raccourcis clavier : `Espace` (flip), `1/2/3` (révision)
+- TTS audio avec voix canadienne-française
+- Sélection granulaire des documents sources
+
+### 📦 Workflow Module-First
+- **Interface accordéon** pour modules extensibles
+- Upload de fichiers intégré lors de la création de modules
+- **Sélecteur de module** dans tous les modals d'import
+- Section "Non assignés" pour documents orphelins
+- Endpoint direct : `POST /api/modules/{module_id}/documents/upload`
+
 ## 🏗️ Structure du projet
 
 ```
 legal-assistant/
 ├── backend/
 │   ├── config/              # Configuration (settings, models)
-│   ├── models/              # Modèles Pydantic (Course, Document, CAIJ)
+│   ├── models/              # Modèles Pydantic (Course, Document, CAIJ, Flashcard)
 │   ├── routes/              # Endpoints API REST
 │   ├── services/            # Services métier
+│   │   ├── document_service.py
 │   │   ├── document_indexing_service.py
 │   │   ├── transcription_service.py
 │   │   ├── tts_service.py
 │   │   ├── caij_search_service.py
-│   │   └── tutor_service.py
+│   │   ├── tutor_service.py
+│   │   └── flashcard_service.py
 │   ├── tools/               # Outils Agno
 │   │   ├── tutor_tools.py
 │   │   ├── caij_search_tool.py
@@ -86,7 +104,12 @@ legal-assistant/
 │   ├── src/
 │   │   ├── app/             # Next.js App Router
 │   │   ├── components/      # Composants React + shadcn/ui
-│   │   └── lib/             # Utilities
+│   │   │   └── cases/       # Composants cours/modules
+│   │   │       ├── module-accordion-item.tsx
+│   │   │       ├── upload-to-module-modal.tsx
+│   │   │       ├── flashcards-section.tsx
+│   │   │       └── flashcard-study-panel.tsx
+│   │   └── lib/             # Utilities et API client
 │   └── package.json
 ├── docs/                    # Documentation
 ├── docker-compose.yml       # SurrealDB
@@ -331,11 +354,22 @@ GET    /api/courses/{id}         # Détails d'un cours
 DELETE /api/courses/{id}         # Supprimer un cours
 
 GET    /api/documents            # Liste des documents
-POST   /api/documents/upload     # Upload de fichiers
+POST   /api/documents/upload     # Upload de fichiers (avec module_id optionnel)
 POST   /api/linked-directories   # Lier un répertoire local
 POST   /api/docusaurus/import    # Importer depuis Docusaurus
 POST   /api/courses/{id}/documents/youtube/info    # Info vidéo YouTube
 POST   /api/courses/{id}/documents/youtube         # Télécharger audio YouTube
+
+# Modules
+POST   /api/modules/{id}/documents/upload  # Upload direct vers module
+GET    /api/courses/{id}/modules           # Liste des modules d'un cours
+
+# Fiches de révision (Flashcards)
+POST   /api/flashcard-decks                # Créer un deck
+GET    /api/flashcard-decks/{course_id}    # Lister les decks d'un cours
+POST   /api/flashcard-decks/{id}/generate  # Générer fiches (SSE)
+GET    /api/flashcard-decks/{id}/study     # Session d'étude
+POST   /api/flashcards/{id}/review         # Enregistrer révision
 
 POST   /api/transcribe           # Transcrire un audio
 POST   /api/tts                  # Générer une synthèse vocale
