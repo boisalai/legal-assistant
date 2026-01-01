@@ -104,11 +104,10 @@
     - Sélection granulaire des documents sources (ex: modules 1-4 pour intra)
     - Streaming SSE pour progression génération en temps réel
 
-12. **Workflow Module-First** 🆕
-    - Interface accordéon pour modules expansibles
-    - Création de modules avec upload intégré (drag & drop)
-    - Sélecteur de module cible dans tous les modals d'import
-    - Section "Non assignés" pour documents orphelins
+12. **Modules d'étude**
+    - CRUD complet pour organiser les documents par module/chapitre
+    - Interface DataTable avec tri et actions
+    - Assignation de documents aux modules
     - Endpoint direct : `POST /api/modules/{module_id}/documents/upload`
 
 ### Architecture technique
@@ -139,56 +138,38 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `frontend/src/components/cases/flashcards-section.tsx` - Section liste des decks
 - `frontend/src/components/cases/create-flashcard-deck-modal.tsx` - Modal création deck
 - `frontend/src/components/cases/flashcard-study-panel.tsx` - Interface révision flip
-- `frontend/src/components/cases/module-accordion-item.tsx` - 🆕 Accordéon module expansible
-- `frontend/src/components/cases/upload-to-module-modal.tsx` - 🆕 Upload vers module
+- `frontend/src/components/cases/modules-section.tsx` - Section modules avec DataTable
+- `frontend/src/components/cases/modules-data-table.tsx` - DataTable des modules
 
 ---
 
-## Session actuelle (2025-12-31) - Workflow Module-First ✅
+## Session actuelle (2026-01-01) - Simplification des modules ✅
 
-**Objectif** : Refonte complète de l'interface pour suivre un workflow "Module-First".
+**Objectif** : Simplifier le système de modules en supprimant les fonctionnalités inutilisées.
 
-### Ancien workflow
-1. Ajouter des documents
-2. Créer des modules
-3. Assigner les documents aux modules
+### Fonctionnalités supprimées
 
-### Nouveau workflow ✅
-1. Créer des modules en premier
-2. Ajouter des documents directement aux modules
+**Backend** :
+- `MasteryLevel` enum et modèles de progression
+- Endpoints `/progress` et `/auto-detect`
+- Calcul de progression dans `module_service.py` (~300 lignes)
 
-### Backend - Support module_id ✅
+**Frontend** :
+- `auto-detect-modules-modal.tsx` - Détection automatique (supprimé)
+- `module-accordion-item.tsx` - Interface accordéon (supprimé)
+- `upload-to-module-modal.tsx` - Modal upload vers module (supprimé)
+- Traductions et types liés à la progression
 
-**Commit** : `08780e3`
+### Interface simplifiée ✅
 
-**Modifications API** :
-- `backend/services/document_service.py` - Paramètre `module_id` dans `create_document()`
-- `backend/routes/documents.py` - Paramètre `module_id` dans upload
-- `backend/routes/modules.py` - Nouvel endpoint `POST /api/modules/{module_id}/documents/upload`
-- `backend/routes/linked_directory.py` - Support `module_id` dans liaison de répertoires
-- `backend/routes/docusaurus.py` - Support `module_id` dans import Docusaurus
-- `backend/routes/transcription.py` - Support `module_id` dans import YouTube
+- `modules-section.tsx` - Utilise maintenant une DataTable simple
+- `modules-data-table.tsx` - Tableau avec colonnes : Nom, # docs, Date
+- Dates affichées au format AAAA-MM-JJ (uniformisé)
 
-### Frontend - Interface Accordion ✅
+### Commits
 
-**Nouveaux composants** :
-- `module-accordion-item.tsx` - Item accordéon avec liste de documents expansible
-- `upload-to-module-modal.tsx` - Modal d'upload vers un module spécifique
-
-**Modifications** :
-- `modules-section.tsx` - Refactorisé de DataTable vers accordéon
-- `create-module-modal.tsx` - Zone d'upload intégrée avec drag & drop
-- `link-directory-modal.tsx` - Sélecteur de module cible
-- `import-docusaurus-modal.tsx` - Sélecteur de module cible
-- `youtube-download-modal.tsx` - Sélecteur de module cible
-- `api.ts` - Support `moduleId` dans toutes les API d'import
-
-**Fonctionnalités UI** :
-- Modules en accordéons extensibles
-- Section "Non assignés" pour documents orphelins
-- Sélecteur de module dans tous les modals d'import
-- Upload direct lors de la création de module
-- Progression et badges par module
+- `4f44bac` - refactor: Simplify module system by removing unused features
+- `2067d68` - fix: Standardize date format to YYYY-MM-DD in DataTables
 
 ---
 
@@ -555,7 +536,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 **Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
 
 **Nouvelles fonctionnalités complétées** :
-- ✅ **Workflow Module-First** (2025-12-31) - Accordéon, upload intégré, sélecteur module
+- ✅ **Simplification modules** (2026-01-01) - Suppression progression/auto-detect, DataTable simple
 - ✅ **Fiches de révision** (2025-12-30) - Génération LLM, flip cards, progression, TTS
 - ✅ **Tuteur IA pédagogique** (2025-12-26) - Résumés, mind maps, quiz, explications
 
