@@ -4,9 +4,6 @@ Routes pour la gestion des modules d'étude.
 Endpoints:
 - POST /api/courses/{course_id}/modules - Créer un module
 - GET /api/courses/{course_id}/modules - Lister les modules d'un cours
-- GET /api/courses/{course_id}/modules/progress - Lister avec progression
-- GET /api/courses/{course_id}/progress - Résumé de progression du cours
-- POST /api/courses/{course_id}/modules/auto-detect - Détecter les modules
 - POST /api/courses/{course_id}/modules/bulk - Créer plusieurs modules
 - GET /api/modules/{module_id} - Détails d'un module
 - PATCH /api/modules/{module_id} - Mettre à jour un module
@@ -21,10 +18,8 @@ Endpoints:
 import logging
 import uuid
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status, Query, UploadFile, File, Form, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Depends
 
 from config.settings import settings
 from services.document_service import get_document_service
@@ -37,14 +32,11 @@ from models.module_models import (
     ModuleCreate,
     ModuleUpdate,
     ModuleResponse,
-    ModuleWithProgress,
     ModuleListResponse,
-    ModuleListWithProgressResponse,
     AssignDocumentsRequest,
     AssignDocumentsResponse,
     ModuleBulkCreateRequest,
     ModuleBulkCreateResponse,
-    AutoDetectResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,134 +91,6 @@ async def list_modules(course_id: str):
     modules, total = await service.list_modules(course_id)
 
     return ModuleListResponse(modules=modules, total=total)
-
-
-@router.get(
-    "/api/courses/{course_id}/modules/progress",
-    response_model=ModuleListWithProgressResponse,
-    summary="Lister les modules avec progression"
-)
-async def list_modules_with_progress(
-    course_id: str,
-    user_id: str = Query(default="user:default", description="ID utilisateur")
-):
-    """
-    Liste tous les modules d'un cours avec leurs métriques de progression.
-
-    Inclut:
-    - Progression de lecture (% documents lus)
-    - Progression flashcards (% cartes maîtrisées)
-    - Scores de quiz
-    - Niveau de maîtrise global
-    """
-    service = get_module_service()
-
-    summary = await service.get_course_progress_summary(course_id, user_id)
-
-    modules = [ModuleWithProgress(**m) for m in summary["modules"]]
-
-    return ModuleListWithProgressResponse(
-        modules=modules,
-        total=len(modules),
-        course_overall_progress=summary["overall_progress"],
-        recommended_module_id=summary.get("recommended_module_id"),
-        recommendation_message=summary.get("recommendation_message")
-    )
-
-
-@router.get(
-    "/api/courses/{course_id}/progress",
-    summary="Résumé de progression du cours"
-)
-async def get_course_progress(
-    course_id: str,
-    user_id: str = Query(default="user:default", description="ID utilisateur")
-):
-    """
-    Récupère un résumé complet de la progression pour le cours.
-
-    Retourne:
-    - Progression globale pondérée par exam_weight
-    - Module recommandé pour étude
-    - Message de recommandation personnalisé
-    """
-    service = get_module_service()
-
-    return await service.get_course_progress_summary(course_id, user_id)
-
-
-@router.post(
-    "/api/courses/{course_id}/modules/auto-detect",
-    response_model=AutoDetectResponse,
-    summary="Détecter automatiquement les modules"
-)
-async def auto_detect_modules(course_id: str):
-    """
-    Analyse les noms de fichiers pour détecter automatiquement les modules.
-
-    Patterns reconnus:
-    - "Module X - ..." ou "module-X-..."
-    - "Chapitre X - ..." ou "chapitre-X-..."
-    - "Semaine X - ..." ou "semaine-X-..."
-    - Préfixes numériques: "01_...", "1-...", "1_..."
-
-    Retourne des suggestions de modules avec les documents correspondants.
-    """
-    service = get_module_service()
-
-    detected, unassigned = await service.auto_detect_modules(course_id)
-
-    # Compter le total des documents
-    total = sum(d.document_count for d in detected) + len(unassigned)
-
-    return AutoDetectResponse(
-        detected_modules=detected,
-        unassigned_documents=unassigned,
-        total_documents=total
-    )
-
-
-class CreateFromDetectionRequest(BaseModel):
-    """Requête pour créer des modules depuis la détection."""
-    assign_documents: bool = True
-
-
-@router.post(
-    "/api/courses/{course_id}/modules/from-detection",
-    response_model=ModuleBulkCreateResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Créer les modules détectés"
-)
-async def create_modules_from_detection(
-    course_id: str,
-    request: Optional[CreateFromDetectionRequest] = None
-):
-    """
-    Exécute la détection automatique et crée les modules détectés.
-
-    Par défaut, assigne automatiquement les documents aux modules créés.
-    """
-    service = get_module_service()
-
-    assign_docs = request.assign_documents if request else True
-
-    # Détecter les modules
-    detected, _ = await service.auto_detect_modules(course_id)
-
-    if not detected:
-        return ModuleBulkCreateResponse(created_count=0, modules=[])
-
-    # Créer les modules
-    created = await service.create_modules_from_detection(
-        course_id,
-        detected,
-        assign_documents=assign_docs
-    )
-
-    return ModuleBulkCreateResponse(
-        created_count=len(created),
-        modules=created
-    )
 
 
 @router.post(
@@ -297,28 +161,6 @@ async def get_module(module_id: str):
     service = get_module_service()
 
     module = await service.get_module(module_id)
-    if not module:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Module non trouvé: {module_id}"
-        )
-
-    return module
-
-
-@router.get(
-    "/api/modules/{module_id}/progress",
-    response_model=ModuleWithProgress,
-    summary="Module avec progression"
-)
-async def get_module_with_progress(
-    module_id: str,
-    user_id: str = Query(default="user:default", description="ID utilisateur")
-):
-    """Récupère un module avec ses métriques de progression."""
-    service = get_module_service()
-
-    module = await service.get_module_with_progress(module_id, user_id)
     if not module:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

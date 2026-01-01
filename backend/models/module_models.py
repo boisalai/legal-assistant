@@ -1,21 +1,11 @@
 """Modèles Pydantic pour les modules d'étude.
 
 Un module représente une unité d'étude au sein d'un cours (ex: Module 3 - Sources du droit).
-Les modules permettent de grouper les documents et de suivre la progression.
+Les modules permettent de grouper les documents.
 """
 
-from datetime import datetime
 from typing import Optional, List
-from enum import Enum
 from pydantic import BaseModel, Field
-
-
-class MasteryLevel(str, Enum):
-    """Niveau de maîtrise d'un module."""
-    NOT_STARTED = "not_started"
-    LEARNING = "learning"
-    PROFICIENT = "proficient"
-    MASTERED = "mastered"
 
 
 # ============================================================================
@@ -56,45 +46,10 @@ class ModuleResponse(ModuleBase):
     document_count: int = 0
 
 
-class ModuleWithProgress(ModuleResponse):
-    """Module avec informations de progression."""
-    # Reading progress
-    documents_total: int = 0
-    documents_completed: int = 0
-    reading_percent: float = 0.0
-
-    # Flashcard progress
-    flashcards_total: int = 0
-    flashcards_mastered: int = 0
-    flashcard_percent: float = 0.0
-
-    # Quiz progress
-    quiz_attempts: int = 0
-    quiz_average_score: float = 0.0
-    quiz_best_score: float = 0.0
-
-    # Combined metrics
-    overall_progress: float = 0.0
-    mastery_level: MasteryLevel = MasteryLevel.NOT_STARTED
-
-    # Time tracking
-    total_study_time_seconds: int = 0
-    last_activity_at: Optional[str] = None
-
-
 class ModuleListResponse(BaseModel):
     """Réponse pour une liste de modules."""
     modules: List[ModuleResponse]
     total: int
-
-
-class ModuleListWithProgressResponse(BaseModel):
-    """Réponse pour une liste de modules avec progression."""
-    modules: List[ModuleWithProgress]
-    total: int
-    course_overall_progress: float = 0.0
-    recommended_module_id: Optional[str] = None
-    recommendation_message: Optional[str] = None
 
 
 # ============================================================================
@@ -134,21 +89,3 @@ class ModuleBulkCreateResponse(BaseModel):
     """Réponse après création en masse."""
     created_count: int
     modules: List[ModuleResponse]
-
-
-# ============================================================================
-# Auto-detect Models
-# ============================================================================
-
-class DetectedModule(BaseModel):
-    """Module détecté automatiquement depuis les noms de fichiers."""
-    suggested_name: str
-    document_ids: List[str]
-    document_count: int
-
-
-class AutoDetectResponse(BaseModel):
-    """Réponse de la détection automatique de modules."""
-    detected_modules: List[DetectedModule]
-    unassigned_documents: List[str]
-    total_documents: int

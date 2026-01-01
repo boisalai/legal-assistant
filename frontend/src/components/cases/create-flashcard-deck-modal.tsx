@@ -316,7 +316,7 @@ export function CreateFlashcardDeckModal({
                     : t("selectAll")}
                 </Button>
               </div>
-              <div className="border rounded-lg max-h-[200px] overflow-y-auto">
+              <div className="border rounded-lg max-h-[140px] overflow-y-auto">
                 {sortedModules.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground text-center">
                     {t("noModulesAvailable")}
@@ -374,44 +374,39 @@ export function CreateFlashcardDeckModal({
               </div>
             </div>
 
-            {/* Card count */}
-            <div className="space-y-2">
-              <Label>{t("cardCount")}</Label>
-              <Select
-                value={cardCount.toString()}
-                onValueChange={(v) => setCardCount(parseInt(v, 10))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10 fiches</SelectItem>
-                  <SelectItem value="20">20 fiches</SelectItem>
-                  <SelectItem value="50">50 fiches</SelectItem>
-                  <SelectItem value="100">100 fiches</SelectItem>
-                  <SelectItem value="200">200 fiches</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Card count and audio option - side by side */}
+            <div className="flex items-start gap-4">
+              {/* Card count */}
+              <div className="space-y-2 flex-1">
+                <Label>{t("cardCount")}</Label>
+                <Select
+                  value={cardCount.toString()}
+                  onValueChange={(v) => setCardCount(parseInt(v, 10))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 fiches</SelectItem>
+                    <SelectItem value="20">20 fiches</SelectItem>
+                    <SelectItem value="50">50 fiches</SelectItem>
+                    <SelectItem value="100">100 fiches</SelectItem>
+                    <SelectItem value="200">200 fiches</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Generate audio option */}
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <Checkbox
-                  checked={generateAudio}
-                  onCheckedChange={(checked) => setGenerateAudio(checked === true)}
-                  className="mt-0.5"
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{t("generateAudio")}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t("generateAudioDesc")}
-                  </p>
-                </div>
-              </label>
+              {/* Generate audio option */}
+              <div className="flex-1 pt-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={generateAudio}
+                    onCheckedChange={(checked) => setGenerateAudio(checked === true)}
+                  />
+                  <Volume2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{t("generateAudio")}</span>
+                </label>
+              </div>
             </div>
           </div>
         )}

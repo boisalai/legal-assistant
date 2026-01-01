@@ -21,14 +21,14 @@ import { Loader2, FileText, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { modulesApi } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
-import type { Module, ModuleWithProgress, Document } from "@/types";
+import type { Module, Document } from "@/types";
 
 interface CreateModuleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   courseId: string;
   documents: Document[];
-  module?: ModuleWithProgress | null; // For editing
+  module?: Module | null; // For editing
   onSuccess: () => void;
 }
 
@@ -233,7 +233,7 @@ export function CreateModuleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] max-w-[calc(100vw-2rem)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("editTitle") : t("createTitle")}
@@ -252,6 +252,7 @@ export function CreateModuleModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("namePlaceholder")}
+              className="focus-visible:ring-inset"
             />
           </div>
 
@@ -264,6 +265,7 @@ export function CreateModuleModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("descriptionPlaceholder")}
               rows={2}
+              className="focus-visible:ring-inset"
             />
           </div>
 
@@ -276,6 +278,7 @@ export function CreateModuleModal({
               min={0}
               value={orderIndex}
               onChange={(e) => setOrderIndex(parseInt(e.target.value) || 0)}
+              className="focus-visible:ring-inset"
             />
             <p className="text-xs text-muted-foreground">
               {t("orderIndexHint")}
@@ -283,15 +286,15 @@ export function CreateModuleModal({
           </div>
 
           {/* Document Assignment */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Label>{t("assignDocuments")}</Label>
-              <div className="flex gap-1">
+          <div className="space-y-2 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <Label className="shrink-0">{t("assignDocuments")}</Label>
+              <div className="flex gap-1 shrink-0 overflow-hidden">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs h-7 px-2"
+                  className="text-xs h-7 px-2 shrink-0"
                   onClick={handleSelectAll}
                   disabled={availableDocuments.length === 0}
                 >
@@ -301,7 +304,7 @@ export function CreateModuleModal({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-xs h-7 px-2"
+                  className="text-xs h-7 px-2 shrink-0"
                   onClick={handleDeselectAll}
                   disabled={selectedDocIds.length === 0}
                 >
@@ -311,12 +314,12 @@ export function CreateModuleModal({
             </div>
 
             {availableDocuments.length > 0 ? (
-              <ScrollArea className="h-48 rounded-md border p-2">
-                <div className="space-y-2">
+              <ScrollArea className="h-48 rounded-md border w-full">
+                <div className="space-y-1 p-2 w-full">
                   {availableDocuments.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center space-x-2 p-2 hover:bg-muted rounded overflow-hidden"
+                      className="flex items-center gap-2 p-2 hover:bg-muted rounded min-w-0"
                     >
                       <Checkbox
                         id={`doc-${doc.id}`}
@@ -329,7 +332,7 @@ export function CreateModuleModal({
                         className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer text-sm"
                       >
                         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="truncate">{doc.filename}</span>
+                        <span className="truncate block max-w-full">{doc.filename}</span>
                       </label>
                     </div>
                   ))}
