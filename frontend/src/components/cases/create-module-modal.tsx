@@ -233,7 +233,7 @@ export function CreateModuleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("editTitle") : t("createTitle")}
@@ -314,18 +314,19 @@ export function CreateModuleModal({
                   {availableDocuments.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center space-x-2 p-2 hover:bg-muted rounded"
+                      className="flex items-center space-x-2 p-2 hover:bg-muted rounded overflow-hidden"
                     >
                       <Checkbox
                         id={`doc-${doc.id}`}
                         checked={selectedDocIds.includes(doc.id)}
                         onCheckedChange={() => handleToggleDocument(doc.id)}
+                        className="shrink-0"
                       />
                       <label
                         htmlFor={`doc-${doc.id}`}
-                        className="flex-1 flex items-center gap-2 cursor-pointer text-sm"
+                        className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer text-sm"
                       >
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="truncate">{doc.filename}</span>
                       </label>
                     </div>
