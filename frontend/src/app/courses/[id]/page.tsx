@@ -15,6 +15,7 @@ import { DocumentUploadModal } from "@/components/cases/document-upload-modal";
 import { AudioRecorderModal } from "@/components/cases/audio-recorder-modal";
 import { LinkDirectoryModal } from "@/components/cases/link-directory-modal";
 import { YouTubeDownloadModal } from "@/components/cases/youtube-download-modal";
+import { ImportDocusaurusModal } from "@/components/cases/import-docusaurus-modal";
 import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import { CreateFlashcardDeckModal } from "@/components/cases/create-flashcard-deck-modal";
 import { FlashcardStudyPanel } from "@/components/cases/flashcard-study-panel";
@@ -23,8 +24,8 @@ import type { LinkedDirectory } from "@/components/cases/linked-directories-data
 import type { FlashcardDeck } from "@/types";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { coursesApi, documentsApi } from "@/lib/api";
-import type { Course, Checklist, Document } from "@/types";
+import { coursesApi, documentsApi, modulesApi } from "@/lib/api";
+import type { Course, Checklist, Document, Module } from "@/types";
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -37,6 +38,7 @@ export default function CourseDetailPage() {
 
   const [courseData, setCourseData] = useState<Course | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export default function CourseDetailPage() {
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
   const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+  const [docusaurusModalOpen, setDocusaurusModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
   const [previewDirectory, setPreviewDirectory] = useState<LinkedDirectory | null>(null);
@@ -71,6 +74,13 @@ export default function CourseDetailPage() {
         setDocuments(docs);
       } catch {
         // Documents endpoint may not exist yet
+      }
+
+      try {
+        const modulesResponse = await modulesApi.listWithProgress(courseId);
+        setModules(modulesResponse.modules);
+      } catch {
+        // Modules endpoint may not exist yet
       }
 
     } catch (err) {
@@ -118,6 +128,10 @@ export default function CourseDetailPage() {
 
   const handleYouTubeImport = () => {
     setYoutubeModalOpen(true);
+  };
+
+  const handleDocusaurusImport = () => {
+    setDocusaurusModalOpen(true);
   };
 
   const handleEdit = () => {
@@ -400,6 +414,7 @@ export default function CourseDetailPage() {
           onOpenChange={setLinkDirectoryModalOpen}
           caseId={courseId}
           onLinkSuccess={handleUploadComplete}
+          modules={modules}
         />
 
         {/* YouTube Download Modal */}
@@ -408,6 +423,16 @@ export default function CourseDetailPage() {
           onClose={() => setYoutubeModalOpen(false)}
           caseId={courseId}
           onDownloadComplete={handleUploadComplete}
+          modules={modules}
+        />
+
+        {/* Import Docusaurus Modal */}
+        <ImportDocusaurusModal
+          open={docusaurusModalOpen}
+          onOpenChange={setDocusaurusModalOpen}
+          caseId={courseId}
+          onImportSuccess={handleUploadComplete}
+          modules={modules}
         />
 
         {/* Edit Course Modal */}

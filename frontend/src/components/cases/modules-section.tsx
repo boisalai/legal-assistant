@@ -37,6 +37,7 @@ import { ModuleAccordionItem } from "./module-accordion-item";
 import { CreateModuleModal } from "./create-module-modal";
 import { AutoDetectModulesModal } from "./auto-detect-modules-modal";
 import { UploadToModuleModal } from "./upload-to-module-modal";
+import { LinkDirectoryModal } from "./link-directory-modal";
 import type { ModuleWithProgress, Document } from "@/types";
 import { formatFileSize } from "@/lib/utils";
 
@@ -75,6 +76,10 @@ export function ModulesSection({
   // Upload to module state
   const [uploadModuleId, setUploadModuleId] = useState<string | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  // Link directory to module state
+  const [linkDirectoryModuleId, setLinkDirectoryModuleId] = useState<string | null>(null);
+  const [linkDirectoryModalOpen, setLinkDirectoryModalOpen] = useState(false);
 
   // Unassigned documents section
   const [unassignedOpen, setUnassignedOpen] = useState(false);
@@ -137,8 +142,8 @@ export function ModulesSection({
   };
 
   const handleLinkDirectoryClick = (moduleId: string) => {
-    // TODO: Open link directory modal with module pre-selected
-    toast.info(t("linkDirectoryComingSoon"));
+    setLinkDirectoryModuleId(moduleId);
+    setLinkDirectoryModalOpen(true);
   };
 
   const handleCreateSuccess = async () => {
@@ -173,6 +178,14 @@ export function ModulesSection({
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     setUploadModuleId(null);
+    onDocumentsChange?.();
+    // Refresh modules to update document counts
+    handleCreateSuccess();
+  };
+
+  const handleLinkDirectorySuccess = () => {
+    setLinkDirectoryModalOpen(false);
+    setLinkDirectoryModuleId(null);
     onDocumentsChange?.();
     // Refresh modules to update document counts
     handleCreateSuccess();
@@ -360,6 +373,18 @@ export function ModulesSection({
           moduleId={uploadModuleId}
           moduleName={modules.find((m) => m.id === uploadModuleId)?.name || ""}
           onSuccess={handleUploadSuccess}
+        />
+      )}
+
+      {/* Link Directory to Module Modal */}
+      {linkDirectoryModuleId && (
+        <LinkDirectoryModal
+          open={linkDirectoryModalOpen}
+          onOpenChange={setLinkDirectoryModalOpen}
+          caseId={courseId}
+          onLinkSuccess={handleLinkDirectorySuccess}
+          modules={modules}
+          preselectedModuleId={linkDirectoryModuleId}
         />
       )}
 
