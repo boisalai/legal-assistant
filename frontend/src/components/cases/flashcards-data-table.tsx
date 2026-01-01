@@ -127,11 +127,7 @@ export function FlashcardsDataTable({
         const date = new Date(row.original.created_at);
         return (
           <span className="text-[14px] text-[#000000]">
-            {date.toLocaleDateString("fr-CA", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
+            {date.toLocaleDateString("fr-CA")}
           </span>
         );
       },
@@ -204,7 +200,7 @@ export function FlashcardsDataTable({
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
                 return (
-                  <TableHead key={header.id} className="bg-blue-50 font-bold text-black">
+                  <TableHead key={header.id} className="bg-blue-50 text-black">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
