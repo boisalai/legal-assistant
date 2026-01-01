@@ -233,7 +233,7 @@ export function CreateModuleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl overflow-hidden">
+      <DialogContent className="sm:max-w-[600px] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("editTitle") : t("createTitle")}
@@ -243,7 +243,7 @@ export function CreateModuleModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-hidden">
           {/* Module Name */}
           <div className="space-y-2">
             <Label htmlFor="module-name">{t("name")} *</Label>
@@ -284,13 +284,14 @@ export function CreateModuleModal({
 
           {/* Document Assignment */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <Label>{t("assignDocuments")}</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="text-xs h-7 px-2"
                   onClick={handleSelectAll}
                   disabled={availableDocuments.length === 0}
                 >
@@ -300,6 +301,7 @@ export function CreateModuleModal({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="text-xs h-7 px-2"
                   onClick={handleDeselectAll}
                   disabled={selectedDocIds.length === 0}
                 >
