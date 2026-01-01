@@ -16,7 +16,6 @@ class ModuleBase(BaseModel):
     """Schéma de base pour un module."""
     name: str = Field(..., min_length=1, max_length=200, description="Nom du module")
     order_index: int = Field(default=0, ge=0, description="Index pour l'ordre d'affichage")
-    description: Optional[str] = Field(None, max_length=1000, description="Description du module")
     exam_weight: Optional[float] = Field(None, ge=0, le=1, description="Poids dans l'examen (0-1)")
 
 
@@ -29,7 +28,6 @@ class ModuleUpdate(BaseModel):
     """Requête pour mettre à jour un module."""
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     order_index: Optional[int] = Field(None, ge=0)
-    description: Optional[str] = Field(None, max_length=1000)
     exam_weight: Optional[float] = Field(None, ge=0, le=1)
 
 
@@ -76,7 +74,6 @@ class ModuleBulkCreateItem(BaseModel):
     """Item pour création en masse de modules."""
     name: str = Field(..., min_length=1, max_length=200)
     order_index: int = Field(default=0, ge=0)
-    description: Optional[str] = None
     exam_weight: Optional[float] = Field(None, ge=0, le=1)
 
 
