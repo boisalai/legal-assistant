@@ -289,7 +289,7 @@ export function CreateFlashcardDeckModal({
 
         {/* Form */}
         {!isCreating && !isGenerating && !generationComplete && !generationError && (
-          <div className="space-y-5 py-2 overflow-y-auto flex-1">
+          <div className="space-y-5 py-2 px-1 overflow-y-auto flex-1">
             {/* Deck name */}
             <div className="space-y-2">
               <Label htmlFor="deck-name">{t("setName")}</Label>
