@@ -83,6 +83,7 @@ export interface Document {
     needs_reindex: boolean;     // True if source has changed
   };
   indexed?: boolean;            // True if indexed for RAG search
+  module_id?: string;           // ID of the module this document is assigned to
 }
 
 // Docusaurus file listing
@@ -383,4 +384,86 @@ export interface FlashcardGenerationProgress {
   status: "starting" | "loading" | "generating" | "parsing" | "saving" | "completed" | "error";
   message: string;
   cards_generated?: number;
+}
+
+// ============================================
+// Module Types
+// ============================================
+
+export type MasteryLevel = "not_started" | "learning" | "proficient" | "mastered";
+
+export interface Module {
+  id: string;
+  course_id: string;
+  name: string;
+  order_index: number;
+  description?: string;
+  exam_weight?: number;
+  created_at: string;
+  updated_at?: string;
+  document_count: number;
+}
+
+export interface ModuleWithProgress extends Module {
+  // Reading progress
+  documents_total: number;
+  documents_completed: number;
+  reading_percent: number;
+
+  // Flashcard progress
+  flashcards_total: number;
+  flashcards_mastered: number;
+  flashcard_percent: number;
+
+  // Quiz progress
+  quiz_attempts: number;
+  quiz_average_score: number;
+  quiz_best_score: number;
+
+  // Combined metrics
+  overall_progress: number;
+  mastery_level: MasteryLevel;
+
+  // Time tracking
+  total_study_time_seconds: number;
+  last_activity_at?: string;
+}
+
+export interface ModuleListResponse {
+  modules: Module[];
+  total: number;
+}
+
+export interface ModuleListWithProgressResponse {
+  modules: ModuleWithProgress[];
+  total: number;
+  course_overall_progress: number;
+  recommended_module_id?: string;
+  recommendation_message?: string;
+}
+
+export interface DetectedModule {
+  suggested_name: string;
+  document_ids: string[];
+  document_count: number;
+}
+
+export interface AutoDetectResponse {
+  detected_modules: DetectedModule[];
+  unassigned_documents: string[];
+  total_documents: number;
+}
+
+export interface ModuleCreate {
+  name: string;
+  order_index?: number;
+  description?: string;
+  exam_weight?: number;
+}
+
+export interface ModuleUpdate {
+  name?: string;
+  order_index?: number;
+  description?: string;
+  exam_weight?: number;
 }
