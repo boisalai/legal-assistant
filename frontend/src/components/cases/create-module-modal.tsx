@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import {
   Dialog,
@@ -16,9 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, FileText, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { modulesApi } from "@/lib/api";
+import { formatFileSize } from "@/lib/utils";
 import type { Module, ModuleWithProgress, Document } from "@/types";
 
 interface CreateModuleModalProps {
@@ -48,6 +50,12 @@ export function CreateModuleModal({
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // File upload state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isEditing = !!module;
 
   // Reset form when modal opens/closes or module changes
@@ -70,8 +78,46 @@ export function CreateModuleModal({
         setExamWeight(undefined);
         setSelectedDocIds([]);
       }
+      setPendingFiles([]);
+      setUploadProgress({ current: 0, total: 0 });
     }
   }, [open, module, documents]);
+
+  // Drag & drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...files]);
+    }
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...files]);
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   // Filter to show unassigned documents + documents assigned to current module (if editing)
   const availableDocuments = documents.filter((doc) => {
@@ -154,7 +200,30 @@ export function CreateModuleModal({
           await modulesApi.assignDocuments(savedModule.id, selectedDocIds);
         }
 
-        toast.success(t("created"));
+        // Upload pending files to the new module
+        if (pendingFiles.length > 0) {
+          setUploadProgress({ current: 0, total: pendingFiles.length });
+          let uploadedCount = 0;
+
+          for (const file of pendingFiles) {
+            try {
+              await modulesApi.uploadToModule(savedModule.id, file, false);
+              uploadedCount++;
+              setUploadProgress({ current: uploadedCount, total: pendingFiles.length });
+            } catch (uploadError) {
+              console.error(`Error uploading ${file.name}:`, uploadError);
+              toast.error(t("uploadError", { filename: file.name }));
+            }
+          }
+
+          if (uploadedCount > 0) {
+            toast.success(t("createdWithFiles", { count: uploadedCount }));
+          } else {
+            toast.success(t("created"));
+          }
+        } else {
+          toast.success(t("created"));
+        }
       }
 
       onSuccess();
@@ -304,6 +373,96 @@ export function CreateModuleModal({
               {t("documentsSelected", { count: selectedDocIds.length })}
             </p>
           </div>
+
+          {/* File Upload Zone - Only for new modules */}
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label>{t("uploadNewFiles")}</Label>
+              <div
+                className={`
+                  border-2 border-dashed rounded-lg p-6 text-center transition-colors
+                  ${isDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                  }
+                `}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.md,.mdx,.txt,.mp3,.wav,.m4a"
+                />
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  {t("dropFilesHere")}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {t("browseFiles")}
+                </Button>
+              </div>
+
+              {/* Pending files list */}
+              {pendingFiles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {t("filesToUpload", { count: pendingFiles.length })}
+                  </p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {pendingFiles.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            ({formatFileSize(file.size)})
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => removeFile(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload progress */}
+              {submitting && uploadProgress.total > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{t("uploading")}</span>
+                    <span>
+                      {uploadProgress.current} / {uploadProgress.total}
+                    </span>
+                  </div>
+                  <Progress
+                    value={(uploadProgress.current / uploadProgress.total) * 100}
+                    className="h-2"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

@@ -13,15 +13,24 @@ Endpoints:
 - DELETE /api/modules/{module_id} - Supprimer un module
 - GET /api/modules/{module_id}/documents - Documents du module
 - POST /api/modules/{module_id}/documents - Assigner des documents
+- POST /api/modules/{module_id}/documents/upload - Upload direct vers module
 - DELETE /api/modules/{module_id}/documents - Désassigner des documents
 - GET /api/courses/{course_id}/documents/unassigned - Documents sans module
 """
 
 import logging
+import uuid
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, UploadFile, File, Form, Depends
 from pydantic import BaseModel
+
+from config.settings import settings
+from services.document_service import get_document_service
+from utils.file_utils import is_allowed_file, get_file_extension, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
+from auth.helpers import require_auth
+from models.document_models import DocumentResponse
 
 from services.module_service import get_module_service
 from models.module_models import (
@@ -437,3 +446,116 @@ async def unassign_documents(module_id: str, request: AssignDocumentsRequest):
         "unassigned_count": count,
         "document_ids": request.document_ids
     }
+
+
+@router.post(
+    "/api/modules/{module_id}/documents/upload",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload direct vers un module"
+)
+async def upload_document_to_module(
+    module_id: str,
+    file: UploadFile = File(...),
+    auto_extract_markdown: bool = Form(False),
+    user_id: str = Depends(require_auth)
+):
+    """
+    Upload un document directement vers un module.
+
+    Le document est créé et automatiquement assigné au module spécifié.
+    Accepte: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
+
+    Args:
+        module_id: ID du module cible
+        file: Fichier à uploader
+        auto_extract_markdown: Si True, extrait automatiquement le contenu en markdown (PDF uniquement)
+    """
+    module_service = get_module_service()
+
+    # Vérifier que le module existe et récupérer son course_id
+    module = await module_service.get_module(module_id)
+    if not module:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Module non trouvé: {module_id}"
+        )
+
+    course_id = module.course_id
+
+    # Validate file type
+    if not file.filename or not is_allowed_file(file.filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Type de fichier non supporté. Extensions acceptées: {', '.join(ALLOWED_EXTENSIONS.keys())}"
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Check file size
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
+        )
+
+    try:
+        # Normalize IDs
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
+        if not module_id.startswith("module:"):
+            module_id = f"module:{module_id}"
+
+        # Save file to disk
+        doc_id = str(uuid.uuid4())[:8]
+        ext = get_file_extension(file.filename)
+
+        upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = str(upload_dir / f"{doc_id}{ext}")
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        logger.info(f"Document saved to module {module_id}: {file_path}")
+
+        # Create document record with module_id
+        doc_service = get_document_service()
+        document = await doc_service.create_document(
+            course_id=course_id,
+            filename=file.filename,
+            file_path=file_path,
+            file_size=len(content),
+            source_type="upload",
+            module_id=module_id
+        )
+
+        logger.info(f"Document {document.id} created and assigned to module {module_id}")
+
+        # If auto_extract_markdown is enabled and file is PDF, trigger extraction in background
+        if auto_extract_markdown and ext.lower() == '.pdf':
+            import asyncio
+            import httpx
+
+            async def trigger_extraction():
+                try:
+                    async with httpx.AsyncClient(timeout=300.0) as client:
+                        url = f"http://localhost:{settings.api_port}/api/courses/{course_id}/documents/{document.id}/extract-to-markdown"
+                        await client.post(url, params={"force_reextract": False})
+                        logger.info(f"Markdown extraction triggered for {document.id}")
+                except Exception as e:
+                    logger.warning(f"Auto-extraction failed for {document.id}: {e}")
+
+            asyncio.create_task(trigger_extraction())
+
+        return document
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading document to module: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,19 +26,26 @@ import {
   Layers,
   Wand2,
   Target,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
-import { modulesApi } from "@/lib/api";
-import { ModulesDataTable } from "./modules-data-table";
+import { modulesApi, documentsApi } from "@/lib/api";
+import { ModuleAccordionItem } from "./module-accordion-item";
 import { CreateModuleModal } from "./create-module-modal";
 import { AutoDetectModulesModal } from "./auto-detect-modules-modal";
+import { UploadToModuleModal } from "./upload-to-module-modal";
 import type { ModuleWithProgress, Document } from "@/types";
+import { formatFileSize } from "@/lib/utils";
 
 interface ModulesSectionProps {
   courseId: string;
   documents: Document[];
   onDocumentsChange?: () => void;
   refreshKey?: number;
+  onDocumentClick?: (document: Document) => void;
 }
 
 export function ModulesSection({
@@ -41,6 +53,7 @@ export function ModulesSection({
   documents,
   onDocumentsChange,
   refreshKey,
+  onDocumentClick,
 }: ModulesSectionProps) {
   const t = useTranslations("modules");
   const tCommon = useTranslations("common");
@@ -58,6 +71,18 @@ export function ModulesSection({
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [autoDetectModalOpen, setAutoDetectModalOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<ModuleWithProgress | null>(null);
+
+  // Upload to module state
+  const [uploadModuleId, setUploadModuleId] = useState<string | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  // Unassigned documents section
+  const [unassignedOpen, setUnassignedOpen] = useState(false);
+
+  // Compute unassigned documents
+  const unassignedDocuments = documents.filter(
+    (doc) => !doc.module_id && !doc.is_derived
+  );
 
   // Fetch modules on mount and when refreshKey changes
   useEffect(() => {
@@ -106,9 +131,14 @@ export function ModulesSection({
     setCreateModalOpen(true);
   };
 
-  const handleViewDocuments = (module: ModuleWithProgress) => {
-    // TODO: Could filter document list or open a dialog
-    toast.info(`${module.document_count} ${t("documentsInModule")}`);
+  const handleUploadClick = (moduleId: string) => {
+    setUploadModuleId(moduleId);
+    setUploadModalOpen(true);
+  };
+
+  const handleLinkDirectoryClick = (moduleId: string) => {
+    // TODO: Open link directory modal with module pre-selected
+    toast.info(t("linkDirectoryComingSoon"));
   };
 
   const handleCreateSuccess = async () => {
@@ -138,6 +168,14 @@ export function ModulesSection({
       console.error("Error refreshing modules:", error);
     }
     onDocumentsChange?.();
+  };
+
+  const handleUploadSuccess = () => {
+    setUploadModalOpen(false);
+    setUploadModuleId(null);
+    onDocumentsChange?.();
+    // Refresh modules to update document counts
+    handleCreateSuccess();
   };
 
   if (loading) {
@@ -213,22 +251,86 @@ export function ModulesSection({
           </Card>
         )}
 
-        {/* Modules DataTable */}
+        {/* Modules Accordion */}
         {modules.length > 0 ? (
-          <ModulesDataTable
-            modules={modules}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-            onViewDocuments={handleViewDocuments}
-            deletingModuleId={deletingModuleId}
-            recommendedModuleId={recommendedModuleId}
-          />
+          <div className="space-y-2">
+            {modules
+              .sort((a, b) => a.order_index - b.order_index)
+              .map((module) => (
+                <ModuleAccordionItem
+                  key={module.id}
+                  module={module}
+                  documents={documents}
+                  isRecommended={module.id === recommendedModuleId}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteClick}
+                  onUploadClick={handleUploadClick}
+                  onLinkDirectoryClick={handleLinkDirectoryClick}
+                  onDocumentClick={onDocumentClick}
+                  isDeleting={deletingModuleId === module.id}
+                />
+              ))}
+          </div>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground border rounded-lg">
             <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">{t("noModules")}</p>
             <p className="text-xs mt-1">{t("noModulesHint")}</p>
           </div>
+        )}
+
+        {/* Unassigned Documents Section */}
+        {unassignedDocuments.length > 0 && (
+          <Collapsible open={unassignedOpen} onOpenChange={setUnassignedOpen}>
+            <div className="border rounded-lg border-dashed border-gray-300 bg-gray-50/50">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="text-gray-400">
+                      {unassignedOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </div>
+                    <Inbox className="h-4 w-4 text-gray-400" />
+                    <span className="font-medium text-sm text-gray-600">
+                      {t("unassigned")}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ({unassignedDocuments.length})
+                    </span>
+                  </div>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t px-3 py-2">
+                  <div className="space-y-1">
+                    {unassignedDocuments.slice(0, 10).map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 cursor-pointer transition-colors"
+                        onClick={() => onDocumentClick?.(doc)}
+                      >
+                        <FileText className="h-4 w-4 text-gray-400" />
+                        <span className="flex-1 text-sm truncate" title={doc.filename}>
+                          {doc.filename}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatFileSize(doc.size)}
+                        </span>
+                      </div>
+                    ))}
+                    {unassignedDocuments.length > 10 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        {t("andMore", { count: unassignedDocuments.length - 10 })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         )}
       </div>
 
@@ -249,6 +351,17 @@ export function ModulesSection({
         courseId={courseId}
         onSuccess={handleAutoDetectSuccess}
       />
+
+      {/* Upload to Module Modal */}
+      {uploadModuleId && (
+        <UploadToModuleModal
+          open={uploadModalOpen}
+          onOpenChange={setUploadModalOpen}
+          moduleId={uploadModuleId}
+          moduleName={modules.find((m) => m.id === uploadModuleId)?.name || ""}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

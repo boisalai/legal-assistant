@@ -9,18 +9,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Youtube, Loader2, Download, Clock, User, AlertCircle } from "lucide-react";
+import { Youtube, Loader2, Download, Clock, User, AlertCircle, Layers } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { documentsApi } from "@/lib/api";
+import type { Module } from "@/types";
 
 interface YouTubeDownloadModalProps {
   open: boolean;
   onClose: () => void;
   caseId: string;
   onDownloadComplete: () => void;
+  modules?: Module[];
 }
 
 interface VideoInfo {
@@ -37,6 +46,7 @@ export function YouTubeDownloadModal({
   onClose,
   caseId,
   onDownloadComplete,
+  modules = [],
 }: YouTubeDownloadModalProps) {
   const [url, setUrl] = useState("");
   const [state, setState] = useState<ModalState>("input");
@@ -44,6 +54,7 @@ export function YouTubeDownloadModal({
   const [error, setError] = useState<string | null>(null);
   const [downloadedTitle, setDownloadedTitle] = useState<string>("");
   const [autoTranscribe, setAutoTranscribe] = useState(true); // Enabled by default
+  const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(undefined);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -95,7 +106,7 @@ export function YouTubeDownloadModal({
     setError(null);
 
     try {
-      const result = await documentsApi.downloadYouTube(caseId, url, autoTranscribe);
+      const result = await documentsApi.downloadYouTube(caseId, url, autoTranscribe, selectedModuleId);
 
       if (result.success) {
         setDownloadedTitle(result.title || videoInfo?.title || "Audio");
@@ -122,6 +133,7 @@ export function YouTubeDownloadModal({
     setError(null);
     setDownloadedTitle("");
     setAutoTranscribe(true); // Reset to default
+    setSelectedModuleId(undefined);
     onClose();
   };
 
@@ -229,6 +241,32 @@ export function YouTubeDownloadModal({
                   Lance la transcription Whisper après téléchargement
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Module selector */}
+          {state === "preview" && modules.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="module-select" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Assigner à un module (optionnel)
+              </Label>
+              <Select
+                value={selectedModuleId || "none"}
+                onValueChange={(value) => setSelectedModuleId(value === "none" ? undefined : value)}
+              >
+                <SelectTrigger id="module-select">
+                  <SelectValue placeholder="Aucun module sélectionné" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun module</SelectItem>
+                  {modules.map((module) => (
+                    <SelectItem key={module.id} value={module.id}>
+                      {module.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

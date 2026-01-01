@@ -668,7 +668,12 @@ export const documentsApi = {
     return result;
   },
 
-  async upload(caseId: string, file: File, autoExtractMarkdown: boolean = false): Promise<Document> {
+  async upload(
+    caseId: string,
+    file: File,
+    autoExtractMarkdown: boolean = false,
+    moduleId?: string
+  ): Promise<Document> {
     // Clean ID (remove judgment: prefix if present)
     const cleanId = caseId.replace("course:", "").replace("judgment:", "");
 
@@ -676,6 +681,10 @@ export const documentsApi = {
     formData.append("file", file);
     if (autoExtractMarkdown) {
       formData.append("auto_extract_markdown", "true");
+    }
+    if (moduleId) {
+      const cleanModuleId = moduleId.replace("module:", "");
+      formData.append("module_id", cleanModuleId);
     }
 
     const response = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(cleanId)}/documents`, {
@@ -807,13 +816,22 @@ export const documentsApi = {
     );
   },
 
-  async downloadYouTube(caseId: string, url: string, autoTranscribe: boolean = false): Promise<YouTubeDownloadResult> {
+  async downloadYouTube(
+    caseId: string,
+    url: string,
+    autoTranscribe: boolean = false,
+    moduleId?: string
+  ): Promise<YouTubeDownloadResult> {
     const cleanCaseId = caseId.replace("course:", "").replace("judgment:", "");
+    const bodyData: Record<string, unknown> = { url, auto_transcribe: autoTranscribe };
+    if (moduleId) {
+      bodyData.module_id = moduleId.replace("module:", "");
+    }
     return fetchApi<YouTubeDownloadResult>(
       `/api/courses/${encodeURIComponent(cleanCaseId)}/documents/youtube`,
       {
         method: "POST",
-        body: JSON.stringify({ url, auto_transcribe: autoTranscribe }),
+        body: JSON.stringify(bodyData),
       }
     );
   },
@@ -1101,11 +1119,15 @@ export const docusaurusApi = {
   },
 
   // Import selected Docusaurus files into a case
-  async importFiles(caseId: string, filePaths: string[]): Promise<Document[]> {
+  async importFiles(caseId: string, filePaths: string[], moduleId?: string): Promise<Document[]> {
     const cleanId = caseId.replace("course:", "").replace("case:", "");
+    const bodyData: Record<string, unknown> = { file_paths: filePaths };
+    if (moduleId) {
+      bodyData.module_id = moduleId.replace("module:", "");
+    }
     return fetchApi<Document[]>(`/api/courses/${cleanId}/import-docusaurus`, {
       method: "POST",
-      body: JSON.stringify({ file_paths: filePaths }),
+      body: JSON.stringify(bodyData),
     });
   },
 
@@ -1352,7 +1374,8 @@ export const linkedDirectoryApi = {
     onProgress?: (event: LinkedDirectoryProgressEvent) => void,
     onComplete?: (result: { success: boolean; total_indexed: number; link_id: string }) => void,
     onError?: (error: string) => void,
-    onLinkIdReceived?: (linkId: string) => void
+    onLinkIdReceived?: (linkId: string) => void,
+    moduleId?: string
   ): Promise<void> {
     const cleanId = caseId.replace("course:", "").replace("case:", "");
     const url = `${API_BASE_URL}/api/courses/${cleanId}/link-directory`;
@@ -1370,14 +1393,19 @@ export const linkedDirectoryApi = {
       }
     }
 
+    const bodyData: Record<string, unknown> = {
+      directory_path: directoryPath,
+      auto_extract_markdown: autoExtractMarkdown,
+    };
+    if (moduleId) {
+      bodyData.module_id = moduleId.replace("module:", "");
+    }
+
     const response = await fetch(url, {
       method: "POST",
       headers,
       signal,
-      body: JSON.stringify({
-        directory_path: directoryPath,
-        auto_extract_markdown: autoExtractMarkdown,
-      }),
+      body: JSON.stringify(bodyData),
     });
 
     if (!response.ok) {
@@ -1596,6 +1624,41 @@ export const modulesApi = {
     return fetchApi<{ documents: Document[]; total: number }>(
       `/api/courses/${encodeURIComponent(cleanId)}/documents/unassigned`
     );
+  },
+
+  // Upload a document directly to a module
+  async uploadToModule(
+    moduleId: string,
+    file: File,
+    autoExtractMarkdown: boolean = false
+  ): Promise<Document> {
+    const cleanId = moduleId.replace("module:", "");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (autoExtractMarkdown) {
+      formData.append("auto_extract_markdown", "true");
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/modules/${encodeURIComponent(cleanId)}/documents/upload`,
+      {
+        method: "POST",
+        body: formData,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Upload failed" }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
   },
 };
 

@@ -19,20 +19,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Folder, Loader2, FolderOpen, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Folder, Loader2, FolderOpen, FileText, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 import { linkedDirectoryApi } from "@/lib/api";
-import type { LinkedDirectoryScanResult } from "@/types";
+import type { LinkedDirectoryScanResult, Module } from "@/types";
 
 interface LinkDirectoryModalProps {
   caseId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLinkSuccess: () => void;
+  modules?: Module[];
+  preselectedModuleId?: string;
 }
 
 type ModalState = "input" | "scanning" | "confirm" | "linking" | "success" | "error";
@@ -42,6 +52,8 @@ export function LinkDirectoryModal({
   open,
   onOpenChange,
   onLinkSuccess,
+  modules = [],
+  preselectedModuleId,
 }: LinkDirectoryModalProps) {
   const [state, setState] = useState<ModalState>("input");
   const [directoryPath, setDirectoryPath] = useState("");
@@ -51,6 +63,7 @@ export function LinkDirectoryModal({
   const [autoExtractMarkdown, setAutoExtractMarkdown] = useState(false);
   const [currentLinkId, setCurrentLinkId] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(preselectedModuleId);
 
   // Reset state when modal closes
   const handleClose = () => {
@@ -63,6 +76,7 @@ export function LinkDirectoryModal({
       setAutoExtractMarkdown(false);
       setCurrentLinkId(null);
       setAbortController(null);
+      setSelectedModuleId(preselectedModuleId);
       onOpenChange(false);
     }
   };
@@ -166,7 +180,8 @@ export function LinkDirectoryModal({
         (linkId) => {
           // Callback to capture link_id early
           setCurrentLinkId(linkId);
-        }
+        },
+        selectedModuleId
       );
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -369,6 +384,35 @@ export function LinkDirectoryModal({
               <div className="p-3 bg-muted rounded text-xs font-mono break-all">
                 {scanResult.base_path}
               </div>
+
+              {/* Module selector */}
+              {modules.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="module-select" className="flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Assigner à un module (optionnel)
+                  </Label>
+                  <Select
+                    value={selectedModuleId || "none"}
+                    onValueChange={(value) => setSelectedModuleId(value === "none" ? undefined : value)}
+                  >
+                    <SelectTrigger id="module-select">
+                      <SelectValue placeholder="Aucun module sélectionné" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun module</SelectItem>
+                      {modules.map((module) => (
+                        <SelectItem key={module.id} value={module.id}>
+                          {module.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Les fichiers seront directement assignés au module sélectionné
+                  </p>
+                </div>
+              )}
 
               {/* Auto-extract option */}
               {scanResult && (scanResult.files_by_type.pdf || scanResult.files_by_type.docx || scanResult.files_by_type.doc) && (

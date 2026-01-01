@@ -197,6 +197,7 @@ async def upload_document(
     course_id: str,
     file: UploadFile = File(...),
     auto_extract_markdown: bool = Form(False),
+    module_id: Optional[str] = Form(None),
     user_id: str = Depends(require_auth)
 ):
     """
@@ -205,6 +206,7 @@ async def upload_document(
 
     Args:
         auto_extract_markdown: Si True, extrait automatiquement le contenu en markdown après l'upload (PDF uniquement)
+        module_id: Si fourni, assigne directement le document à ce module
     """
     # Validate file type
     if not file.filename or not is_allowed_file(file.filename):
@@ -264,7 +266,8 @@ async def upload_document(
             filename=file.filename,
             file_path=file_path,
             file_size=len(content),
-            source_type="upload"
+            source_type="upload",
+            module_id=module_id
         )
 
         logger.info(f"Document created: {document.id}")

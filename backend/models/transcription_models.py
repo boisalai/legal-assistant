@@ -1,5 +1,6 @@
 """Modèles Pydantic pour la transcription et l'extraction de documents."""
 
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -31,6 +32,7 @@ class YouTubeDownloadRequest(BaseModel):
     """Request pour télécharger l'audio d'une vidéo YouTube."""
     url: str
     auto_transcribe: bool = False  # Si True, lance la transcription automatiquement
+    module_id: Optional[str] = None  # Si fourni, assigne le document à ce module
 
 
 class YouTubeInfoResponse(BaseModel):
