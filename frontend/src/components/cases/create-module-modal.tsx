@@ -117,13 +117,31 @@ export function CreateModuleModal({
   }, []);
 
   // Filter to show unassigned documents + documents assigned to current module (if editing)
-  const availableDocuments = documents.filter((doc) => {
-    // Show if unassigned
-    if (!doc.module_id) return true;
-    // Show if assigned to the module we're editing
-    if (isEditing && doc.module_id === module?.id) return true;
-    return false;
-  });
+  // Deduplicate by filename and sort alphabetically
+  const availableDocuments = (() => {
+    const filtered = documents.filter((doc) => {
+      // Show if unassigned
+      if (!doc.module_id) return true;
+      // Show if assigned to the module we're editing
+      if (isEditing && doc.module_id === module?.id) return true;
+      return false;
+    });
+
+    // Deduplicate by filename, keeping the first occurrence (prefer assigned to current module)
+    const seen = new Map<string, Document>();
+    for (const doc of filtered) {
+      if (!seen.has(doc.filename)) {
+        seen.set(doc.filename, doc);
+      } else if (isEditing && doc.module_id === module?.id) {
+        // Prefer document assigned to current module
+        seen.set(doc.filename, doc);
+      }
+    }
+
+    return Array.from(seen.values()).sort((a, b) =>
+      a.filename.localeCompare(b.filename, "fr", { sensitivity: "base" })
+    );
+  })();
 
   const handleToggleDocument = (docId: string) => {
     setSelectedDocIds((prev) =>

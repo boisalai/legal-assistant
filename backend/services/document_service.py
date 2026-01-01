@@ -241,6 +241,28 @@ class DocumentService:
             if not course_id.startswith("course:"):
                 course_id = f"course:{course_id}"
 
+            # Check for duplicate documents (same filename in same course)
+            # Only check for upload source type to avoid blocking linked/docusaurus syncs
+            if source_type == "upload" and not is_derived:
+                # Check if document with same filename already exists (any source type)
+                existing = await self.surreal_service.query(
+                    "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename LIMIT 1",
+                    {"course_id": course_id, "filename": filename}
+                )
+                if existing and len(existing) > 0:
+                    first_result = existing[0]
+                    if isinstance(first_result, dict) and "result" in first_result:
+                        items = first_result["result"]
+                    else:
+                        items = existing
+                    if items and len(items) > 0:
+                        existing_doc = items[0]
+                        existing_id = str(existing_doc.get("id", ""))
+                        existing_source = existing_doc.get("source_type", "unknown")
+                        logger.info(f"Document with filename '{filename}' already exists in course {course_id} (source: {existing_source}): {existing_id} - replacing with new upload")
+                        # Delete the existing document (and its file) before creating new one
+                        await self.delete_document(existing_id, delete_file=True)
+
             # Auto-detect file type and mime type if not provided
             if not file_type:
                 file_type = get_file_extension(filename)
