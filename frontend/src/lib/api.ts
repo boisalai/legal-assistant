@@ -9,10 +9,7 @@ import type {
   AnalysisResult,
   Checklist,
   Module,
-  ModuleWithProgress,
   ModuleListResponse,
-  ModuleListWithProgressResponse,
-  AutoDetectResponse,
   ModuleCreate,
   ModuleUpdate,
 } from "@/types";
@@ -1483,29 +1480,10 @@ export const linkedDirectoryApi = {
 
 export const modulesApi = {
   // List modules for a course
-  async list(courseId: string): Promise<Module[]> {
+  async list(courseId: string): Promise<ModuleListResponse> {
     const cleanId = courseId.replace("course:", "");
-    const response = await fetchApi<ModuleListResponse>(
+    return fetchApi<ModuleListResponse>(
       `/api/courses/${encodeURIComponent(cleanId)}/modules`
-    );
-    return response.modules;
-  },
-
-  // List modules with progress
-  async listWithProgress(courseId: string, userId?: string): Promise<ModuleListWithProgressResponse> {
-    const cleanId = courseId.replace("course:", "");
-    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
-    return fetchApi<ModuleListWithProgressResponse>(
-      `/api/courses/${encodeURIComponent(cleanId)}/modules/progress${params}`
-    );
-  },
-
-  // Get course progress summary
-  async getCourseProgress(courseId: string, userId?: string): Promise<ModuleListWithProgressResponse> {
-    const cleanId = courseId.replace("course:", "");
-    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
-    return fetchApi<ModuleListWithProgressResponse>(
-      `/api/courses/${encodeURIComponent(cleanId)}/progress${params}`
     );
   },
 
@@ -1513,15 +1491,6 @@ export const modulesApi = {
   async get(moduleId: string): Promise<Module> {
     const cleanId = moduleId.replace("module:", "");
     return fetchApi<Module>(`/api/modules/${encodeURIComponent(cleanId)}`);
-  },
-
-  // Get module with progress
-  async getWithProgress(moduleId: string, userId?: string): Promise<ModuleWithProgress> {
-    const cleanId = moduleId.replace("module:", "");
-    const params = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
-    return fetchApi<ModuleWithProgress>(
-      `/api/modules/${encodeURIComponent(cleanId)}/progress${params}`
-    );
   },
 
   // Create a new module
@@ -1554,30 +1523,6 @@ export const modulesApi = {
     await fetchApi<void>(`/api/modules/${encodeURIComponent(cleanId)}`, {
       method: "DELETE",
     });
-  },
-
-  // Auto-detect modules from document names
-  async autoDetect(courseId: string): Promise<AutoDetectResponse> {
-    const cleanId = courseId.replace("course:", "");
-    return fetchApi<AutoDetectResponse>(
-      `/api/courses/${encodeURIComponent(cleanId)}/modules/auto-detect`,
-      { method: "POST" }
-    );
-  },
-
-  // Create modules from auto-detection
-  async createFromDetection(
-    courseId: string,
-    assignDocuments: boolean = true
-  ): Promise<{ created_count: number; modules: Module[] }> {
-    const cleanId = courseId.replace("course:", "");
-    return fetchApi<{ created_count: number; modules: Module[] }>(
-      `/api/courses/${encodeURIComponent(cleanId)}/modules/from-detection`,
-      {
-        method: "POST",
-        body: JSON.stringify({ assign_documents: assignDocuments }),
-      }
-    );
   },
 
   // Get documents in a module

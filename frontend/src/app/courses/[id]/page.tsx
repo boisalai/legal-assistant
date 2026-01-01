@@ -77,7 +77,7 @@ export default function CourseDetailPage() {
       }
 
       try {
-        const modulesResponse = await modulesApi.listWithProgress(courseId);
+        const modulesResponse = await modulesApi.list(courseId);
         setModules(modulesResponse.modules);
       } catch {
         // Modules endpoint may not exist yet

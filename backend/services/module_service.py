@@ -3,12 +3,10 @@ Service pour la gestion des modules d'étude.
 
 Un module est une unité d'organisation au sein d'un cours qui permet de:
 - Grouper des documents par thème/chapitre
-- Suivre la progression d'apprentissage
 - Organiser les révisions (flashcards, quiz)
 """
 
 import logging
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Tuple
@@ -18,9 +16,6 @@ from models.module_models import (
     ModuleCreate,
     ModuleUpdate,
     ModuleResponse,
-    ModuleWithProgress,
-    MasteryLevel,
-    DetectedModule,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,45 +120,15 @@ class ModuleService:
 
         return self._format_module_response(module)
 
-    async def get_module_with_progress(
-        self,
-        module_id: str,
-        user_id: str = "user:default"
-    ) -> Optional[ModuleWithProgress]:
-        """
-        Récupère un module avec ses métriques de progression.
-
-        Args:
-            module_id: ID du module
-            user_id: ID de l'utilisateur
-
-        Returns:
-            Module avec progression ou None
-        """
-        module = await self.get_module(module_id)
-        if not module:
-            return None
-
-        progress = await self._calculate_module_progress(module_id, user_id)
-
-        return ModuleWithProgress(
-            **module.model_dump(),
-            **progress
-        )
-
     async def list_modules(
         self,
-        course_id: str,
-        include_progress: bool = False,
-        user_id: str = "user:default"
+        course_id: str
     ) -> Tuple[List[ModuleResponse], int]:
         """
         Liste tous les modules d'un cours.
 
         Args:
             course_id: ID du cours
-            include_progress: Inclure les métriques de progression
-            user_id: ID de l'utilisateur (pour progression)
 
         Returns:
             Tuple (liste des modules, total)
@@ -188,16 +153,7 @@ class ModuleService:
                 module_id = str(module.get("id", ""))
                 doc_count = await self._count_module_documents(module_id)
                 module["document_count"] = doc_count
-
-                if include_progress:
-                    progress = await self._calculate_module_progress(module_id, user_id)
-                    formatted = self._format_module_response(module)
-                    modules.append(ModuleWithProgress(
-                        **formatted.model_dump(),
-                        **progress
-                    ))
-                else:
-                    modules.append(self._format_module_response(module))
+                modules.append(self._format_module_response(module))
 
         return modules, len(modules)
 
@@ -426,288 +382,6 @@ class ModuleService:
         )
 
         return result if result else []
-
-    # =========================================================================
-    # Auto-detection
-    # =========================================================================
-
-    async def auto_detect_modules(
-        self,
-        course_id: str
-    ) -> Tuple[List[DetectedModule], List[str]]:
-        """
-        Détecte automatiquement les modules à partir des noms de fichiers.
-
-        Patterns reconnus:
-        - "Module X - ..." ou "module-X-..."
-        - "Chapitre X - ..." ou "chapitre-X-..."
-        - "Semaine X - ..." ou "semaine-X-..."
-        - Préfixes numériques: "01_...", "1-...", "1_..."
-
-        Args:
-            course_id: ID du cours
-
-        Returns:
-            Tuple (modules détectés, documents non assignables)
-        """
-        if not course_id.startswith("course:"):
-            course_id = f"course:{course_id}"
-
-        # Récupérer tous les documents du cours
-        result = await self.db.query(
-            """
-            SELECT id, filename, linked_source FROM document
-            WHERE course_id = $course_id
-            ORDER BY filename ASC
-            """,
-            {"course_id": course_id}
-        )
-
-        if not result:
-            return [], []
-
-        # Patterns de détection
-        patterns = [
-            # Module X - Title ou module-X-title
-            (r"[Mm]odule[\s_-]*(\d+)", "Module {num}"),
-            # Chapitre X - Title
-            (r"[Cc]hapitre[\s_-]*(\d+)", "Chapitre {num}"),
-            # Semaine X - Title
-            (r"[Ss]emaine[\s_-]*(\d+)", "Semaine {num}"),
-            # Préfixe numérique: 01_, 1-, etc.
-            (r"^(\d{1,2})[\s_-]", "Section {num}"),
-        ]
-
-        # Grouper les documents par module détecté
-        module_groups: Dict[str, List[str]] = {}
-        unassigned: List[str] = []
-
-        for doc in result:
-            doc_id = str(doc.get("id", ""))
-            filename = doc.get("filename") or ""
-
-            # Essayer aussi le relative_path si disponible
-            linked = doc.get("linked_source")
-            if linked and isinstance(linked, dict):
-                relative_path = linked.get("relative_path", "")
-                if relative_path:
-                    filename = relative_path
-
-            detected = False
-            for pattern, name_template in patterns:
-                match = re.search(pattern, filename)
-                if match:
-                    num = match.group(1)
-                    module_name = name_template.format(num=num)
-                    if module_name not in module_groups:
-                        module_groups[module_name] = []
-                    module_groups[module_name].append(doc_id)
-                    detected = True
-                    break
-
-            if not detected:
-                unassigned.append(doc_id)
-
-        # Convertir en liste de DetectedModule
-        detected_modules = []
-        for name, doc_ids in sorted(module_groups.items()):
-            detected_modules.append(DetectedModule(
-                suggested_name=name,
-                document_ids=doc_ids,
-                document_count=len(doc_ids)
-            ))
-
-        return detected_modules, unassigned
-
-    async def create_modules_from_detection(
-        self,
-        course_id: str,
-        detected_modules: List[DetectedModule],
-        assign_documents: bool = True
-    ) -> List[ModuleResponse]:
-        """
-        Crée des modules à partir de la détection automatique.
-
-        Args:
-            course_id: ID du cours
-            detected_modules: Modules détectés
-            assign_documents: Assigner automatiquement les documents
-
-        Returns:
-            Liste des modules créés
-        """
-        created = []
-        for idx, detected in enumerate(detected_modules):
-            module_data = ModuleCreate(
-                name=detected.suggested_name,
-                order_index=idx
-            )
-
-            module = await self.create_module(course_id, module_data)
-            created.append(module)
-
-            if assign_documents and detected.document_ids:
-                await self.assign_documents(module.id, detected.document_ids)
-
-        return created
-
-    # =========================================================================
-    # Progress Calculation
-    # =========================================================================
-
-    async def _calculate_module_progress(
-        self,
-        module_id: str,
-        user_id: str
-    ) -> Dict[str, Any]:
-        """
-        Calcule les métriques de progression pour un module.
-
-        Args:
-            module_id: ID du module
-            user_id: ID de l'utilisateur
-
-        Returns:
-            Dict avec les métriques de progression
-        """
-        if not module_id.startswith("module:"):
-            module_id = f"module:{module_id}"
-
-        # Compter les documents
-        doc_result = await self.db.query(
-            """
-            SELECT count() as total FROM document
-            WHERE module_id = $module_id
-            GROUP ALL
-            """,
-            {"module_id": module_id}
-        )
-
-        documents_total = 0
-        if doc_result and len(doc_result) > 0:
-            documents_total = doc_result[0].get("total", 0)
-
-        # TODO: Compter les documents complétés (quand document_progress sera implémenté)
-        documents_completed = 0
-        reading_percent = 0.0
-
-        # Récupérer les stats des flashcards pour ce module
-        # Les flashcard_decks peuvent avoir un module_id ou on peut les lier via les documents
-        flashcard_result = await self.db.query(
-            """
-            SELECT
-                count() as total,
-                count(status = 'mastered') as mastered
-            FROM flashcard
-            WHERE deck_id IN (
-                SELECT id FROM flashcard_deck WHERE module_id = $module_id
-            )
-            GROUP ALL
-            """,
-            {"module_id": module_id}
-        )
-
-        flashcards_total = 0
-        flashcards_mastered = 0
-        if flashcard_result and len(flashcard_result) > 0:
-            stats = flashcard_result[0]
-            flashcards_total = stats.get("total", 0)
-            flashcards_mastered = stats.get("mastered", 0)
-
-        flashcard_percent = (flashcards_mastered / flashcards_total * 100) if flashcards_total > 0 else 0.0
-
-        # TODO: Quiz stats (quand quiz_attempt sera implémenté)
-        quiz_attempts = 0
-        quiz_average_score = 0.0
-        quiz_best_score = 0.0
-
-        # Calculer la progression globale
-        # Pondération: lecture 20%, flashcards 40%, quiz 40%
-        overall_progress = (
-            reading_percent * 0.20 +
-            flashcard_percent * 0.40 +
-            quiz_average_score * 0.40
-        )
-
-        # Déterminer le niveau de maîtrise
-        if overall_progress >= 85:
-            mastery_level = MasteryLevel.MASTERED
-        elif overall_progress >= 65:
-            mastery_level = MasteryLevel.PROFICIENT
-        elif overall_progress >= 25:
-            mastery_level = MasteryLevel.LEARNING
-        else:
-            mastery_level = MasteryLevel.NOT_STARTED
-
-        return {
-            "documents_total": documents_total,
-            "documents_completed": documents_completed,
-            "reading_percent": reading_percent,
-            "flashcards_total": flashcards_total,
-            "flashcards_mastered": flashcards_mastered,
-            "flashcard_percent": flashcard_percent,
-            "quiz_attempts": quiz_attempts,
-            "quiz_average_score": quiz_average_score,
-            "quiz_best_score": quiz_best_score,
-            "overall_progress": overall_progress,
-            "mastery_level": mastery_level,
-            "total_study_time_seconds": 0,  # TODO: Implémenter avec study_session
-            "last_activity_at": None,  # TODO: Implémenter avec study_session
-        }
-
-    async def get_course_progress_summary(
-        self,
-        course_id: str,
-        user_id: str = "user:default"
-    ) -> Dict[str, Any]:
-        """
-        Récupère un résumé de la progression pour tout le cours.
-
-        Args:
-            course_id: ID du cours
-            user_id: ID de l'utilisateur
-
-        Returns:
-            Dict avec le résumé de progression
-        """
-        modules, _ = await self.list_modules(course_id, include_progress=True, user_id=user_id)
-
-        if not modules:
-            return {
-                "course_id": course_id,
-                "modules": [],
-                "overall_progress": 0.0,
-                "recommended_module_id": None,
-                "recommendation_message": "Aucun module configuré pour ce cours."
-            }
-
-        # Calculer la progression globale pondérée
-        total_weight = sum(m.exam_weight or 1.0 for m in modules)
-        weighted_progress = sum(
-            (m.exam_weight or 1.0) * m.overall_progress
-            for m in modules
-        ) / total_weight if total_weight > 0 else 0
-
-        # Trouver le module le plus faible
-        weakest = min(modules, key=lambda m: m.overall_progress)
-
-        # Générer une recommandation
-        if weakest.reading_percent < 50:
-            recommendation = f"Continuez la lecture de {weakest.name}"
-        elif weakest.flashcard_percent < 50:
-            recommendation = f"Révisez les flashcards de {weakest.name}"
-        elif weakest.quiz_average_score < 70:
-            recommendation = f"Faites un quiz sur {weakest.name}"
-        else:
-            recommendation = "Vous êtes sur la bonne voie! Continuez à réviser."
-
-        return {
-            "course_id": course_id,
-            "modules": [m.model_dump() for m in modules],
-            "overall_progress": weighted_progress,
-            "recommended_module_id": weakest.id,
-            "recommendation_message": recommendation
-        }
 
     # =========================================================================
     # Helper Methods
