@@ -109,13 +109,23 @@ DEFAULT_DEV_OLLAMA_MODEL: OllamaModel = "llama3.2"
 # ========================================
 
 ClaudeModel = Literal[
-    "claude-sonnet-4-5-20250929",      # Sonnet 4.5 (latest) - Meilleur équilibre
+    "claude-opus-4-5-20251101",         # Opus 4.5 (latest) - Qualité maximale
+    "claude-sonnet-4-5-20250929",       # Sonnet 4.5 - Meilleur équilibre
     "claude-sonnet-4-20250514",         # Sonnet 4.0
-    "claude-opus-4-20250514",           # Opus 4.0 - Qualité maximale
+    "claude-opus-4-20250514",           # Opus 4.0
     "claude-3-5-sonnet-20241022",       # Sonnet 3.5 (legacy)
 ]
 
 CLAUDE_MODELS_INFO = {
+    "claude-opus-4-5-20251101": {
+        "name": "Claude Opus 4.5",
+        "speed": "Medium",
+        "quality": "Best",
+        "cost": "$15 / $75 per 1M tokens",
+        "context": "200K tokens",
+        "best_for": "Qualité maximale, raisonnement avancé, génération 200 fiches",
+        "recommended": True,
+    },
     "claude-sonnet-4-5-20250929": {
         "name": "Claude Sonnet 4.5",
         "speed": "Fast",
@@ -125,23 +135,23 @@ CLAUDE_MODELS_INFO = {
         "best_for": "Production - Excellent équilibre qualité/coût",
         "recommended": True,
     },
-    "claude-opus-4-20250514": {
-        "name": "Claude Opus 4.0",
-        "speed": "Medium",
-        "quality": "Best",
-        "cost": "$15 / $75 per 1M tokens",
-        "context": "200K tokens",
-        "best_for": "Analyse complexe, qualité maximale",
-        "recommended": False,  # Plus cher
-    },
     "claude-sonnet-4-20250514": {
-        "name": "Claude Sonnet 4.0",
+        "name": "Claude Sonnet 4",
         "speed": "Fast",
         "quality": "Excellent",
         "cost": "$3 / $15 per 1M tokens",
         "context": "200K tokens",
         "best_for": "Usage général production",
-        "recommended": True,
+        "recommended": False,
+    },
+    "claude-opus-4-20250514": {
+        "name": "Claude Opus 4",
+        "speed": "Medium",
+        "quality": "Best",
+        "cost": "$15 / $75 per 1M tokens",
+        "context": "200K tokens",
+        "best_for": "Analyse complexe (version précédente)",
+        "recommended": False,
     },
 }
 
