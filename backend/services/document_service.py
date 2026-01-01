@@ -110,7 +110,8 @@ class DocumentService:
                     source_type=item.get("source_type", "upload"),
                     linked_source=linked_source_data,
                     docusaurus_source=DocusaurusSource(**docusaurus_source_data) if docusaurus_source_data else None,
-                    indexed=item.get("indexed", False)
+                    indexed=item.get("indexed", False),
+                    module_id=item.get("module_id")
                 )
 
                 documents.append(doc_response)
@@ -185,7 +186,8 @@ class DocumentService:
                 source_type=doc_data.get("source_type", "upload"),
                 linked_source=linked_source_data,
                 docusaurus_source=DocusaurusSource(**docusaurus_source_data) if docusaurus_source_data else None,
-                indexed=doc_data.get("indexed", False)
+                indexed=doc_data.get("indexed", False),
+                module_id=doc_data.get("module_id")
             )
 
         except Exception as e:
@@ -206,7 +208,8 @@ class DocumentService:
         is_derived: bool = False,
         derivation_type: Optional[str] = None,
         linked_source: Optional[Dict[str, Any]] = None,
-        docusaurus_source: Optional[Dict[str, Any]] = None
+        docusaurus_source: Optional[Dict[str, Any]] = None,
+        module_id: Optional[str] = None
     ) -> DocumentResponse:
         """
         Create a new document record.
@@ -225,6 +228,7 @@ class DocumentService:
             derivation_type: Type of derivation (transcription, pdf_extraction, tts)
             linked_source: Metadata for linked directory source
             docusaurus_source: Metadata for Docusaurus source
+            module_id: Optional module ID to assign the document to
 
         Returns:
             Created DocumentResponse
@@ -273,6 +277,11 @@ class DocumentService:
                 doc_data["linked_source"] = linked_source
             if docusaurus_source:
                 doc_data["docusaurus_source"] = docusaurus_source
+            if module_id:
+                # Normalize module ID
+                if not module_id.startswith("module:"):
+                    module_id = f"module:{module_id}"
+                doc_data["module_id"] = module_id
 
             # Insert into database
             result = await self.surreal_service.query(

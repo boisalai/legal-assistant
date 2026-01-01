@@ -55,6 +55,7 @@ class LinkDirectoryRequest(BaseModel):
     directory_path: str
     file_paths: Optional[List[str]] = None  # Si None, importe tous les fichiers trouvés
     auto_extract_markdown: bool = False  # Si True, extrait automatiquement PDF/DOCX/Audio en markdown
+    module_id: Optional[str] = None  # Si fourni, assigne tous les fichiers à ce module
 
 
 class LinkedDirectoryMetadata(BaseModel):
@@ -79,7 +80,8 @@ async def create_markdown_from_file(
     course_id: str,
     user_id: str,
     link_id: str,
-    linked_source_metadata: dict
+    linked_source_metadata: dict,
+    module_id: Optional[str] = None
 ) -> Optional[tuple[str, str]]:
     """
     Extrait un fichier (PDF, Word, Audio) et crée un fichier Markdown dérivé.
@@ -154,6 +156,10 @@ async def create_markdown_from_file(
             "derivation_type": derivation_type,
             "is_transcription": extraction_result.is_transcription,
         }
+
+        # Ajouter module_id si spécifié
+        if module_id:
+            document_data["module_id"] = module_id
 
         await service.create("document", document_data, record_id=doc_id)
         logger.info(f"Created markdown document {doc_id} from {source_file.name}")
@@ -236,6 +242,13 @@ async def link_directory_endpoint(
             indexed = 0
             now = datetime.utcnow().isoformat()
 
+            # Normaliser le module_id si fourni
+            target_module_id = None
+            if request.module_id:
+                target_module_id = request.module_id
+                if not target_module_id.startswith("module:"):
+                    target_module_id = f"module:{target_module_id}"
+
             # Créer une entrée pour le répertoire lié
             link_id = str(uuid.uuid4())[:8]
             link_metadata = {
@@ -309,6 +322,10 @@ async def link_directory_endpoint(
                             "indexed": False
                         }
 
+                        # Ajouter module_id si spécifié
+                        if target_module_id:
+                            document_data["module_id"] = target_module_id
+
                         await service.create("document", document_data, record_id=doc_id)
 
                         # Si auto_extract_markdown est activé et le fichier est PDF/DOCX/Audio
@@ -320,7 +337,8 @@ async def link_directory_endpoint(
                                 course_id=course_id,
                                 user_id=user_id,
                                 link_id=link_id,
-                                linked_source_metadata=linked_source
+                                linked_source_metadata=linked_source,
+                                module_id=target_module_id
                             )
 
                         # Déterminer quel contenu indexer

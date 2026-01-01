@@ -469,6 +469,13 @@ async def download_youtube_audio(
         if not case_id.startswith("case:"):
             case_id = f"case:{case_id}"
 
+        # Normaliser le module_id si fourni
+        target_module_id = None
+        if request.module_id:
+            target_module_id = request.module_id
+            if not target_module_id.startswith("module:"):
+                target_module_id = f"module:{target_module_id}"
+
         # Create upload directory for this judgment
         upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
@@ -504,6 +511,10 @@ async def download_youtube_audio(
                 "duration_seconds": result.duration,
             }
         }
+
+        # Ajouter module_id si spécifié
+        if target_module_id:
+            document_data["module_id"] = target_module_id
 
         await service.create("document", document_data, record_id=doc_id)
         logger.info(f"YouTube audio saved as document: {doc_id}")

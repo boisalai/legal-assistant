@@ -9,20 +9,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Folder, Loader2, Search } from "lucide-react";
+import { FileText, Folder, Loader2, Search, Layers } from "lucide-react";
 import { docusaurusApi } from "@/lib/api";
-import type { DocusaurusFile } from "@/types";
+import type { DocusaurusFile, Module } from "@/types";
 
 interface ImportDocusaurusModalProps {
   caseId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImportSuccess: () => void;
+  modules?: Module[];
 }
 
 export function ImportDocusaurusModal({
@@ -30,6 +39,7 @@ export function ImportDocusaurusModal({
   open,
   onOpenChange,
   onImportSuccess,
+  modules = [],
 }: ImportDocusaurusModalProps) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -37,6 +47,7 @@ export function ImportDocusaurusModal({
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(undefined);
 
   // Load Docusaurus files when modal opens
   useEffect(() => {
@@ -96,10 +107,11 @@ export function ImportDocusaurusModal({
     setError(null);
 
     try {
-      await docusaurusApi.importFiles(caseId, Array.from(selectedFiles));
+      await docusaurusApi.importFiles(caseId, Array.from(selectedFiles), selectedModuleId);
       onImportSuccess();
       onOpenChange(false);
       setSelectedFiles(new Set());
+      setSelectedModuleId(undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'import");
     } finally {
@@ -216,12 +228,44 @@ export function ImportDocusaurusModal({
             )}
           </ScrollArea>
 
+          {/* Module selector */}
+          {modules.length > 0 && selectedFiles.size > 0 && (
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="module-select" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Assigner à un module (optionnel)
+              </Label>
+              <Select
+                value={selectedModuleId || "none"}
+                onValueChange={(value) => setSelectedModuleId(value === "none" ? undefined : value)}
+              >
+                <SelectTrigger id="module-select">
+                  <SelectValue placeholder="Aucun module sélectionné" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun module</SelectItem>
+                  {modules.map((module) => (
+                    <SelectItem key={module.id} value={module.id}>
+                      {module.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Selection summary */}
           {selectedFiles.size > 0 && (
             <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
               <p className="text-sm text-blue-700">
                 <strong>{selectedFiles.size}</strong> fichier{selectedFiles.size > 1 ? "s" : ""}{" "}
                 sélectionné{selectedFiles.size > 1 ? "s" : ""}
+                {selectedModuleId && modules.length > 0 && (
+                  <span>
+                    {" "}
+                    → <strong>{modules.find((m) => m.id === selectedModuleId)?.name}</strong>
+                  </span>
+                )}
               </p>
             </div>
           )}

@@ -59,6 +59,7 @@ class DocusaurusListResponse(BaseModel):
 class ImportDocusaurusRequest(BaseModel):
     """Requête pour importer des fichiers Docusaurus."""
     file_paths: List[str]  # Liste de chemins absolus vers les fichiers à importer
+    module_id: Optional[str] = None  # Si fourni, assigne tous les fichiers à ce module
 
 
 class CheckUpdatesResponse(BaseModel):
@@ -208,6 +209,13 @@ async def import_docusaurus_files(
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
+        # Normaliser le module_id si fourni
+        target_module_id = None
+        if request.module_id:
+            target_module_id = request.module_id
+            if not target_module_id.startswith("module:"):
+                target_module_id = f"module:{target_module_id}"
+
         # Créer le répertoire d'upload
         upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
@@ -270,6 +278,10 @@ async def import_docusaurus_files(
                     "texte_extrait": content,  # Stocker le contenu directement
                     "indexed": False  # Sera mis à True après indexation
                 }
+
+                # Ajouter module_id si spécifié
+                if target_module_id:
+                    document_data["module_id"] = target_module_id
 
                 await service.create("document", document_data, record_id=doc_id)
                 logger.info(f"Imported Docusaurus file: {source_file.name} -> document:{doc_id}")
