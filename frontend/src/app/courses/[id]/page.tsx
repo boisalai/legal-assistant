@@ -449,6 +449,7 @@ export default function CourseDetailPage() {
           onOpenChange={setCreateDeckModalOpen}
           courseId={courseId}
           documents={documents}
+          modules={modules}
           onSuccess={handleFlashcardsUpdated}
         />
       </div>
