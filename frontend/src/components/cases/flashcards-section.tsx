@@ -178,7 +178,10 @@ export function FlashcardsSection({
             <AlertDialogCancel onClick={() => setDeckToDelete(null)}>
               {tCommon("cancel")}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDeck}>
+            <AlertDialogAction
+              onClick={handleDeleteDeck}
+              className="bg-red-600 hover:bg-red-700"
+            >
               {tCommon("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
