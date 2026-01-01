@@ -107,10 +107,11 @@ class ModuleService:
             Module ou None si non trouvé
         """
         record_id = module_id.replace("module:", "")
+        full_id = f"module:{record_id}"
 
+        # Use direct record reference to handle both string and numeric IDs
         result = await self.db.query(
-            "SELECT * FROM module WHERE id = type::thing('module', $record_id)",
-            {"record_id": record_id}
+            f"SELECT * FROM {full_id}"
         )
 
         if not result or len(result) == 0:
