@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2,
-  FileText,
   Sparkles,
   CheckCircle2,
   AlertCircle,
@@ -32,13 +31,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
-import type { Document, CardType, FlashcardGenerationProgress } from "@/types";
+import type { Document, CardType, FlashcardGenerationProgress, Module } from "@/types";
 
 interface CreateFlashcardDeckModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   courseId: string;
   documents: Document[];
+  modules: Module[];
   onSuccess: () => void;
 }
 
@@ -49,6 +49,7 @@ export function CreateFlashcardDeckModal({
   onOpenChange,
   courseId,
   documents,
+  modules,
   onSuccess,
 }: CreateFlashcardDeckModalProps) {
   const t = useTranslations("flashcards");
@@ -56,7 +57,7 @@ export function CreateFlashcardDeckModal({
 
   // Form state
   const [name, setName] = useState("");
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
   const [selectedCardTypes, setSelectedCardTypes] = useState<CardType[]>([
     "definition",
     "concept",
@@ -74,25 +75,34 @@ export function CreateFlashcardDeckModal({
   const [generationComplete, setGenerationComplete] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  // Filter markdown documents only and sort alphabetically
-  const markdownDocs = documents
-    .filter(
-      (doc) =>
-        doc.filename?.endsWith(".md") ||
-        doc.filename?.endsWith(".markdown") ||
-        doc.filename?.endsWith(".txt")
-    )
-    .sort((a, b) => {
-      const nameA = a.linked_source?.relative_path || a.filename || "";
-      const nameB = b.linked_source?.relative_path || b.filename || "";
-      return nameA.localeCompare(nameB, "fr", { sensitivity: "base" });
-    });
+  // Filter markdown documents only
+  const markdownDocs = documents.filter(
+    (doc) =>
+      doc.filename?.endsWith(".md") ||
+      doc.filename?.endsWith(".markdown") ||
+      doc.filename?.endsWith(".txt")
+  );
+
+  // Get markdown document count per module
+  const getModuleMarkdownCount = (moduleId: string) => {
+    return markdownDocs.filter((doc) => doc.module_id === moduleId).length;
+  };
+
+  // Get document IDs from selected modules
+  const getSelectedDocumentIds = () => {
+    return markdownDocs
+      .filter((doc) => doc.module_id && selectedModuleIds.includes(doc.module_id))
+      .map((doc) => doc.id);
+  };
+
+  // Sort modules by order_index
+  const sortedModules = [...modules].sort((a, b) => a.order_index - b.order_index);
 
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setName("");
-      setSelectedDocIds([]);
+      setSelectedModuleIds([]);
       setSelectedCardTypes(["definition", "concept", "case", "question"]);
       setCardCount(50);
       setGenerateAudio(false);
@@ -104,11 +114,11 @@ export function CreateFlashcardDeckModal({
     }
   }, [open]);
 
-  const handleDocumentToggle = (docId: string) => {
-    setSelectedDocIds((prev) =>
-      prev.includes(docId)
-        ? prev.filter((id) => id !== docId)
-        : [...prev, docId]
+  const handleModuleToggle = (moduleId: string) => {
+    setSelectedModuleIds((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((id) => id !== moduleId)
+        : [...prev, moduleId]
     );
   };
 
@@ -118,11 +128,12 @@ export function CreateFlashcardDeckModal({
     );
   };
 
-  const handleSelectAllDocs = () => {
-    if (selectedDocIds.length === markdownDocs.length) {
-      setSelectedDocIds([]);
+  const handleSelectAllModules = () => {
+    const modulesWithDocs = sortedModules.filter((m) => getModuleMarkdownCount(m.id) > 0);
+    if (selectedModuleIds.length === modulesWithDocs.length) {
+      setSelectedModuleIds([]);
     } else {
-      setSelectedDocIds(markdownDocs.map((d) => d.id));
+      setSelectedModuleIds(modulesWithDocs.map((m) => m.id));
     }
   };
 
@@ -131,8 +142,13 @@ export function CreateFlashcardDeckModal({
       toast.error(t("setNameRequired"));
       return;
     }
+    if (selectedModuleIds.length === 0) {
+      toast.error(t("selectModule"));
+      return;
+    }
+    const selectedDocIds = getSelectedDocumentIds();
     if (selectedDocIds.length === 0) {
-      toast.error(t("selectDocument"));
+      toast.error(t("noDocsInModules"));
       return;
     }
     if (selectedCardTypes.length === 0) {
@@ -188,9 +204,11 @@ export function CreateFlashcardDeckModal({
     }
   };
 
+  const selectedDocCount = getSelectedDocumentIds().length;
   const isFormValid =
     name.trim() &&
-    selectedDocIds.length > 0 &&
+    selectedModuleIds.length > 0 &&
+    selectedDocCount > 0 &&
     selectedCardTypes.length > 0 &&
     !isCreating &&
     !isGenerating;
@@ -283,48 +301,57 @@ export function CreateFlashcardDeckModal({
               />
             </div>
 
-            {/* Document selection */}
+            {/* Module selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>{t("sourceDocuments")}</Label>
+                <Label>{t("sourceModules")}</Label>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleSelectAllDocs}
+                  onClick={handleSelectAllModules}
                   className="text-xs h-7"
                 >
-                  {selectedDocIds.length === markdownDocs.length
+                  {selectedModuleIds.length === sortedModules.filter((m) => getModuleMarkdownCount(m.id) > 0).length
                     ? t("deselectAll")
                     : t("selectAll")}
                 </Button>
               </div>
               <div className="border rounded-lg max-h-[200px] overflow-y-auto">
-                {markdownDocs.length === 0 ? (
+                {sortedModules.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground text-center">
-                    {t("noMarkdownAvailable")}
+                    {t("noModulesAvailable")}
                   </p>
                 ) : (
                   <div className="divide-y">
-                    {markdownDocs.map((doc) => (
-                      <label
-                        key={doc.id}
-                        className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={selectedDocIds.includes(doc.id)}
-                          onCheckedChange={() => handleDocumentToggle(doc.id)}
-                        />
-                        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm truncate flex-1">
-                          {doc.linked_source?.relative_path || doc.filename}
-                        </span>
-                      </label>
-                    ))}
+                    {sortedModules.map((module) => {
+                      const docCount = getModuleMarkdownCount(module.id);
+                      const isDisabled = docCount === 0;
+                      return (
+                        <label
+                          key={module.id}
+                          className={`flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <Checkbox
+                            checked={selectedModuleIds.includes(module.id)}
+                            onCheckedChange={() => !isDisabled && handleModuleToggle(module.id)}
+                            disabled={isDisabled}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm truncate block">
+                              {module.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {docCount} {docCount === 1 ? "document" : "documents"}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {t("documentsSelected", { count: selectedDocIds.length })}
+                {t("modulesSelected", { count: selectedModuleIds.length })} ({selectedDocCount} documents)
               </p>
             </div>
 
