@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
     course_id: Optional[str] = None
     model_id: str = "ollama:qwen2.5:7b"
     history: list[ChatMessage] = []
+    language: str = Field(default="fr", description="Language for assistant responses (fr or en)")
 
 
 class DocumentSource(BaseModel):
@@ -158,7 +159,8 @@ def _build_tutor_system_prompt(
     current_document_id: Optional[str],
     current_document: Optional[dict],
     tools_desc: str,
-    current_module: Optional[dict] = None
+    current_module: Optional[dict] = None,
+    language: str = "fr"
 ) -> str:
     """
     Build context-aware tutor system prompt.
@@ -171,12 +173,19 @@ def _build_tutor_system_prompt(
         current_document: Full document data (if any)
         tools_desc: Description of available tools
         current_module: Info about currently viewed module (if any)
+        language: Language for the prompt (fr or en)
 
     Returns:
         Complete system prompt for tutor mode
     """
+    is_english = language == "en"
+
     # Base tutor identity
-    base_prompt = """Tu es un tuteur pédagogique IA spécialisé dans l'accompagnement d'étudiants en droit.
+    if is_english:
+        base_prompt = """You are an AI pedagogical tutor specialized in assisting law students.
+Your role is to help students understand, memorize, and master their course content."""
+    else:
+        base_prompt = """Tu es un tuteur pédagogique IA spécialisé dans l'accompagnement d'étudiants en droit.
 Ton rôle est d'aider l'étudiant à comprendre, mémoriser et maîtriser le contenu de ses cours."""
 
     # Context-specific instructions
@@ -186,7 +195,40 @@ Ton rôle est d'aider l'étudiant à comprendre, mémoriser et maîtriser le con
         doc_name = current_document.get("nom_fichier", "document")
         doc_preview = current_document.get("texte_extrait", "")[:2000]
 
-        context_specific = f"""
+        if is_english:
+            context_specific = f"""
+
+📄 **CURRENT CONTEXT**: The student is currently viewing the document "{doc_name}"
+
+**TUTOR MODE - SPECIFIC DOCUMENT**:
+- The student is studying THIS particular document
+- Focus your answers on this document's content
+- Use the Socratic method: ask questions to guide their thinking
+- Encourage active understanding rather than passive memorization
+- Offer appropriate pedagogical tools:
+  - 📝 Summaries (use tool: generate_summary)
+  - 🗺️ Mind maps (use tool: generate_mindmap)
+  - ❓ Self-assessment quizzes (use tool: generate_quiz)
+  - 💡 Concept explanations (use tool: explain_concept)
+
+**PEDAGOGICAL APPROACH**:
+1. First understand what the student wants to learn
+2. Assess their current level of understanding through questions
+3. Adapt your explanation level accordingly
+4. Provide concrete examples and practical applications
+5. Verify understanding before moving to the next concept
+
+**SPECIFIC RULES**:
+- If the student asks "summarize this document", use `generate_summary` with document_id={current_document_id}
+- If the student asks for a "mind map", use `generate_mindmap` with document_id={current_document_id}
+- If the student wants to "test their knowledge", use `generate_quiz` with document_id={current_document_id}
+- If the student asks "explain X", ALWAYS search in the open document first
+
+**CURRENT DOCUMENT CONTENT** (preview):
+{doc_preview}...
+"""
+        else:
+            context_specific = f"""
 
 📄 **CONTEXTE ACTUEL**: L'étudiant consulte actuellement le document "{doc_name}"
 
@@ -227,7 +269,36 @@ Ton rôle est d'aider l'étudiant à comprendre, mémoriser et maîtriser le con
         module_docs = [doc for doc in documents if doc.get("module_id") == module_id]
         module_doc_names = ", ".join([doc.get("nom_fichier", "") for doc in module_docs[:10]])
 
-        context_specific = f"""
+        if is_english:
+            context_specific = f"""
+
+📁 **CURRENT CONTEXT**: The student is viewing the module "{module_name}"
+Documents in this module: {doc_count}
+{f"Files: {module_doc_names}" if module_doc_names else ""}
+
+**TUTOR MODE - SPECIFIC MODULE**:
+- The student is studying THIS particular module
+- Focus your answers on documents in this module
+- Use `semantic_search` to search only within this module's documents
+- Offer pedagogical tools for the entire module:
+  - 📝 Module summaries (use tool: generate_summary)
+  - 🗺️ Module mind maps (use tool: generate_mindmap)
+  - ❓ Module quizzes (use tool: generate_quiz)
+  - 💡 Concept explanations (use tool: explain_concept)
+
+**PEDAGOGICAL APPROACH**:
+1. Help the student understand the module structure
+2. Suggest a logical path through the module's documents
+3. Connect concepts across different documents in the module
+4. Suggest which document to consult to deepen a topic
+
+**SPECIFIC RULES**:
+- When the student asks a question, first search in this module's documents
+- Use `semantic_search` to identify relevant documents in this module
+- Suggest opening a specific document from the module if necessary
+"""
+        else:
+            context_specific = f"""
 
 📁 **CONTEXTE ACTUEL**: L'étudiant consulte le module "{module_name}"
 Documents dans ce module: {doc_count}
@@ -256,10 +327,38 @@ Documents dans ce module: {doc_count}
 """
     else:
         # TUTOR MODE: Course-wide
-        course_title = case_data.get("title", "ce cours") if case_data else "ce cours"
+        course_title = case_data.get("title", "this course" if is_english else "ce cours") if case_data else ("this course" if is_english else "ce cours")
         num_docs = len(documents)
 
-        context_specific = f"""
+        if is_english:
+            context_specific = f"""
+
+📚 **CURRENT CONTEXT**: The student is working on the course "{course_title}"
+Number of available documents: {num_docs}
+
+**TUTOR MODE - FULL COURSE**:
+- The student is studying the entire course
+- Help them navigate between different documents
+- Provide an overview of covered concepts
+- Guide them to relevant documents based on their questions
+- Use pedagogical tools to consolidate learning:
+  - 📝 Full course summaries (use tool: generate_summary without document_id)
+  - 🗺️ Global mind map (use tool: generate_mindmap without document_id)
+  - ❓ Global quiz (use tool: generate_quiz without document_id)
+
+**PEDAGOGICAL APPROACH**:
+1. Identify knowledge gaps
+2. Suggest a logical learning path
+3. Connect concepts across different documents
+4. Create a coherent vision of the course
+
+**SPECIFIC RULES**:
+- If the student asks "summarize the course", use `generate_summary` without document_id
+- Suggest opening a specific document if the question requires in-depth reading
+- Use `semantic_search` to find which document contains the requested information
+"""
+        else:
+            context_specific = f"""
 
 📚 **CONTEXTE ACTUEL**: L'étudiant travaille sur le cours "{course_title}"
 Nombre de documents disponibles: {num_docs}
@@ -286,8 +385,46 @@ Nombre de documents disponibles: {num_docs}
 - Utilise `semantic_search` pour trouver dans quel document se trouve l'information recherchée
 """
 
-    # Combine all parts
-    full_prompt = f"""{base_prompt}
+    # Combine all parts with language-appropriate rules
+    if is_english:
+        full_prompt = f"""{base_prompt}
+
+{context_specific}
+
+{activity_context}
+
+**ABSOLUTE RULE - ANSWERS BASED ONLY ON DOCUMENTS**:
+- You must ALWAYS search for the answer in available documents using `semantic_search`
+- NEVER answer with your own general knowledge
+- If semantic search finds nothing relevant, clearly state: "I did not find relevant information on this topic in the available documents."
+
+**ABSOLUTE RULE - SOURCE CITATION**:
+- ALWAYS indicate the source of each piece of information in your response
+- Required format: "According to [filename], ..." or "Based on [filename], ..."
+
+{tools_desc}
+
+**AVAILABLE TOOLS**:
+- **generate_summary**: Generates a structured pedagogical summary
+- **generate_mindmap**: Creates a markdown mind map with emojis
+- **generate_quiz**: Generates an interactive quiz with explanations
+- **explain_concept**: Explains a concept in detail with examples
+- **semantic_search**: Semantic search (MAIN TOOL) - understands the meaning of the question
+- **search_documents**: Exact keyword search
+- **list_documents**: Lists all available documents
+- **search_caij_jurisprudence**: Quebec jurisprudence search on CAIJ
+
+**SOCRATIC METHOD** (preferred):
+Instead of giving the answer directly, ask questions that guide the student:
+- "What do you already understand about this topic?"
+- "Did you notice that the document mentions...?"
+- "What is the difference between X and Y in your opinion?"
+- "Can you identify the essential elements?"
+
+Be encouraging, patient, and adapt to the student's pace.
+"""
+    else:
+        full_prompt = f"""{base_prompt}
 
 {context_specific}
 
@@ -648,7 +785,8 @@ Contenu des documents:"""
                             current_document_id=current_document_id,
                             current_document=current_document,
                             tools_desc=tools_desc,
-                            current_module=current_module
+                            current_module=current_module,
+                            language=request.language
                         )
 
             except Exception as e:
@@ -663,19 +801,22 @@ Contenu des documents:"""
                 current_document_id=None,
                 current_document=None,
                 tools_desc=tools_desc,
-                current_module=None
+                current_module=None,
+                language=request.language
             )
 
         # Build the conversation prompt
         conversation_prompt = ""
+        is_english = request.language == "en"
 
         # Add conversation history
         for msg in request.history:
-            role_name = "Utilisateur" if msg.role == "user" else "Assistant"
+            role_name = ("User" if msg.role == "user" else "Assistant") if is_english else ("Utilisateur" if msg.role == "user" else "Assistant")
             conversation_prompt += f"\n{role_name}: {msg.content}\n"
 
         # Add current user message
-        conversation_prompt += f"\nUtilisateur: {request.message}"
+        user_label = "User" if is_english else "Utilisateur"
+        conversation_prompt += f"\n{user_label}: {request.message}"
 
         logger.info(f"Sending conversation to agent with {len(request.history)} history messages")
 
@@ -707,7 +848,8 @@ Contenu des documents:"""
 
         # Inject course_id into the tool's context by modifying the prompt
         if request.course_id:
-            conversation_prompt += f"\n\n[Contexte: L'identifiant du cours actuel est '{request.course_id}']"
+            context_msg = f"Context: The current course identifier is '{request.course_id}'" if is_english else f"Contexte: L'identifiant du cours actuel est '{request.course_id}'"
+            conversation_prompt += f"\n\n[{context_msg}]"
 
         # Get response from agent (use arun for async tools support)
         response = await agent.arun(conversation_prompt)
@@ -717,7 +859,7 @@ Contenu des documents:"""
         if response and hasattr(response, 'content') and response.content:
             assistant_message = response.content
         else:
-            assistant_message = "Désolé, je n'ai pas pu générer une réponse."
+            assistant_message = "Sorry, I couldn't generate a response." if is_english else "Désolé, je n'ai pas pu générer une réponse."
 
         logger.info(f"Got response: {len(assistant_message)} chars")
 
@@ -955,8 +1097,20 @@ async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[st
         # Get tools description
         tools_desc = get_tools_description()
 
-        # System prompt (simplified version)
-        system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
+        # System prompt (simplified version) - language-aware
+        is_english = request.language == "en"
+        if is_english:
+            system_content = f"""You are an intelligent and versatile conversational assistant. You help users with their questions in a professional and precise manner.
+
+Guidelines:
+- Always respond in English
+- Be concise but complete
+- If you're unsure about something, state it clearly
+- Adapt your expertise to the context (legal, academic, technical, etc.)
+
+{tools_desc}"""
+        else:
+            system_content = f"""Tu es un assistant conversationnel intelligent et polyvalent. Tu aides les utilisateurs avec leurs questions de manière professionnelle et précise.
 
 Directives:
 - Réponds toujours en français
@@ -969,9 +1123,10 @@ Directives:
         # Build conversation
         conversation_prompt = ""
         for msg in request.history:
-            role_name = "Utilisateur" if msg.role == "user" else "Assistant"
+            role_name = ("User" if msg.role == "user" else "Assistant") if is_english else ("Utilisateur" if msg.role == "user" else "Assistant")
             conversation_prompt += f"\n{role_name}: {msg.content}\n"
-        conversation_prompt += f"\nUtilisateur: {request.message}"
+        user_label = "User" if is_english else "Utilisateur"
+        conversation_prompt += f"\n{user_label}: {request.message}"
 
         # Create agent without tools for regular chat
         agent = Agent(
@@ -987,12 +1142,13 @@ Directives:
         if response and hasattr(response, 'content') and response.content:
             yield f"event: complete_message\ndata: {json.dumps({'content': response.content, 'role': 'assistant'})}\n\n"
         else:
-            error_msg = "Désolé, je n'ai pas pu générer une réponse."
+            error_msg = "Sorry, I couldn't generate a response." if is_english else "Désolé, je n'ai pas pu générer une réponse."
             yield f"event: complete_message\ndata: {json.dumps({'content': error_msg, 'role': 'assistant'})}\n\n"
 
     except Exception as e:
         logger.error(f"Regular chat stream error: {e}", exc_info=True)
-        yield f"event: complete_message\ndata: {json.dumps({'content': f'Erreur: {str(e)}', 'role': 'assistant'})}\n\n"
+        error_prefix = "Error" if request.language == "en" else "Erreur"
+        yield f"event: complete_message\ndata: {json.dumps({'content': f'{error_prefix}: {str(e)}', 'role': 'assistant'})}\n\n"
 
 
 @router.get("/chat/history/{course_id}")

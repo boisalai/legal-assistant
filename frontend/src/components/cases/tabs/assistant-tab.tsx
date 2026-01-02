@@ -20,6 +20,7 @@ import type { Course, Document } from "@/types";
 import { TranscriptionProgress, useTranscriptionProgress } from "../transcription-progress";
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 import { useActivityTracker } from "@/lib/activity-tracker";
+import { useLocale } from "@/i18n/client";
 
 // Import SVG logos for LLM providers
 import AnthropicLogo from "@/svg/anthropic.svg";
@@ -127,6 +128,9 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get current locale for language-aware responses
+  const { locale } = useLocale();
 
   // LLM settings hook - persists to localStorage
   const { modelId: selectedModel, updateSetting: updateLLMSetting, isLoaded: llmSettingsLoaded } = useLLMSettings();
@@ -396,6 +400,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
             caseId: caseData.id,
             model: selectedModel,
             history: buildHistory(),
+            language: locale,
           });
           responseContent = response.message;
           usedModel = response.model || selectedModel;
