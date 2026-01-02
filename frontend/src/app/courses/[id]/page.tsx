@@ -61,12 +61,19 @@ export default function CourseDetailPage() {
   const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
-  const [assistantMessages, setAssistantMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?",
-    },
-  ]);
+  const [assistantMessages, setAssistantMessages] = useState<Message[]>([]);
+
+  // Initialize assistant greeting message with proper translation
+  useEffect(() => {
+    if (assistantMessages.length === 0) {
+      setAssistantMessages([
+        {
+          role: "assistant",
+          content: t("assistant.welcome"),
+        },
+      ]);
+    }
+  }, [t]); // Only run when t changes (locale change)
 
   const fetchCaseDetails = useCallback(async () => {
     try {
