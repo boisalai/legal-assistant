@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Layers, FileUp, Mic, Youtube } from "lucide-react";
+import { X, Layers, FileUp, Mic, Youtube } from "lucide-react";
 import { useActivityTracker } from "@/lib/activity-tracker";
 import {
   AlertDialog,
@@ -222,24 +222,23 @@ export function ModuleDetailsPanel({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b bg-background flex items-center justify-between shrink-0 min-h-[65px]">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex flex-col">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Layers className="h-5 w-5" />
-              {module.name}
-            </h2>
-            <span className="text-sm text-muted-foreground">
-              {moduleDocuments.length} {t("modules.documentsInModule")}
-            </span>
-          </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Layers className="h-5 w-5 flex-shrink-0" />
+            <span className="truncate">{module.name}</span>
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {moduleDocuments.length} {t("modules.documentsInModule")}
+          </span>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClose}
+          className="shrink-0 ml-4"
+        >
+          <X className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Content */}
