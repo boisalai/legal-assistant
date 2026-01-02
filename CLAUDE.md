@@ -139,6 +139,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `frontend/src/components/cases/flashcard-study-panel.tsx` - Interface révision flip
 - `frontend/src/components/cases/modules-section.tsx` - Section modules avec DataTable
 - `frontend/src/components/cases/modules-data-table.tsx` - DataTable des modules
+- `frontend/src/components/cases/module-details-panel.tsx` - Vue détaillée d'un module avec ses documents
 
 ### Activity Tracking (Contexte IA)
 
