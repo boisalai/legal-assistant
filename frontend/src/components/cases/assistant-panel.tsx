@@ -22,8 +22,8 @@ import {
   loadLLMConfig,
   saveLLMConfig,
 } from "@/lib/llm-models";
-import { useLocale } from "@/i18n/client";
-import { useTranslations } from "next-intl";
+import { useLocale as useCustomLocale } from "@/i18n/client";
+import { useTranslations, useLocale } from "next-intl";
 
 export interface Message {
   role: "user" | "assistant";
@@ -52,9 +52,11 @@ export function AssistantPanel({
   messages: controlledMessages,
   setMessages: controlledSetMessages
 }: AssistantPanelProps) {
-  // Get current locale for language-aware responses
-  const { locale } = useLocale();
+  // Get current locale - use next-intl's useLocale for translations
+  const locale = useLocale();
   const t = useTranslations();
+  // Keep custom locale hook for API calls
+  const { locale: apiLocale } = useCustomLocale();
 
   // If messages/setMessages are provided as props, use them (controlled mode)
   // Otherwise, use local state (uncontrolled mode)
@@ -162,7 +164,7 @@ export function AssistantPanel({
             caseId,
             model: config.model,
             history,
-            language: locale,
+            language: apiLocale,
           });
 
           // Read SSE stream
@@ -233,7 +235,7 @@ export function AssistantPanel({
             caseId,
             model: config.model,
             history,
-            language: locale,
+            language: apiLocale,
           });
 
           const assistantMessage: Message = {
