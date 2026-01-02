@@ -140,6 +140,12 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `frontend/src/components/cases/modules-section.tsx` - Section modules avec DataTable
 - `frontend/src/components/cases/modules-data-table.tsx` - DataTable des modules
 - `frontend/src/components/cases/module-details-panel.tsx` - Vue détaillée d'un module avec ses documents
+- `frontend/src/components/ui/generic-data-table.tsx` - 🆕 Composant DataTable générique réutilisable
+- `frontend/src/components/ui/column-helpers.tsx` - 🆕 Helpers colonnes (SortableHeader, DateCell, TruncatedCell)
+- `frontend/src/components/cases/case-edit-form.tsx` - 🆕 Formulaire d'édition de cours extrait
+- `frontend/src/components/cases/documents-section.tsx` - 🆕 Section documents avec handlers
+- `frontend/src/components/cases/sync-section.tsx` - 🆕 Section synchronisation répertoires liés
+- `backend/utils/file_utils.py` - Utilitaires fichiers + validation centralisée
 
 ### Activity Tracking (Contexte IA)
 
@@ -204,7 +210,50 @@ Le système d'activity tracking permet à l'assistant IA de savoir ce que l'util
 
 ---
 
-## Session actuelle (2026-01-02) - Activity Tracking complet ✅
+## Session actuelle (2026-01-02) - Simplification du codebase ✅
+
+**Objectif** : Réduire la complexité et la duplication du code sans changer les fonctionnalités.
+
+### Phase 1 : GenericDataTable (Frontend)
+
+Factorisation du code dupliqué dans les 3 DataTables :
+
+| Fichier | Avant | Après | Gain |
+|---------|-------|-------|------|
+| `documents-data-table.tsx` | 387 | 308 | -20% |
+| `flashcards-data-table.tsx` | 223 | 134 | -40% |
+| `modules-data-table.tsx` | 213 | 121 | -43% |
+
+**Nouveaux fichiers** :
+- `generic-data-table.tsx` - Composant générique avec tri, filtres optionnels
+- `column-helpers.tsx` - `SortableHeader`, `DateCell`, `TruncatedCell`
+
+### Phase 2 : Découpage course-details-panel (Frontend)
+
+Extraction de sous-composants depuis le fichier monolithique (780 → 260 lignes, -67%) :
+
+- `case-edit-form.tsx` (161 lignes) - Formulaire d'édition avec 5 champs
+- `documents-section.tsx` (294 lignes) - Gestion documents + handlers + dialogues
+- `sync-section.tsx` (144 lignes) - Synchronisation répertoires liés
+
+**Amélioration** : useState réduit de 19 à 1 dans le composant principal.
+
+### Phase 3 : Validation backend centralisée
+
+Ajout de `validate_file_for_upload()` dans `file_utils.py` :
+- Validation extension par type (`upload`, `link`, `audio`)
+- Validation taille (max 500 MB)
+- Exception `FileValidationError` pour messages cohérents
+
+Code dupliqué éliminé dans `documents.py` (3 occurrences → 1 fonction).
+
+### Commit
+
+- `4f1aba6` - refactor: Simplify codebase with GenericDataTable and component extraction
+
+---
+
+## Session précédente (2026-01-02) - Activity Tracking complet ✅
 
 **Objectif** : Permettre à l'assistant IA de toujours savoir ce que l'utilisateur consulte dans la zone centrale.
 
