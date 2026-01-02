@@ -29,6 +29,7 @@ interface ModulesSectionProps {
   documents: Document[];
   onDocumentsChange?: () => void;
   refreshKey?: number;
+  onViewModule?: (module: Module) => void;
 }
 
 export function ModulesSection({
@@ -36,6 +37,7 @@ export function ModulesSection({
   documents,
   onDocumentsChange,
   refreshKey,
+  onViewModule,
 }: ModulesSectionProps) {
   const t = useTranslations("modules");
   const tCommon = useTranslations("common");
@@ -87,6 +89,12 @@ export function ModulesSection({
   const handleDeleteClick = (module: Module) => {
     setModuleToDelete(module);
     setDeleteDialogOpen(true);
+  };
+
+  const handleView = (module: Module) => {
+    if (onViewModule) {
+      onViewModule(module);
+    }
   };
 
   const handleEdit = (module: Module) => {
@@ -145,6 +153,7 @@ export function ModulesSection({
         {/* DataTable */}
         <ModulesDataTable
           modules={modules}
+          onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDeleteClick}
           deletingModuleId={deletingModuleId}

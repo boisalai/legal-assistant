@@ -40,7 +40,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Course, Document, Checklist, FlashcardDeck } from "@/types";
+import type { Course, Document, Checklist, FlashcardDeck, Module } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
 import { DocumentsDataTable } from "./documents-data-table";
 import { LinkedDirectoriesSection } from "./linked-directories-section";
@@ -80,6 +80,8 @@ interface CaseDetailsPanelProps {
   onCreateDeck?: () => void;
   onListenFlashcardAudio?: (deck: FlashcardDeck) => void;
   flashcardsRefreshKey?: number;
+  // Module props
+  onViewModule?: (module: Module) => void;
 }
 
 export function CaseDetailsPanel({
@@ -103,6 +105,7 @@ export function CaseDetailsPanel({
   onCreateDeck,
   onListenFlashcardAudio,
   flashcardsRefreshKey,
+  onViewModule,
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
@@ -564,6 +567,7 @@ export function CaseDetailsPanel({
           courseId={caseData.id}
           documents={documents}
           onDocumentsChange={onDocumentsChange}
+          onViewModule={onViewModule}
         />
       </div>
 
