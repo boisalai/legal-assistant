@@ -31,16 +31,15 @@ from services.document_service import get_document_service
 from models.transcription_models import ExtractionResponse
 from models.tts_models import TTSVoice, TTSRequest, TTSResponse
 from utils.file_utils import (
-    ALLOWED_EXTENSIONS,
     LINKABLE_EXTENSIONS,
-    MAX_FILE_SIZE,
     MAX_LINKED_FILES,
+    FileValidationError,
     calculate_file_hash,
     get_file_extension,
-    is_allowed_file,
-    is_linkable_file,
-    scan_folder_for_files,
     get_mime_type,
+    is_allowed_file,
+    scan_folder_for_files,
+    validate_file_for_upload,
 )
 
 logger = logging.getLogger(__name__)
@@ -208,22 +207,14 @@ async def upload_document(
         auto_extract_markdown: If True, automatically extract content to markdown after upload (PDF only)
         module_id: If provided, directly assign the document to this module
     """
-    # Validate file type
-    if not file.filename or not is_allowed_file(file.filename):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS.keys())}"
-        )
-
     # Read file content
     content = await file.read()
 
-    # Check file size
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)} MB"
-        )
+    # Validate file type and size
+    try:
+        validate_file_for_upload(file.filename or "", len(content), "upload")
+    except FileValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
 
     try:
         # Normalize course ID
@@ -331,21 +322,13 @@ async def register_document(
             detail=f"Path is not a file: {request.file_path}"
         )
 
-    # Check file type
+    # Validate file type and size
     filename = file_path.name
-    if not is_allowed_file(filename):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS.keys())}"
-        )
-
-    # Check file size
     file_size = file_path.stat().st_size
-    if file_size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)} MB"
-        )
+    try:
+        validate_file_for_upload(filename, file_size, "upload")
+    except FileValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
 
     try:
         # Normalize course ID
@@ -429,12 +412,11 @@ async def link_file_or_folder(
         files_to_link = []
 
         if path.is_file():
-            # Single file
-            if not is_linkable_file(path.name):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported file type. Allowed extensions: {', '.join(LINKABLE_EXTENSIONS)}"
-                )
+            # Single file - validate extension
+            try:
+                validate_file_for_upload(path.name, 0, "link")  # Size checked later
+            except FileValidationError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
             files_to_link = [path]
 
         elif path.is_dir():

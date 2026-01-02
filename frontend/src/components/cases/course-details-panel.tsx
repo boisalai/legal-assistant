@@ -3,24 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  FileUp,
-  Mic,
   Trash2,
   CheckCircle2,
   AlertTriangle,
   Edit2,
-  Check,
-  X,
-  Loader2,
-  Folder,
-  RefreshCw,
-  FileText,
-  Youtube,
   MoreVertical,
 } from "lucide-react";
 import {
@@ -42,13 +29,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Course, Document, Checklist, FlashcardDeck, Module } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
-import { DocumentsDataTable } from "./documents-data-table";
-import { LinkedDirectoriesSection } from "./linked-directories-section";
+import { CaseEditForm } from "./case-edit-form";
+import { DocumentsSection } from "./documents-section";
+import { SyncSection } from "./sync-section";
 import { FlashcardsSection } from "./flashcards-section";
 import { ModulesSection } from "./modules-section";
-import { SyncProgressModal, SyncTask, SyncResult } from "./sync-progress-modal";
-import { documentsApi } from "@/lib/api";
-import { toast } from "sonner";
 
 interface CaseDetailsPanelProps {
   caseData: Course;
@@ -100,7 +85,6 @@ export function CaseDetailsPanel({
   onDelete,
   onDocumentsChange,
   deleting,
-  isAnalyzing,
   onStudyDeck,
   onCreateDeck,
   onListenFlashcardAudio,
@@ -109,329 +93,15 @@ export function CaseDetailsPanel({
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState(caseData.description || "");
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Academic fields for editing
-  const [editCourseCode, setEditCourseCode] = useState(caseData.course_code || "");
-  const [editProfessor, setEditProfessor] = useState(caseData.professor || "");
-  const [editCredits, setEditCredits] = useState(caseData.credits?.toString() || "3");
-  const [editColor, setEditColor] = useState(caseData.color || "#3B82F6");
-  const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
-  const [transcribingDocId, setTranscribingDocId] = useState<string | null>(null);
-  const [clearingDocId, setClearingDocId] = useState<string | null>(null);
-  const [extractingPDFDocId, setExtractingPDFDocId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [docToDelete, setDocToDelete] = useState<Document | null>(null);
-  const [reextractDialogOpen, setReextractDialogOpen] = useState(false);
-  const [docToReextract, setDocToReextract] = useState<Document | null>(null);
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [syncTasks, setSyncTasks] = useState<SyncTask[]>([]);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
-  const [syncComplete, setSyncComplete] = useState(false);
-  const [syncHasError, setSyncHasError] = useState(false);
-
-  // Handle synchronize documents
-  const handleSyncDocuments = async () => {
-    // Initialize sync state
-    setSyncModalOpen(true);
-    setSyncComplete(false);
-    setSyncHasError(false);
-    setSyncResult(null);
-
-    const initialTasks: SyncTask[] = [
-      {
-        id: "scan-uploaded",
-        label: "Analyse des documents uploadés",
-        status: "pending",
-      },
-      {
-        id: "scan-linked",
-        label: "Analyse des répertoires liés",
-        status: "pending",
-      },
-      {
-        id: "refresh",
-        label: "Actualisation de la liste",
-        status: "pending",
-      },
-    ];
-    setSyncTasks(initialTasks);
-
-    try {
-      // Step 1: Sync uploaded documents
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "scan-uploaded" ? { ...t, status: "running" } : t
-        )
-      );
-
-      const uploadResult = await documentsApi.sync(caseData.id);
-      const uploadDetails: string[] = [];
-      if (uploadResult.discovered > 0) {
-        uploadDetails.push(`${uploadResult.discovered} fichier(s) découvert(s)`);
-      }
-
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "scan-uploaded"
-            ? { ...t, status: "completed", details: uploadDetails.length > 0 ? uploadDetails : ["Aucun changement"] }
-            : t
-        )
-      );
-
-      // Step 2: Sync linked directories
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "scan-linked" ? { ...t, status: "running" } : t
-        )
-      );
-
-      const linkedResult = await documentsApi.syncLinkedDirectories(caseData.id);
-      const linkedDetails: string[] = [];
-      if (linkedResult.added > 0) {
-        linkedDetails.push(`${linkedResult.added} fichier(s) ajouté(s)`);
-      }
-      if (linkedResult.updated > 0) {
-        linkedDetails.push(`${linkedResult.updated} fichier(s) mis à jour`);
-      }
-      if (linkedResult.removed > 0) {
-        linkedDetails.push(`${linkedResult.removed} fichier(s) supprimé(s)`);
-      }
-
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "scan-linked"
-            ? { ...t, status: "completed", details: linkedDetails.length > 0 ? linkedDetails : ["Aucun changement"] }
-            : t
-        )
-      );
-
-      // Step 3: Refresh documents list
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "refresh" ? { ...t, status: "running" } : t
-        )
-      );
-
-      if (onDocumentsChange) {
-        await onDocumentsChange();
-      }
-
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.id === "refresh" ? { ...t, status: "completed" } : t
-        )
-      );
-
-      // Set final result
-      setSyncResult({
-        uploadedDiscovered: uploadResult.discovered,
-        linkedAdded: linkedResult.added,
-        linkedUpdated: linkedResult.updated,
-        linkedRemoved: linkedResult.removed,
-      });
-
-      setSyncComplete(true);
-      setSyncHasError(false);
-    } catch (err) {
-      // Mark current running task as error
-      setSyncTasks((prev) =>
-        prev.map((t) =>
-          t.status === "running"
-            ? {
-                ...t,
-                status: "error",
-                error: err instanceof Error ? err.message : "Erreur inconnue",
-              }
-            : t
-        )
-      );
-      setSyncComplete(true);
-      setSyncHasError(true);
-      toast.error("Erreur lors de la synchronisation");
-    }
-  };
-
-  // Check if document is an audio file
-  const isAudioFile = (doc: Document) => {
-    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
-    const audioExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg", "opus", "flac", "aac"];
-    return audioExtensions.includes(ext) || (doc.mime_type?.includes("audio") ?? false);
-  };
-
-  // Check if document is a PDF file
-  const isPDFFile = (doc: Document) => {
-    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
-    return ext === "pdf" || doc.mime_type === "application/pdf";
-  };
-
-  // Check if a document can have text extracted (non-audio without extracted_text)
-  const canExtractText = (doc: Document) => {
-    const ext = doc.filename?.split(".").pop()?.toLowerCase() || "";
-    // PDF files should use "Extraire en markdown" instead of direct extraction
-    const extractableExtensions = ["doc", "docx", "txt", "rtf", "md"];
-    return extractableExtensions.includes(ext);
-  };
-
-  // Check if a document needs text extraction (non-audio without extracted_text)
-  const needsExtraction = (doc: Document) => {
-    return canExtractText(doc) && !doc.extracted_text;
-  };
-
-  const handleExtractText = async (doc: Document) => {
-    setExtractingDocId(doc.id);
-    try {
-      const result = await documentsApi.extract(caseData.id, doc.id);
-      if (result.success) {
-        toast.success(`Texte extrait avec succes (${result.method})`);
-        // Refresh the documents list
-        if (onDocumentsChange) {
-          await onDocumentsChange();
-        }
-      } else {
-        toast.error(result.error || "Erreur lors de l'extraction");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de l'extraction");
-    } finally {
-      setExtractingDocId(null);
-    }
-  };
-
-  // Handle transcription for audio files
-  const handleTranscribe = async (doc: Document) => {
-    setTranscribingDocId(doc.id);
-    try {
-      const result = await documentsApi.transcribeWithWorkflow(caseData.id, doc.id, {
-        language: "fr",
-        createMarkdown: true,
-      });
-
-      // Only refresh and show success if transcription actually succeeded
-      if (result.success) {
-        // Refresh documents list to get updated state
-        if (onDocumentsChange) {
-          await onDocumentsChange();
-        }
-        toast.success("Transcription terminée");
-      } else {
-        toast.error(result.error || "Erreur lors de la transcription");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la transcription");
-    } finally {
-      setTranscribingDocId(null);
-    }
-  };
-
-  // Handle PDF extraction to markdown
-  const handleExtractPDF = async (doc: Document, forceReextract: boolean = false) => {
-    setExtractingPDFDocId(doc.id);
-    try {
-      const result = await documentsApi.extractPDFToMarkdown(caseData.id, doc.id, {
-        forceReextract,
-      });
-
-      // Only refresh and show success if extraction actually succeeded
-      if (result.success) {
-        // Refresh documents list to get updated state
-        if (onDocumentsChange) {
-          await onDocumentsChange();
-        }
-        toast.success("Markdown créé avec succès");
-      } else {
-        toast.error(result.error || "Erreur lors de l'extraction");
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Erreur lors de l'extraction";
-
-      // Check if error is about existing markdown file
-      if (errorMessage.includes("existe déjà")) {
-        // Ask user if they want to force re-extract
-        setDocToReextract(doc);
-        setReextractDialogOpen(true);
-        setExtractingPDFDocId(null);
-        return;
-      }
-
-      toast.error(errorMessage);
-    } finally {
-      setExtractingPDFDocId(null);
-    }
-  };
-
-  // Handle confirm re-extract PDF
-  const handleConfirmReextract = async () => {
-    if (docToReextract) {
-      setReextractDialogOpen(false);
-      await handleExtractPDF(docToReextract, true);
-      setDocToReextract(null);
-    }
-  };
-
-  // Handle clearing extracted text
-  const handleClearText = async (doc: Document) => {
-    setClearingDocId(doc.id);
-    try {
-      await documentsApi.clearText(caseData.id, doc.id);
-      toast.success("Texte retiré de la base de données");
-      if (onDocumentsChange) {
-        await onDocumentsChange();
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la suppression du texte");
-    } finally {
-      setClearingDocId(null);
-    }
-  };
-
-  // Handle document deletion (also clears extracted text from DB if present)
-  const handleConfirmDelete = async () => {
-    if (docToDelete) {
-      // Only clear text for non-markdown documents with extracted text
-      // Markdown files store their content in extracted_text but don't need clearing
-      const isMarkdown = docToDelete.filename?.endsWith('.md');
-      if (docToDelete.extracted_text && !isMarkdown) {
-        try {
-          await documentsApi.clearText(caseData.id, docToDelete.id);
-        } catch (err) {
-          // Continue with deletion even if clearing text fails
-          console.warn("Failed to clear text before deletion:", err);
-        }
-      }
-      await onDeleteDocument(docToDelete.id);
-      setDocToDelete(null);
-      setDeleteDialogOpen(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const updateData: any = {
-        description: editDescription,
-      };
-
-      // Add academic fields if they have values
-      if (editCourseCode) updateData.course_code = editCourseCode;
-      if (editProfessor) updateData.professor = editProfessor;
-      if (editCredits) updateData.credits = parseInt(editCredits, 10);
-      if (editColor) updateData.color = editColor;
-
-      await onUpdateCase(updateData);
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditDescription(caseData.description || "");
-    setEditCourseCode(caseData.course_code || "");
-    setEditProfessor(caseData.professor || "");
-    setEditCredits(caseData.credits?.toString() || "3");
-    setEditColor(caseData.color || "#3B82F6");
+  const handleSaveEdit = async (data: {
+    description?: string;
+    course_code?: string;
+    professor?: string;
+    credits?: number;
+    color?: string;
+  }) => {
+    await onUpdateCase(data);
     setIsEditing(false);
   };
 
@@ -451,7 +121,7 @@ export function CaseDetailsPanel({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit ? onEdit() : setIsEditing(true)}>
+            <DropdownMenuItem onClick={() => (onEdit ? onEdit() : setIsEditing(true))}>
               <Edit2 className="h-4 w-4 mr-2" />
               {t("common.edit")}
             </DropdownMenuItem>
@@ -459,233 +129,105 @@ export function CaseDetailsPanel({
         </DropdownMenu>
       </div>
 
-      {/* Contenu principal avec padding */}
+      {/* Main content */}
       <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
-        {/* Mode édition */}
+        {/* Edit mode */}
         {isEditing && (
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-            <h3 className="font-semibold text-sm">{t("courses.editCourse")}</h3>
+          <CaseEditForm
+            caseData={caseData}
+            onSave={handleSaveEdit}
+            onCancel={() => setIsEditing(false)}
+          />
+        )}
 
-            {/* Academic fields */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm text-muted-foreground">{t("courses.academicInfo")}</h4>
+        {/* Modules Section */}
+        <div className="mb-4">
+          <ModulesSection
+            courseId={caseData.id}
+            documents={documents}
+            onDocumentsChange={onDocumentsChange}
+            onViewModule={onViewModule}
+          />
+        </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-course-code">{t("courses.courseCode")}</Label>
-                  <Input
-                    id="edit-course-code"
-                    value={editCourseCode}
-                    onChange={(e) => setEditCourseCode(e.target.value)}
-                    placeholder="Ex: DRT-1151G"
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-credits">{t("courses.credits")}</Label>
-                  <Input
-                    id="edit-credits"
-                    type="number"
-                    min="0"
-                    max="6"
-                    value={editCredits}
-                    onChange={(e) => setEditCredits(e.target.value)}
-                    disabled={isSaving}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">{t("courses.description")}</Label>
-                <Textarea
-                  id="edit-description"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder={t("courses.descriptionPlaceholder")}
-                  disabled={isSaving}
-                  className="text-sm min-h-[80px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-professor">{t("courses.professor")}</Label>
-                <Input
-                  id="edit-professor"
-                  value={editProfessor}
-                  onChange={(e) => setEditProfessor(e.target.value)}
-                  placeholder="Ex: Prof. Dupont"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-color">{t("courses.color")}</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="edit-color"
-                    type="color"
-                    value={editColor}
-                    onChange={(e) => setEditColor(e.target.value)}
-                    disabled={isSaving}
-                    className="w-20 h-10"
-                  />
-                  <span className="text-sm text-muted-foreground">{editColor}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                {t("common.save")}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancelEdit}
-                disabled={isSaving}
-              >
-                <X className="h-4 w-4" />
-                {t("common.cancel")}
-              </Button>
-            </div>
+        {/* Flashcards Section */}
+        {onStudyDeck && onCreateDeck && (
+          <div className="mb-4">
+            <FlashcardsSection
+              courseId={caseData.id}
+              documents={documents}
+              onStudyDeck={onStudyDeck}
+              onCreateDeck={onCreateDeck}
+              onListenAudio={onListenFlashcardAudio}
+              refreshKey={flashcardsRefreshKey}
+            />
           </div>
         )}
 
-      {/* Section Modules */}
-      <div className="mb-4">
-        <ModulesSection
-          courseId={caseData.id}
-          documents={documents}
-          onDocumentsChange={onDocumentsChange}
-          onViewModule={onViewModule}
-        />
-      </div>
-
-      {/* Section Fiches de révision */}
-      {onStudyDeck && onCreateDeck && (
+        {/* Linked Directories & Sync */}
         <div className="mb-4">
-          <FlashcardsSection
+          <SyncSection
             courseId={caseData.id}
             documents={documents}
-            onStudyDeck={onStudyDeck}
-            onCreateDeck={onCreateDeck}
-            onListenAudio={onListenFlashcardAudio}
-            refreshKey={flashcardsRefreshKey}
+            onDocumentsChange={onDocumentsChange}
+            onPreviewDirectory={onPreviewDirectory}
+            onLinkDirectory={onLinkFile}
           />
         </div>
-      )}
 
-      {/* Répertoires liés */}
-      <div className="mb-4">
-        <LinkedDirectoriesSection
-          caseId={caseData.id}
-          documents={documents.filter((doc) => doc.source_type === "linked")}
-          onDocumentsChange={onDocumentsChange || (() => {})}
-          onPreviewDirectory={onPreviewDirectory}
-          onLinkDirectory={onLinkFile}
-          onSync={handleSyncDocuments}
-          isSyncing={syncModalOpen && !syncComplete}
+        {/* Documents Section */}
+        <DocumentsSection
+          courseId={caseData.id}
+          documents={documents}
+          onUploadDocuments={onUploadDocuments}
+          onRecordAudio={onRecordAudio}
+          onYouTubeImport={onYouTubeImport}
+          onPreviewDocument={onPreviewDocument}
+          onDeleteDocument={onDeleteDocument}
+          onDocumentsChange={onDocumentsChange}
         />
+
+        {/* Checklist */}
+        {checklist && (
+          <>
+            {checklist.items && checklist.items.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Points de vérification
+                </h3>
+                <ul className="space-y-1.5">
+                  {checklist.items.slice(0, 5).map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{item.titre}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {checklist.points_attention && checklist.points_attention.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  Points d'attention ({checklist.points_attention.length})
+                </h3>
+                <ul className="space-y-1.5">
+                  {checklist.points_attention.map((point, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Liste des documents */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-base flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            {t("documents.title")} ({documents.filter((doc) => doc.source_type !== "linked").length})
-          </h3>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={onUploadDocuments} className="gap-1">
-              <FileUp className="h-3 w-3" />
-              {t("documents.addDocuments")}
-            </Button>
-            <Button size="sm" onClick={onRecordAudio} className="gap-1">
-              <Mic className="h-3 w-3" />
-              {t("courses.recordAudio")}
-            </Button>
-            <Button size="sm" onClick={onYouTubeImport} className="gap-1">
-              <Youtube className="h-3 w-3" />
-              {t("courses.youtube")}
-            </Button>
-          </div>
-        </div>
-
-        {/* DataTable with filters */}
-        <DocumentsDataTable
-          documents={documents.filter((doc) => doc.source_type !== "linked")}
-          onPreview={onPreviewDocument}
-          onDelete={(doc) => {
-            setDocToDelete(doc);
-            setDeleteDialogOpen(true);
-          }}
-          onExtract={handleExtractText}
-          onExtractPDF={handleExtractPDF}
-          onTranscribe={handleTranscribe}
-          onClearText={handleClearText}
-          extractingDocId={extractingDocId}
-          extractingPDFDocId={extractingPDFDocId}
-          transcribingDocId={transcribingDocId}
-          clearingDocId={clearingDocId}
-          needsExtraction={needsExtraction}
-          isPDFFile={isPDFFile}
-          isAudioFile={isAudioFile}
-        />
-      </div>
-
-      {/* Points de vérification et d'attention */}
-      {checklist && (
-        <>
-          {/* Points de vérification */}
-          {checklist.items && checklist.items.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Points de vérification
-              </h3>
-              <ul className="space-y-1.5">
-                {checklist.items.slice(0, 5).map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
-                    <span className="text-muted-foreground">{item.titre}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Points d'attention */}
-          {checklist.points_attention && checklist.points_attention.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                Points d'attention ({checklist.points_attention.length})
-              </h3>
-              <ul className="space-y-1.5">
-                {checklist.points_attention.map((point, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm">
-                    <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 mt-0.5 shrink-0" />
-                    <span className="text-muted-foreground">{point}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </>
-      )}
-      </div>
-
-      {/* Footer avec bouton Supprimer */}
+      {/* Footer with delete button */}
       <div className="p-4 border-t mt-auto flex justify-end items-center">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -713,67 +255,6 @@ export function CaseDetailsPanel({
           </AlertDialogContent>
         </AlertDialog>
       </div>
-
-      {/* AlertDialog for document deletion */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer ce document ?' : 'Retirer ce document ?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {docToDelete?.file_path?.includes('data/uploads/') ? (
-                <>
-                  Le document « {docToDelete?.filename} » sera définitivement supprimé du dossier et du disque.
-                </>
-              ) : (
-                <>
-                  Le document « {docToDelete?.filename} » sera retiré de ce dossier.
-                  Le fichier original ne sera pas supprimé de votre disque.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDocToDelete(null)}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className={docToDelete?.file_path?.includes('data/uploads/') ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-            >
-              {docToDelete?.file_path?.includes('data/uploads/') ? 'Supprimer' : 'Retirer'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Re-extract PDF Confirmation Dialog */}
-      <AlertDialog open={reextractDialogOpen} onOpenChange={setReextractDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Fichier markdown existant</AlertDialogTitle>
-            <AlertDialogDescription>
-              Un fichier markdown existe déjà pour ce PDF.
-              Voulez-vous supprimer et réextraire le fichier ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDocToReextract(null)}>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmReextract}>
-              Supprimer et réextraire
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Sync Progress Modal */}
-      <SyncProgressModal
-        open={syncModalOpen}
-        onOpenChange={setSyncModalOpen}
-        tasks={syncTasks}
-        result={syncResult}
-        isComplete={syncComplete}
-        hasError={syncHasError}
-      />
     </div>
   );
 }
