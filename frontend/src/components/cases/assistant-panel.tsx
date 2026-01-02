@@ -68,20 +68,24 @@ export function AssistantPanel({
   const [backendConnected, setBackendConnected] = useState(false);
   const [checkingBackend, setCheckingBackend] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [greetingUpdated, setGreetingUpdated] = useState(false);
+  const [lastLocale, setLastLocale] = useState<string | null>(null);
 
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
 
-  // Initialize greeting message on mount (only if using internal messages)
+  // Initialize greeting message on mount and update when locale changes
   useEffect(() => {
-    if (!controlledMessages && !greetingUpdated) {
-      const welcomeMessage = t("assistant.welcome");
-      internalSetMessages([{ role: "assistant", content: welcomeMessage }]);
-      setGreetingUpdated(true);
+    if (!controlledMessages) {
+      // Only update greeting if it's the first message and locale changed
+      const isFirstMessageGreeting = internalMessages.length <= 1;
+      if (isFirstMessageGreeting && locale !== lastLocale) {
+        const welcomeMessage = t("assistant.welcome");
+        internalSetMessages([{ role: "assistant", content: welcomeMessage }]);
+        setLastLocale(locale);
+      }
     }
-  }, [controlledMessages, greetingUpdated, t]);
+  }, [controlledMessages, locale, lastLocale, t, internalMessages.length]);
 
   // Load config from localStorage on mount (client-side only)
   useEffect(() => {
