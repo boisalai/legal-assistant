@@ -1,13 +1,13 @@
 """
-Routes pour la configuration et les paramètres de l'application.
+Routes for application configuration and settings.
 
 Endpoints:
-- GET /api/settings/current - Paramètres actuels
-- PUT /api/settings/current - Mettre à jour les paramètres
-- GET /api/settings/extraction-methods - Méthodes d'extraction disponibles
-- GET /api/settings/mlx/status - Statut du serveur MLX
-- POST /api/settings/mlx/start - Démarrer le serveur MLX
-- POST /api/settings/mlx/stop - Arrêter le serveur MLX
+- GET /api/settings/current - Current settings
+- PUT /api/settings/current - Update settings
+- GET /api/settings/extraction-methods - Available extraction methods
+- GET /api/settings/mlx/status - MLX server status
+- POST /api/settings/mlx/start - Start MLX server
+- POST /api/settings/mlx/stop - Stop MLX server
 """
 
 import logging
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/settings", tags=["Settings"])
 # ============================================================================
 
 class SettingsUpdate(BaseModel):
-    """Modèle pour la mise à jour des paramètres."""
+    """Model for updating settings."""
     model_id: str | None = None
     extraction_method: str | None = None
     use_ocr: bool | None = None
@@ -41,7 +41,7 @@ class SettingsUpdate(BaseModel):
 
 
 class CurrentSettings(BaseModel):
-    """Modèle pour les paramètres actuels."""
+    """Model for current settings."""
     analysis: Dict[str, Any]
     available_models: Dict[str, Any]
     available_extraction_methods: Dict[str, Any]
@@ -54,42 +54,42 @@ class CurrentSettings(BaseModel):
 @router.get("/current")
 async def get_current_settings() -> Dict[str, Any]:
     """
-    Récupère les paramètres actuels de l'application.
+    Retrieve current application settings.
 
     Returns:
-        Dict contenant:
-        - analysis: Paramètres d'analyse (model_id, extraction_method, use_ocr)
-        - available_models: Modèles LLM disponibles
-        - available_extraction_methods: Méthodes d'extraction disponibles
+        Dict containing:
+        - analysis: Analysis parameters (model_id, extraction_method, use_ocr)
+        - available_models: Available LLM models
+        - available_extraction_methods: Available extraction methods
     """
     try:
-        # Récupérer les modèles disponibles
+        # Get available models
         available_models = get_all_models_for_api()
 
-        # Récupérer les méthodes d'extraction disponibles
+        # Get available extraction methods
         extraction_methods = {
             "pypdf": {
                 "name": "PyPDF (Standard)",
-                "description": "Extraction basique, rapide",
+                "description": "Basic extraction, fast",
                 "available": True,
             },
             "docling-standard": {
                 "name": "Docling Standard",
-                "description": "Extraction avancée avec layout",
-                "available": False,  # TODO: Implémenter
+                "description": "Advanced extraction with layout",
+                "available": False,  # TODO: Implement
             },
             "docling-vlm": {
                 "name": "Docling VLM",
-                "description": "Extraction maximale avec vision",
-                "available": False,  # TODO: Implémenter
+                "description": "Maximum extraction with vision",
+                "available": False,  # TODO: Implement
             },
         }
 
         return {
             "analysis": {
                 "model_id": settings.model_id,
-                "extraction_method": "pypdf",  # Valeur par défaut
-                "use_ocr": False,  # Valeur par défaut
+                "extraction_method": "pypdf",  # Default value
+                "use_ocr": False,  # Default value
             },
             "embedding": {
                 "provider": settings.embedding_provider,
@@ -99,41 +99,41 @@ async def get_current_settings() -> Dict[str, Any]:
             "available_extraction_methods": extraction_methods,
         }
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération des paramètres: {e}")
+        logger.error(f"Error retrieving settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/current")
 async def update_settings(settings_update: SettingsUpdate) -> Dict[str, Any]:
     """
-    Met à jour les paramètres de l'application.
+    Update application settings.
 
     Args:
-        settings_update: Nouveaux paramètres à appliquer
+        settings_update: New settings to apply
 
     Returns:
-        Dict contenant le message de confirmation et les paramètres mis à jour
+        Dict containing confirmation message and updated settings
     """
     try:
-        # Mettre à jour model_id si fourni
+        # Update model_id if provided
         if settings_update.model_id:
             settings.model_id = settings_update.model_id
-            logger.info(f"Paramètre model_id mis à jour: {settings_update.model_id}")
+            logger.info(f"Setting model_id updated: {settings_update.model_id}")
 
-        # Mettre à jour embedding_provider et embedding_model si fournis
+        # Update embedding_provider and embedding_model if provided
         if settings_update.embedding_provider:
             settings.embedding_provider = settings_update.embedding_provider
-            logger.info(f"Paramètre embedding_provider mis à jour: {settings_update.embedding_provider}")
+            logger.info(f"Setting embedding_provider updated: {settings_update.embedding_provider}")
 
         if settings_update.embedding_model:
             settings.embedding_model = settings_update.embedding_model
-            logger.info(f"Paramètre embedding_model mis à jour: {settings_update.embedding_model}")
+            logger.info(f"Setting embedding_model updated: {settings_update.embedding_model}")
 
-        # TODO: Persister les paramètres dans un fichier ou base de données
-        # Pour l'instant, les changements sont en mémoire seulement
+        # TODO: Persist settings to file or database
+        # For now, changes are in memory only
 
         return {
-            "message": "Paramètres mis à jour avec succès",
+            "message": "Settings updated successfully",
             "settings": {
                 "model_id": settings.model_id,
                 "extraction_method": settings_update.extraction_method or "pypdf",
@@ -143,20 +143,20 @@ async def update_settings(settings_update: SettingsUpdate) -> Dict[str, Any]:
             },
         }
     except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour des paramètres: {e}")
+        logger.error(f"Error updating settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/extraction-methods")
 async def get_extraction_methods() -> Dict[str, Any]:
     """
-    Récupère les méthodes d'extraction de documents disponibles.
+    Retrieve available document extraction methods.
 
     Returns:
-        Dict contenant:
-        - methods: Dictionnaire des méthodes disponibles
-        - docling_available: Si Docling est disponible
-        - default: Méthode par défaut
+        Dict containing:
+        - methods: Dictionary of available methods
+        - docling_available: Whether Docling is available
+        - default: Default method
     """
     return {
         "methods": {
@@ -184,13 +184,13 @@ async def get_extraction_methods() -> Dict[str, Any]:
 @router.get("/embedding-models")
 async def get_embedding_models() -> Dict[str, Any]:
     """
-    Récupère les modèles d'embedding disponibles.
+    Retrieve available embedding models.
 
     Returns:
-        Dict contenant:
-        - providers: Dictionnaire des providers disponibles
-        - default_provider: Provider par défaut
-        - default_model: Modèle par défaut
+        Dict containing:
+        - providers: Dictionary of available providers
+        - default_provider: Default provider
+        - default_model: Default model
     """
     return {
         "providers": {
@@ -267,38 +267,38 @@ async def get_embedding_models() -> Dict[str, Any]:
 @router.get("/check-embedding-mismatch")
 async def check_embedding_mismatch() -> Dict[str, Any]:
     """
-    Vérifie si des embeddings existent avec un modèle différent du modèle actuel.
+    Check if embeddings exist with a different model than the current one.
 
     Returns:
-        Dict contenant:
-        - has_mismatch: bool - True si réindexation nécessaire
-        - current_model: str - Modèle actuellement configuré
-        - existing_models: list[str] - Modèles trouvés dans la DB
-        - total_chunks: int - Chunks avec le modèle actuel
-        - mismatched_chunks: int - Chunks avec un modèle différent
-        - documents_to_reindex: int - Nombre de documents à réindexer
+        Dict containing:
+        - has_mismatch: bool - True if reindexing is needed
+        - current_model: str - Currently configured model
+        - existing_models: list[str] - Models found in the DB
+        - total_chunks: int - Chunks with the current model
+        - mismatched_chunks: int - Chunks with a different model
+        - documents_to_reindex: int - Number of documents to reindex
     """
     try:
         indexing_service = get_document_indexing_service()
         result = await indexing_service.check_embedding_model_mismatch()
         return result
     except Exception as e:
-        logger.error(f"Erreur lors de la vérification du modèle d'embedding: {e}")
+        logger.error(f"Error checking embedding model: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/reindex-all")
 async def reindex_all_documents() -> Dict[str, Any]:
     """
-    Réindexe tous les documents avec le modèle d'embedding actuel.
+    Reindex all documents with the current embedding model.
 
-    ATTENTION: Cette opération:
-    1. Supprime TOUS les anciens embeddings (tous modèles confondus)
-    2. Réindexe tous les documents avec le modèle actuel
-    3. Peut prendre plusieurs minutes selon le nombre de documents
+    WARNING: This operation:
+    1. Deletes ALL old embeddings (all models)
+    2. Reindexes all documents with the current model
+    3. May take several minutes depending on the number of documents
 
     Returns:
-        Dict avec:
+        Dict with:
         - success: bool
         - message: str
         - documents_processed: int
@@ -306,13 +306,13 @@ async def reindex_all_documents() -> Dict[str, Any]:
         - errors: list[str]
     """
     try:
-        logger.info("Début de la réindexation de tous les documents")
+        logger.info("Starting reindexation of all documents")
 
         surreal_service = get_surreal_service()
         if not surreal_service.db:
             await surreal_service.connect()
 
-        # Récupérer tous les documents avec du texte extrait
+        # Retrieve all documents with extracted text
         query = """
         SELECT id, course_id, texte_extrait
         FROM document
@@ -337,13 +337,13 @@ async def reindex_all_documents() -> Dict[str, Any]:
                 "errors": []
             }
 
-        logger.info(f"Trouvé {len(documents)} documents à réindexer")
+        logger.info(f"Found {len(documents)} documents to reindex")
 
-        # Supprimer TOUS les anciens embeddings
-        logger.info("Suppression de tous les anciens embeddings...")
+        # Delete ALL old embeddings
+        logger.info("Deleting all old embeddings...")
         await surreal_service.query("DELETE document_embedding")
 
-        # Réindexer tous les documents
+        # Reindex all documents
         indexing_service = get_document_indexing_service()
         documents_processed = 0
         total_chunks_created = 0
@@ -356,10 +356,10 @@ async def reindex_all_documents() -> Dict[str, Any]:
                 texte_extrait = doc.get("texte_extrait")
 
                 if not doc_id or not course_id or not texte_extrait:
-                    logger.warning(f"Document incomplet ignoré: {doc_id}")
+                    logger.warning(f"Incomplete document skipped: {doc_id}")
                     continue
 
-                logger.info(f"Réindexation de {doc_id}...")
+                logger.info(f"Reindexing {doc_id}...")
                 index_result = await indexing_service.index_document(
                     document_id=doc_id,
                     case_id=course_id,
@@ -370,18 +370,18 @@ async def reindex_all_documents() -> Dict[str, Any]:
                 if index_result.get("success"):
                     documents_processed += 1
                     total_chunks_created += index_result.get("chunks_created", 0)
-                    logger.info(f"✓ {doc_id}: {index_result.get('chunks_created', 0)} chunks créés")
+                    logger.info(f"✓ {doc_id}: {index_result.get('chunks_created', 0)} chunks created")
                 else:
-                    error_msg = f"Échec {doc_id}: {index_result.get('error', 'Unknown error')}"
+                    error_msg = f"Failed {doc_id}: {index_result.get('error', 'Unknown error')}"
                     errors.append(error_msg)
                     logger.error(error_msg)
 
             except Exception as e:
-                error_msg = f"Erreur {doc.get('id', 'unknown')}: {str(e)}"
+                error_msg = f"Error {doc.get('id', 'unknown')}: {str(e)}"
                 errors.append(error_msg)
                 logger.error(error_msg)
 
-        logger.info(f"Réindexation terminée: {documents_processed}/{len(documents)} documents, {total_chunks_created} chunks")
+        logger.info(f"Reindexation completed: {documents_processed}/{len(documents)} documents, {total_chunks_created} chunks")
 
         return {
             "success": True,
@@ -389,11 +389,11 @@ async def reindex_all_documents() -> Dict[str, Any]:
             "documents_processed": documents_processed,
             "total_documents": len(documents),
             "chunks_created": total_chunks_created,
-            "errors": errors[:10]  # Limiter à 10 premières erreurs
+            "errors": errors[:10]  # Limit to first 10 errors
         }
 
     except Exception as e:
-        logger.error(f"Erreur lors de la réindexation: {e}", exc_info=True)
+        logger.error(f"Error during reindexation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -402,17 +402,17 @@ async def reindex_all_documents() -> Dict[str, Any]:
 # ============================================================================
 
 class MLXStartRequest(BaseModel):
-    """Modèle pour démarrer le serveur MLX."""
+    """Model for starting the MLX server."""
     model_id: str  # Format: "mlx:mlx-community/Qwen2.5-3B-Instruct-4bit"
 
 
 @router.get("/mlx/status")
 async def get_mlx_status() -> Dict[str, Any]:
     """
-    Récupère le statut du serveur MLX.
+    Retrieve the MLX server status.
 
     Returns:
-        Dict contenant: running, model, port, host, url
+        Dict containing: running, model, port, host, url
     """
     service = get_mlx_server_service()
     return service.get_status()
@@ -421,18 +421,18 @@ async def get_mlx_status() -> Dict[str, Any]:
 @router.post("/mlx/start")
 async def start_mlx_server(request: MLXStartRequest) -> Dict[str, Any]:
     """
-    Démarre le serveur MLX avec le modèle spécifié.
+    Start the MLX server with the specified model.
 
     Args:
-        request: Contient le model_id à démarrer
+        request: Contains the model_id to start
 
     Returns:
-        Dict avec: success, message, status
+        Dict with: success, message, status
     """
     try:
-        logger.info(f"Demande de démarrage serveur MLX: {request.model_id}")
+        logger.info(f"MLX server start request: {request.model_id}")
 
-        # Démarrer le serveur (ou redémarrer si déjà en cours avec un autre modèle)
+        # Start the server (or restart if already running with a different model)
         success = await ensure_mlx_server(request.model_id)
 
         if success:
@@ -449,17 +449,17 @@ async def start_mlx_server(request: MLXStartRequest) -> Dict[str, Any]:
                 "status": get_mlx_server_service().get_status(),
             }
     except Exception as e:
-        logger.error(f"Erreur lors du démarrage du serveur MLX: {e}")
+        logger.error(f"Error starting MLX server: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/mlx/stop")
 async def stop_mlx_server() -> Dict[str, Any]:
     """
-    Arrête le serveur MLX en cours.
+    Stop the running MLX server.
 
     Returns:
-        Dict avec: success, message
+        Dict with: success, message
     """
     try:
         service = get_mlx_server_service()
@@ -469,5 +469,5 @@ async def stop_mlx_server() -> Dict[str, Any]:
             "message": "Serveur MLX arrêté",
         }
     except Exception as e:
-        logger.error(f"Erreur lors de l'arrêt du serveur MLX: {e}")
+        logger.error(f"Error stopping MLX server: {e}")
         raise HTTPException(status_code=500, detail=str(e))

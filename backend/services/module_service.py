@@ -1,9 +1,9 @@
 """
-Service pour la gestion des modules d'étude.
+Service for study module management.
 
-Un module est une unité d'organisation au sein d'un cours qui permet de:
-- Grouper des documents par thème/chapitre
-- Organiser les révisions (flashcards, quiz)
+A module is an organizational unit within a course that allows:
+- Grouping documents by theme/chapter
+- Organizing revisions (flashcards, quiz)
 """
 
 import logging
@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 def generate_hex_id() -> str:
-    """Génère un ID hexadécimal court compatible SurrealDB."""
+    """Generate a short hexadecimal ID compatible with SurrealDB."""
     return uuid.uuid4().hex[:8]
 
 
 class ModuleService:
-    """Service pour la gestion des modules."""
+    """Service for module management."""
 
     def __init__(self):
         self.db = get_surreal_service()
@@ -42,32 +42,32 @@ class ModuleService:
         data: ModuleCreate
     ) -> ModuleResponse:
         """
-        Crée un nouveau module pour un cours.
+        Create a new module for a course.
 
         Args:
-            course_id: ID du cours
-            data: Données du module
+            course_id: Course ID
+            data: Module data
 
         Returns:
-            Module créé
+            Created module
         """
-        # Normaliser le course_id
+        # Normalize the course_id
         course_record_id = course_id.replace("course:", "")
 
-        # Vérifier que le cours existe
+        # Verify that the course exists
         course_result = await self.db.query(
             "SELECT id FROM course WHERE id = type::thing('course', $record_id)",
             {"record_id": course_record_id}
         )
 
         if not course_result or len(course_result) == 0:
-            raise ValueError(f"Cours non trouvé: {course_id}")
+            raise ValueError(f"Course not found: {course_id}")
 
-        # Générer l'ID et les timestamps
+        # Generate ID and timestamps
         module_id = generate_hex_id()
         now = datetime.now(timezone.utc).isoformat()
 
-        # Créer le module
+        # Create the module
         module_data = {
             "course_id": f"course:{course_record_id}",
             "name": data.name,
@@ -83,22 +83,22 @@ class ModuleService:
         )
 
         if not result or len(result) == 0:
-            raise RuntimeError("Erreur lors de la création du module")
+            raise RuntimeError("Error creating module")
 
         created = result[0]
-        logger.info(f"Module créé: {module_id} pour cours {course_id}")
+        logger.info(f"Module created: {module_id} for course {course_id}")
 
         return self._format_module_response(created)
 
     async def get_module(self, module_id: str) -> Optional[ModuleResponse]:
         """
-        Récupère un module par son ID.
+        Get a module by its ID.
 
         Args:
-            module_id: ID du module
+            module_id: Module ID
 
         Returns:
-            Module ou None si non trouvé
+            Module or None if not found
         """
         record_id = module_id.replace("module:", "")
         full_id = f"module:{record_id}"
@@ -113,7 +113,7 @@ class ModuleService:
 
         module = result[0]
 
-        # Compter les documents assignés
+        # Count assigned documents
         doc_count = await self._count_module_documents(module_id)
         module["document_count"] = doc_count
 
@@ -124,15 +124,15 @@ class ModuleService:
         course_id: str
     ) -> Tuple[List[ModuleResponse], int]:
         """
-        Liste tous les modules d'un cours.
+        List all modules for a course.
 
         Args:
-            course_id: ID du cours
+            course_id: Course ID
 
         Returns:
-            Tuple (liste des modules, total)
+            Tuple (list of modules, total)
         """
-        # Normaliser le course_id
+        # Normalize the course_id
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -148,7 +148,7 @@ class ModuleService:
         modules = []
         if result:
             for module in result:
-                # Compter les documents
+                # Count documents
                 module_id = str(module.get("id", ""))
                 doc_count = await self._count_module_documents(module_id)
                 module["document_count"] = doc_count
@@ -162,23 +162,23 @@ class ModuleService:
         data: ModuleUpdate
     ) -> Optional[ModuleResponse]:
         """
-        Met à jour un module.
+        Update a module.
 
         Args:
-            module_id: ID du module
-            data: Données de mise à jour
+            module_id: Module ID
+            data: Update data
 
         Returns:
-            Module mis à jour ou None si non trouvé
+            Updated module or None if not found
         """
         record_id = module_id.replace("module:", "")
 
-        # Vérifier que le module existe
+        # Verify that the module exists
         existing = await self.get_module(module_id)
         if not existing:
             return None
 
-        # Construire les champs à mettre à jour
+        # Build fields to update
         update_fields = {}
         if data.name is not None:
             update_fields["name"] = data.name
@@ -192,7 +192,7 @@ class ModuleService:
 
         update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-        # Construire la requête de mise à jour
+        # Build the update query
         set_clauses = ", ".join([f"{k} = ${k}" for k in update_fields.keys()])
         query = f"""
             UPDATE module
@@ -203,29 +203,29 @@ class ModuleService:
 
         await self.db.query(query, params)
 
-        logger.info(f"Module mis à jour: {module_id}")
+        logger.info(f"Module updated: {module_id}")
         return await self.get_module(module_id)
 
     async def delete_module(self, module_id: str) -> bool:
         """
-        Supprime un module.
+        Delete a module.
 
-        Note: Les documents ne sont pas supprimés, juste désassignés.
+        Note: Documents are not deleted, just unassigned.
 
         Args:
-            module_id: ID du module
+            module_id: Module ID
 
         Returns:
-            True si supprimé, False si non trouvé
+            True if deleted, False if not found
         """
         record_id = module_id.replace("module:", "")
 
-        # Vérifier que le module existe
+        # Verify that the module exists
         existing = await self.get_module(module_id)
         if not existing:
             return False
 
-        # Désassigner les documents (mettre module_id à null)
+        # Unassign documents (set module_id to null)
         full_module_id = f"module:{record_id}"
         await self.db.query(
             """
@@ -236,13 +236,13 @@ class ModuleService:
             {"module_id": full_module_id}
         )
 
-        # Supprimer le module
+        # Delete the module
         await self.db.query(
             "DELETE module WHERE id = type::thing('module', $record_id)",
             {"record_id": record_id}
         )
 
-        logger.info(f"Module supprimé: {module_id}")
+        logger.info(f"Module deleted: {module_id}")
         return True
 
     # =========================================================================
@@ -255,22 +255,22 @@ class ModuleService:
         document_ids: List[str]
     ) -> int:
         """
-        Assigne des documents à un module.
+        Assign documents to a module.
 
         Args:
-            module_id: ID du module
-            document_ids: Liste des IDs de documents
+            module_id: Module ID
+            document_ids: List of document IDs
 
         Returns:
-            Nombre de documents assignés
+            Number of assigned documents
         """
         record_id = module_id.replace("module:", "")
         full_module_id = f"module:{record_id}"
 
-        # Vérifier que le module existe
+        # Verify that the module exists
         existing = await self.get_module(module_id)
         if not existing:
-            raise ValueError(f"Module non trouvé: {module_id}")
+            raise ValueError(f"Module not found: {module_id}")
 
         assigned_count = 0
         for doc_id in document_ids:
@@ -288,7 +288,7 @@ class ModuleService:
             if result:
                 assigned_count += 1
 
-        logger.info(f"Assigné {assigned_count} documents au module {module_id}")
+        logger.info(f"Assigned {assigned_count} documents to module {module_id}")
         return assigned_count
 
     async def unassign_documents(
@@ -297,14 +297,14 @@ class ModuleService:
         document_ids: List[str]
     ) -> int:
         """
-        Retire des documents d'un module.
+        Remove documents from a module.
 
         Args:
-            module_id: ID du module
-            document_ids: Liste des IDs de documents
+            module_id: Module ID
+            document_ids: List of document IDs
 
         Returns:
-            Nombre de documents désassignés
+            Number of unassigned documents
         """
         unassigned_count = 0
         for doc_id in document_ids:
@@ -322,7 +322,7 @@ class ModuleService:
             if result:
                 unassigned_count += 1
 
-        logger.info(f"Désassigné {unassigned_count} documents du module {module_id}")
+        logger.info(f"Unassigned {unassigned_count} documents from module {module_id}")
         return unassigned_count
 
     async def get_module_documents(
@@ -330,13 +330,13 @@ class ModuleService:
         module_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Récupère tous les documents d'un module.
+        Get all documents of a module.
 
         Args:
-            module_id: ID du module
+            module_id: Module ID
 
         Returns:
-            Liste des documents
+            List of documents
         """
         if not module_id.startswith("module:"):
             module_id = f"module:{module_id}"
@@ -357,13 +357,13 @@ class ModuleService:
         course_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Récupère les documents d'un cours qui ne sont assignés à aucun module.
+        Get course documents that are not assigned to any module.
 
         Args:
-            course_id: ID du cours
+            course_id: Course ID
 
         Returns:
-            Liste des documents non assignés
+            List of unassigned documents
         """
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
@@ -385,7 +385,7 @@ class ModuleService:
     # =========================================================================
 
     async def _count_module_documents(self, module_id: str) -> int:
-        """Compte le nombre de documents dans un module."""
+        """Count the number of documents in a module."""
         if not module_id.startswith("module:"):
             module_id = f"module:{module_id}"
 
@@ -403,7 +403,7 @@ class ModuleService:
         return 0
 
     def _format_module_response(self, module: Dict[str, Any]) -> ModuleResponse:
-        """Formate un module pour la réponse API."""
+        """Format a module for the API response."""
         module_id = module.get("id", "")
         if hasattr(module_id, "__str__"):
             module_id = str(module_id)

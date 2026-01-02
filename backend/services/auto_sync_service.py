@@ -1,11 +1,11 @@
 """
-Service de synchronisation automatique des répertoires liés.
+Automatic synchronization service for linked directories.
 
-Ce service s'exécute en arrière-plan et synchronise périodiquement
-tous les répertoires liés pour détecter :
-- Les nouveaux fichiers (ajout et indexation)
-- Les fichiers modifiés (réindexation)
-- Les fichiers supprimés (suppression de l'index)
+This service runs in the background and periodically synchronizes
+all linked directories to detect:
+- New files (add and index)
+- Modified files (reindex)
+- Deleted files (remove from index)
 """
 
 import asyncio
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoSyncService:
-    """Service singleton pour la synchronisation automatique des répertoires liés."""
+    """Singleton service for automatic synchronization of linked directories."""
 
     _instance: Optional["AutoSyncService"] = None
     _task: Optional[asyncio.Task] = None
@@ -46,27 +46,27 @@ class AutoSyncService:
             return
         self._initialized = True
         self._running = False
-        self._interval_seconds = 300  # 5 minutes par défaut
+        self._interval_seconds = 300  # 5 minutes by default
         self._task = None
 
     @property
     def interval_seconds(self) -> int:
-        """Intervalle de synchronisation en secondes."""
+        """Synchronization interval in seconds."""
         return self._interval_seconds
 
     @interval_seconds.setter
     def interval_seconds(self, value: int):
-        """Définir l'intervalle de synchronisation (minimum 60 secondes)."""
+        """Set the synchronization interval (minimum 60 seconds)."""
         self._interval_seconds = max(60, value)
         logger.info(f"Auto-sync interval set to {self._interval_seconds} seconds")
 
     @property
     def is_running(self) -> bool:
-        """Vérifie si le service est en cours d'exécution."""
+        """Check if the service is running."""
         return self._running and self._task is not None and not self._task.done()
 
     async def start(self):
-        """Démarre la synchronisation automatique en arrière-plan."""
+        """Start automatic synchronization in the background."""
         if self.is_running:
             logger.warning("Auto-sync service is already running")
             return
@@ -78,7 +78,7 @@ class AutoSyncService:
         )
 
     async def stop(self):
-        """Arrête proprement la synchronisation automatique."""
+        """Gracefully stop automatic synchronization."""
         if not self._running:
             return
 
@@ -93,8 +93,8 @@ class AutoSyncService:
         logger.info("Auto-sync service stopped")
 
     async def _sync_loop(self):
-        """Boucle principale de synchronisation."""
-        # Attendre un peu au démarrage pour laisser le temps à la DB de se connecter
+        """Main synchronization loop."""
+        # Wait a bit at startup to allow the DB to connect
         await asyncio.sleep(10)
 
         while self._running:
@@ -104,21 +104,21 @@ class AutoSyncService:
                 logger.error(f"Error in auto-sync loop: {e}")
                 logger.debug(traceback.format_exc())
 
-            # Attendre l'intervalle avant la prochaine sync
+            # Wait for interval before next sync
             try:
                 await asyncio.sleep(self._interval_seconds)
             except asyncio.CancelledError:
                 break
 
     async def _sync_all_linked_directories(self):
-        """Synchronise tous les répertoires liés de tous les cours."""
+        """Synchronize all linked directories from all courses."""
         try:
             service = get_surreal_service()
             if not service.db:
                 logger.debug("Database not connected, skipping auto-sync")
                 return
 
-            # Récupérer tous les documents liés (tous les cours)
+            # Retrieve all linked documents (all courses)
             query = """
                 SELECT * FROM document
                 WHERE source_type = 'linked'
@@ -131,7 +131,7 @@ class AutoSyncService:
                 logger.debug("No linked directories found, skipping sync")
                 return
 
-            # Grouper par course_id puis par link_id
+            # Group by course_id then by link_id
             by_course = defaultdict(lambda: defaultdict(list))
             for doc in linked_docs:
                 course_id = doc.get("course_id", "")
@@ -140,7 +140,7 @@ class AutoSyncService:
                 if course_id and link_id:
                     by_course[course_id][link_id].append(doc)
 
-            # Statistiques globales
+            # Global statistics
             global_stats = {
                 "courses_synced": 0,
                 "added": 0,
@@ -150,7 +150,7 @@ class AutoSyncService:
                 "errors": 0,
             }
 
-            # Synchroniser chaque cours
+            # Synchronize each course
             for course_id, links in by_course.items():
                 try:
                     stats = await self._sync_course_directories(
@@ -165,7 +165,7 @@ class AutoSyncService:
                     global_stats["errors"] += 1
                     logger.error(f"Error syncing course {course_id}: {e}")
 
-            # Log uniquement si des changements ont eu lieu
+            # Log only if changes occurred
             changes = (
                 global_stats["added"]
                 + global_stats["updated"]
@@ -189,14 +189,14 @@ class AutoSyncService:
     async def _sync_course_directories(
         self, service, course_id: str, links: dict
     ) -> dict:
-        """Synchronise les répertoires liés d'un cours spécifique."""
+        """Synchronize linked directories for a specific course."""
         stats = {"added": 0, "updated": 0, "removed": 0, "unchanged": 0}
         indexing_service = DocumentIndexingService()
         now = datetime.utcnow().isoformat()
 
         for link_id, docs in links.items():
             try:
-                # Obtenir le chemin de base
+                # Get the base path
                 first_doc_linked_source = normalize_linked_source(
                     docs[0].get("linked_source")
                 )
@@ -208,30 +208,30 @@ class AutoSyncService:
                         continue
                     directory_path = str(Path(absolute_path).parent)
 
-                # Vérifier que le répertoire existe toujours
+                # Verify the directory still exists
                 if not Path(directory_path).exists():
                     logger.warning(
                         f"Linked directory no longer exists: {directory_path}"
                     )
                     continue
 
-                # Scanner le répertoire
+                # Scan the directory
                 try:
                     scan_result = scan_directory(directory_path)
                 except Exception as e:
                     logger.error(f"Cannot scan {directory_path}: {e}")
                     continue
 
-                # Index des fichiers existants
+                # Index of existing files
                 existing_files = {doc["file_path"]: doc for doc in docs}
                 scanned_files = {
                     str(f.absolute_path): f for f in scan_result.files
                 }
 
-                # Obtenir le user_id du premier document pour les nouveaux fichiers
+                # Get user_id from first document for new files
                 user_id = docs[0].get("user_id", "system")
 
-                # 1. Détecter les fichiers supprimés
+                # 1. Detect deleted files
                 for file_path, doc in existing_files.items():
                     if file_path not in scanned_files:
                         doc_id = doc["id"]
@@ -239,12 +239,12 @@ class AutoSyncService:
                         stats["removed"] += 1
                         logger.info(f"Auto-sync: removed {Path(file_path).name}")
 
-                # 2. Détecter les nouveaux fichiers et modifications
+                # 2. Detect new files and modifications
                 for file_path, file_info in scanned_files.items():
                     source_file = Path(file_path)
 
                     if file_path not in existing_files:
-                        # Nouveau fichier
+                        # New file
                         try:
                             await self._add_new_file(
                                 service,
@@ -262,7 +262,7 @@ class AutoSyncService:
                         except Exception as e:
                             logger.error(f"Error adding {file_path}: {e}")
                     else:
-                        # Fichier existant - vérifier modifications
+                        # Existing file - check for modifications
                         existing_doc = existing_files[file_path]
                         existing_linked_source = normalize_linked_source(
                             existing_doc.get("linked_source")
@@ -276,7 +276,7 @@ class AutoSyncService:
                             new_hash != old_hash
                             or file_info.modified_time != old_mtime
                         ):
-                            # Fichier modifié
+                            # Modified file
                             try:
                                 await self._update_modified_file(
                                     service,
@@ -313,7 +313,7 @@ class AutoSyncService:
         user_id: str,
         now: str,
     ):
-        """Ajoute un nouveau fichier détecté."""
+        """Add a newly detected file."""
         doc_id = str(uuid.uuid4())[:8]
         content = extract_text_from_file(source_file)
         file_hash = calculate_file_hash(source_file)
@@ -358,7 +358,7 @@ class AutoSyncService:
 
         await service.create("document", document_data, record_id=doc_id)
 
-        # Indexer si contenu disponible
+        # Index if content is available
         if content and not content.startswith("[Contenu"):
             try:
                 result = await indexing_service.index_document(
@@ -383,7 +383,7 @@ class AutoSyncService:
         course_id: str,
         now: str,
     ):
-        """Met à jour un fichier modifié."""
+        """Update a modified file."""
         content = extract_text_from_file(source_file)
         doc_id = existing_doc["id"]
 
@@ -403,7 +403,7 @@ class AutoSyncService:
 
         await service.merge(doc_id, update_data)
 
-        # Réindexer si contenu disponible
+        # Reindex if content is available
         if content and not content.startswith("[Contenu"):
             try:
                 result = await indexing_service.index_document(
@@ -417,12 +417,12 @@ class AutoSyncService:
                 logger.error(f"Error re-indexing {doc_id}: {e}")
 
 
-# Instance globale du service
+# Global service instance
 _auto_sync_service: Optional[AutoSyncService] = None
 
 
 def get_auto_sync_service() -> AutoSyncService:
-    """Retourne l'instance singleton du service de synchronisation automatique."""
+    """Return the singleton auto-sync service instance."""
     global _auto_sync_service
     if _auto_sync_service is None:
         _auto_sync_service = AutoSyncService()
@@ -430,13 +430,13 @@ def get_auto_sync_service() -> AutoSyncService:
 
 
 async def start_auto_sync(interval_seconds: int = 300):
-    """Démarre le service de synchronisation automatique."""
+    """Start the automatic synchronization service."""
     service = get_auto_sync_service()
     service.interval_seconds = interval_seconds
     await service.start()
 
 
 async def stop_auto_sync():
-    """Arrête le service de synchronisation automatique."""
+    """Stop the automatic synchronization service."""
     service = get_auto_sync_service()
     await service.stop()

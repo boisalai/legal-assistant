@@ -1,8 +1,8 @@
 """
-Service de synthèse vocale (Text-to-Speech) avec edge-tts.
+Text-to-Speech service with edge-tts.
 
-Utilise Microsoft Edge TTS pour convertir du texte en audio.
-Support du français et de l'anglais avec des voix naturelles.
+Uses Microsoft Edge TTS to convert text to audio.
+Supports French and English with natural voices.
 """
 
 import logging
@@ -20,12 +20,12 @@ try:
     EDGE_TTS_AVAILABLE = True
 except ImportError:
     EDGE_TTS_AVAILABLE = False
-    logger.warning("edge-tts n'est pas installé. Exécuter: uv add edge-tts")
+    logger.warning("edge-tts is not installed. Run: uv add edge-tts")
 
 
 @dataclass
 class TTSResult:
-    """Résultat de la synthèse vocale."""
+    """Text-to-speech result."""
     success: bool
     audio_path: str = ""
     duration: float = 0.0
@@ -36,14 +36,14 @@ class TTSResult:
 
 class TTSService:
     """
-    Service de synthèse vocale avec edge-tts.
+    Text-to-speech service with edge-tts.
 
-    Voix disponibles:
-    - Français: fr-FR-DeniseNeural (femme), fr-FR-HenriNeural (homme)
-    - Anglais: en-US-AriaNeural (femme), en-US-GuyNeural (homme)
+    Available voices:
+    - French: fr-FR-DeniseNeural (female), fr-FR-HenriNeural (male)
+    - English: en-US-AriaNeural (female), en-US-GuyNeural (male)
     """
 
-    # Liste complète des voix disponibles
+    # Complete list of available voices
     AVAILABLE_VOICES = [
         {"name": "fr-FR-HenriNeural", "locale": "fr-FR", "country": "France", "language": "French", "gender": "Male"},
         {"name": "fr-FR-RemyMultilingualNeural", "locale": "fr-FR", "country": "France", "language": "French", "gender": "Male"},
@@ -62,101 +62,101 @@ class TTSService:
         {"name": "en-CA-LiamNeural", "locale": "en-CA", "country": "Canada", "language": "English", "gender": "Male"},
     ]
 
-    # Voix par défaut pour chaque langue
+    # Default voice for each language
     DEFAULT_VOICES = {
-        "fr": "fr-FR-DeniseNeural",  # Voix féminine française
-        "en": "en-CA-ClaraNeural",    # Voix féminine anglaise (Canada)
+        "fr": "fr-FR-DeniseNeural",  # French female voice
+        "en": "en-CA-ClaraNeural",    # English female voice (Canada)
     }
 
     def __init__(self):
         if not EDGE_TTS_AVAILABLE:
-            logger.error("edge-tts n'est pas disponible")
+            logger.error("edge-tts is not available")
         else:
-            logger.info("Service TTS initialisé avec edge-tts")
+            logger.info("TTS service initialized with edge-tts")
 
     def clean_markdown(self, text: str) -> str:
         """
-        Nettoie le markdown pour le convertir en texte brut lisible par TTS.
+        Clean markdown to convert it to plain text readable by TTS.
 
-        Supprime les symboles de formatage markdown tout en préservant le contenu textuel.
+        Removes markdown formatting symbols while preserving textual content.
         """
-        # Sauvegarder le texte original pour logging
+        # Save original text for logging
         original_length = len(text)
 
-        # 0. Supprimer le frontmatter YAML Docusaurus (---\n...\n---)
-        # Le frontmatter doit être au début du fichier
+        # 0. Remove Docusaurus YAML frontmatter (---\n...\n---)
+        # Frontmatter must be at the beginning of the file
         text = re.sub(r'^---\n.*?\n---\n', '', text, flags=re.DOTALL)
 
-        # 1. Remplacer les titres (# Titre) par juste le texte
+        # 1. Replace headings (# Title) with just the text
         text = re.sub(r'^#{1,6}\s+(.+)$', r'\1', text, flags=re.MULTILINE)
 
-        # 2. Supprimer le gras/italique (**texte** ou *texte*)
+        # 2. Remove bold/italic (**text** or *text*)
         text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)  # Bold + italic
         text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)      # Bold
         text = re.sub(r'\*(.+?)\*', r'\1', text)          # Italic
         text = re.sub(r'__(.+?)__', r'\1', text)          # Bold alt
         text = re.sub(r'_(.+?)_', r'\1', text)            # Italic alt
 
-        # 3. Supprimer les liens mais garder le texte [texte](url)
+        # 3. Remove links but keep the text [text](url)
         text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
 
-        # 4. Supprimer les images ![alt](url)
+        # 4. Remove images ![alt](url)
         text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
 
-        # 5. Supprimer le code inline `code`
+        # 5. Remove inline code `code`
         text = re.sub(r'`([^`]+)`', r'\1', text)
 
-        # 6. Supprimer les blocs de code ```
+        # 6. Remove code blocks ```
         text = re.sub(r'```[\s\S]*?```', '', text)
         text = re.sub(r'~~~[\s\S]*?~~~', '', text)
 
-        # 7. Supprimer les citations (> texte)
+        # 7. Remove blockquotes (> text)
         text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
 
-        # 8. Supprimer les listes à puces (-, *, +)
+        # 8. Remove bullet lists (-, *, +)
         text = re.sub(r'^[\*\-\+]\s+', '', text, flags=re.MULTILINE)
 
-        # 9. Supprimer les listes numérotées (1. texte)
+        # 9. Remove numbered lists (1. text)
         text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
 
-        # 10. Supprimer les lignes horizontales (---, ***, ___)
+        # 10. Remove horizontal rules (---, ***, ___)
         text = re.sub(r'^[\-\*_]{3,}$', '', text, flags=re.MULTILINE)
 
-        # 11. Supprimer les tableaux markdown (lignes avec |)
+        # 11. Remove markdown tables (lines with |)
         text = re.sub(r'^\|.*\|$', '', text, flags=re.MULTILINE)
 
-        # 12. Supprimer les balises HTML si présentes
+        # 12. Remove HTML tags if present
         text = re.sub(r'<[^>]+>', '', text)
 
-        # 13. Remplacer les multiples espaces par un seul
+        # 13. Replace multiple spaces with single space
         text = re.sub(r'  +', ' ', text)
 
-        # 14. Remplacer les multiples sauts de ligne par deux max (paragraphes)
+        # 14. Replace multiple newlines with max two (paragraphs)
         text = re.sub(r'\n{3,}', '\n\n', text)
 
-        # 15. Nettoyer les espaces en début/fin de lignes
+        # 15. Clean leading/trailing spaces on lines
         text = '\n'.join(line.strip() for line in text.split('\n'))
 
-        # 16. Supprimer les lignes vides en début et fin
+        # 16. Remove empty lines at beginning and end
         text = text.strip()
 
         cleaned_length = len(text)
-        logger.info(f"Markdown nettoyé: {original_length} → {cleaned_length} caractères")
+        logger.info(f"Markdown cleaned: {original_length} → {cleaned_length} characters")
 
         return text
 
     def get_voice_for_language(self, language: str, gender: str = "female") -> str:
         """
-        Récupère la voix appropriée pour une langue.
+        Get the appropriate voice for a language.
 
         Args:
-            language: Code de langue (fr, en)
-            gender: Genre de la voix (female, male)
+            language: Language code (fr, en)
+            gender: Voice gender (female, male)
 
         Returns:
-            Identifiant de la voix edge-tts
+            edge-tts voice identifier
         """
-        lang_code = language.lower()[:2]  # Prendre les 2 premiers caractères
+        lang_code = language.lower()[:2]  # Take first 2 characters
 
         voices = {
             "fr": {
@@ -169,12 +169,12 @@ class TTSService:
             },
         }
 
-        # Fallback sur français si langue non supportée
+        # Fallback to French if language not supported
         if lang_code not in voices:
-            logger.warning(f"Langue {language} non supportée, utilisation du français")
+            logger.warning(f"Language {language} not supported, using French")
             lang_code = "fr"
 
-        # Fallback sur female si genre non supporté
+        # Fallback to female if gender not supported
         if gender not in voices[lang_code]:
             gender = "female"
 
@@ -191,55 +191,55 @@ class TTSService:
         clean_markdown: bool = True
     ) -> TTSResult:
         """
-        Convertit du texte en audio avec edge-tts.
+        Convert text to audio with edge-tts.
 
         Args:
-            text: Texte à convertir en audio
-            output_path: Chemin du fichier audio de sortie (.mp3)
-            language: Langue du texte (fr, en)
-            voice: Voix spécifique à utiliser (optionnel, auto-détecté si None)
-            rate: Vitesse de lecture (ex: "+20%" pour 20% plus rapide, "-10%" pour 10% plus lent)
-            volume: Volume (ex: "+10%" pour 10% plus fort, "-10%" pour 10% plus faible)
-            clean_markdown: Si True, nettoie le markdown avant conversion (par défaut: True)
+            text: Text to convert to audio
+            output_path: Output audio file path (.mp3)
+            language: Text language (fr, en)
+            voice: Specific voice to use (optional, auto-detected if None)
+            rate: Speech rate (e.g., "+20%" for 20% faster, "-10%" for 10% slower)
+            volume: Volume (e.g., "+10%" for 10% louder, "-10%" for 10% quieter)
+            clean_markdown: If True, clean markdown before conversion (default: True)
 
         Returns:
-            TTSResult avec le résultat de la synthèse
+            TTSResult with the synthesis result
         """
         if not EDGE_TTS_AVAILABLE:
             return TTSResult(
                 success=False,
-                error="edge-tts n'est pas installé. Exécuter: uv add edge-tts"
+                error="edge-tts is not installed. Run: uv add edge-tts"
             )
 
         if not text or not text.strip():
             return TTSResult(
                 success=False,
-                error="Texte vide fourni"
+                error="Empty text provided"
             )
 
         try:
-            # Nettoyer le markdown si demandé
+            # Clean markdown if requested
             if clean_markdown:
                 text = self.clean_markdown(text)
 
-            # Vérifier qu'il reste du texte après nettoyage
+            # Verify text remains after cleaning
             if not text or not text.strip():
                 return TTSResult(
                     success=False,
-                    error="Texte vide après nettoyage markdown"
+                    error="Empty text after markdown cleaning"
                 )
 
-            # Sélectionner la voix
+            # Select voice
             selected_voice = voice or self.get_voice_for_language(language)
 
-            logger.info(f"Génération TTS avec voix {selected_voice} (rate: {rate}, volume: {volume})")
-            logger.info(f"Texte à convertir: {len(text)} caractères")
+            logger.info(f"TTS generation with voice {selected_voice} (rate: {rate}, volume: {volume})")
+            logger.info(f"Text to convert: {len(text)} characters")
 
-            # Créer le répertoire de sortie si nécessaire
+            # Create output directory if needed
             output_path_obj = Path(output_path)
             output_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
-            # Créer la communication avec edge-tts
+            # Create edge-tts communication
             communicate = edge_tts.Communicate(
                 text=text,
                 voice=selected_voice,
@@ -247,22 +247,22 @@ class TTSService:
                 volume=volume
             )
 
-            # Sauvegarder l'audio
+            # Save audio
             await communicate.save(str(output_path_obj))
 
-            # Vérifier que le fichier a été créé
+            # Verify file was created
             if not output_path_obj.exists():
                 return TTSResult(
                     success=False,
-                    error="Le fichier audio n'a pas été créé"
+                    error="Audio file was not created"
                 )
 
             file_size = output_path_obj.stat().st_size
-            logger.info(f"Audio généré avec succès: {output_path} ({file_size} bytes)")
+            logger.info(f"Audio generated successfully: {output_path} ({file_size} bytes)")
 
-            # Estimer la durée (approximation: ~150 mots/minute, ~5 caractères/mot)
+            # Estimate duration (approximation: ~150 words/minute, ~5 characters/word)
             words = len(text) / 5
-            estimated_duration = (words / 150) * 60  # en secondes
+            estimated_duration = (words / 150) * 60  # in seconds
 
             return TTSResult(
                 success=True,
@@ -273,7 +273,7 @@ class TTSService:
             )
 
         except Exception as e:
-            logger.error(f"Erreur lors de la synthèse vocale: {e}", exc_info=True)
+            logger.error(f"Error during text-to-speech: {e}", exc_info=True)
             return TTSResult(
                 success=False,
                 error=str(e)
@@ -281,19 +281,19 @@ class TTSService:
 
     def get_available_voices(self) -> list[dict]:
         """
-        Retourne la liste des voix TTS disponibles.
+        Return the list of available TTS voices.
 
         Returns:
-            Liste de dictionnaires avec les informations des voix
+            List of dictionaries with voice information
         """
         return self.AVAILABLE_VOICES
 
     async def list_all_voices_from_edge(self) -> list[dict]:
         """
-        Liste toutes les voix disponibles directement depuis edge-tts (pour référence).
+        List all available voices directly from edge-tts (for reference).
 
         Returns:
-            Liste de dictionnaires avec les informations des voix
+            List of dictionaries with voice information
         """
         if not EDGE_TTS_AVAILABLE:
             return []
@@ -310,7 +310,7 @@ class TTSService:
                 for v in voices
             ]
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération des voix: {e}")
+            logger.error(f"Error retrieving voices: {e}")
             return []
 
 
@@ -319,7 +319,7 @@ _tts_service: Optional[TTSService] = None
 
 
 def get_tts_service() -> TTSService:
-    """Récupère l'instance singleton du service TTS."""
+    """Get the singleton TTS service instance."""
     global _tts_service
     if _tts_service is None:
         _tts_service = TTSService()
