@@ -23,6 +23,7 @@ import {
   saveLLMConfig,
 } from "@/lib/llm-models";
 import { useLocale } from "@/i18n/client";
+import { useTranslations } from "next-intl";
 
 export interface Message {
   role: "user" | "assistant";
@@ -53,20 +54,11 @@ export function AssistantPanel({
 }: AssistantPanelProps) {
   // Get current locale for language-aware responses
   const { locale } = useLocale();
-
-  // Language-aware greeting messages
-  const getGreeting = (lang: string) => lang === "en"
-    ? "Hello! I'm your AI assistant. How can I help you with this case?"
-    : "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?";
+  const t = useTranslations();
 
   // If messages/setMessages are provided as props, use them (controlled mode)
   // Otherwise, use local state (uncontrolled mode)
-  const [internalMessages, internalSetMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: getGreeting("fr"), // Default to French, will update after mount
-    },
-  ]);
+  const [internalMessages, internalSetMessages] = useState<Message[]>([]);
 
   const messages = controlledMessages ?? internalMessages;
   const setMessages = controlledSetMessages ?? internalSetMessages;
@@ -82,16 +74,14 @@ export function AssistantPanel({
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
 
-  // Update greeting message when locale changes (only if using internal messages and only once)
+  // Initialize greeting message on mount (only if using internal messages)
   useEffect(() => {
-    if (!controlledMessages && !greetingUpdated && messages.length === 1 && messages[0].role === "assistant") {
-      const newGreeting = getGreeting(locale);
-      if (messages[0].content !== newGreeting) {
-        internalSetMessages([{ role: "assistant", content: newGreeting }]);
-        setGreetingUpdated(true);
-      }
+    if (!controlledMessages && !greetingUpdated) {
+      const welcomeMessage = t("assistant.welcome");
+      internalSetMessages([{ role: "assistant", content: welcomeMessage }]);
+      setGreetingUpdated(true);
     }
-  }, [locale, controlledMessages, greetingUpdated, messages]);
+  }, [controlledMessages, greetingUpdated, t]);
 
   // Load config from localStorage on mount (client-side only)
   useEffect(() => {
@@ -212,7 +202,7 @@ export function AssistantPanel({
                       case "error":
                         setMessages((prev) => [
                           ...prev,
-                          { role: "assistant", content: `Erreur: ${data.error}` },
+                          { role: "assistant", content: t("assistant.error", { message: data.error }) },
                         ]);
                         break;
                       case "done":
@@ -260,14 +250,14 @@ export function AssistantPanel({
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const assistantMessage: Message = {
           role: "assistant",
-          content: `Le backend n'est pas disponible. Démarrez le serveur backend pour utiliser l'assistant IA. Votre question était: "${currentMessage}"`,
+          content: t("assistant.backendUnavailable", { message: currentMessage }),
         };
         setMessages((prev) => [...prev, assistantMessage]);
       }
     } catch (error) {
       const errorMessage: Message = {
         role: "assistant",
-        content: `Erreur: ${error instanceof Error ? error.message : "Erreur inconnue"}`,
+        content: t("assistant.error", { message: error instanceof Error ? error.message : "Unknown error" }),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -297,7 +287,7 @@ export function AssistantPanel({
     <div className="flex flex-col h-full border-l overflow-hidden">
       {/* Header */}
       <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
-        <h2 className="text-xl font-bold">Assistant IA</h2>
+        <h2 className="text-xl font-bold">{t("assistant.title")}</h2>
       </div>
 
       {/* Backend status warning */}
@@ -306,7 +296,7 @@ export function AssistantPanel({
           <Alert>
             <Loader2 className="h-4 w-4 animate-spin" />
             <AlertDescription>
-              Vérification de la connexion au backend...
+              {t("assistant.checkingBackend")}
             </AlertDescription>
           </Alert>
         </div>
@@ -316,7 +306,7 @@ export function AssistantPanel({
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Backend non connecté. Démarrez le serveur backend et Ollama pour utiliser l'assistant IA.
+              {t("assistant.backendNotConnected")}
             </AlertDescription>
           </Alert>
         </div>
@@ -352,7 +342,7 @@ export function AssistantPanel({
                       size="icon"
                       className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => handleCopyMessage(message.content, idx)}
-                      title="Copier le markdown"
+                      title={t("assistant.copyMarkdown")}
                     >
                       {copiedIndex === idx ? (
                         <Check className="h-3.5 w-3.5 text-green-600" />
@@ -394,7 +384,7 @@ export function AssistantPanel({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Posez une question... (Enter pour envoyer, Shift+Enter pour nouvelle ligne)"
+            placeholder={t("assistant.placeholder")}
             className="min-h-[60px] max-h-[120px] resize-none flex-1"
             disabled={isLoading}
           />

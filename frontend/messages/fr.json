@@ -129,7 +129,8 @@
     "directoryContent": "Contenu du répertoire lié",
     "directoryName": "Nom du répertoire",
     "viewTree": "Voir l'arborescence",
-    "unlinkDirectoryAction": "Délier le répertoire"
+    "unlinkDirectoryAction": "Délier le répertoire",
+    "noLinkedDirectories": "Aucun répertoire lié."
   },
   "documents": {
     "title": "Documents",
@@ -203,12 +204,55 @@
   "assistant": {
     "title": "Assistant IA",
     "subtitle": "Posez vos questions sur vos jugements et le droit",
-    "placeholder": "Posez une question sur un jugement...",
+    "placeholder": "Posez une question... (Entrée pour envoyer, Maj+Entrée pour nouvelle ligne)",
+    "placeholderNotarial": "Posez votre question sur les transactions notariales...",
     "send": "Envoyer",
     "thinking": "Réflexion en cours...",
-    "welcome": "Bonjour ! Je suis votre assistant juridique. Je peux vous aider à comprendre des jugements, résumer des décisions, ou répondre à vos questions de droit.",
+    "welcome": "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?",
     "selectModel": "Modèle IA",
-    "clearHistory": "Effacer l'historique"
+    "clearHistory": "Effacer l'historique",
+    "clear": "Effacer",
+    "checkingBackend": "Vérification de la connexion au backend...",
+    "backendNotConnected": "Backend non connecté. Démarrez le serveur backend et Ollama pour utiliser l'assistant IA.",
+    "backendUnavailable": "Le backend n'est pas disponible. Démarrez le serveur backend pour utiliser l'assistant IA. Votre question était : « {message} »",
+    "backendSimulation": "Backend non connecté. Les réponses sont simulées. Démarrez le serveur backend pour utiliser l'IA.",
+    "backendSimulationWithCommand": "Backend non connecté. Les réponses sont simulées. Démarrez le serveur backend avec {command} pour utiliser l'IA.",
+    "copyMarkdown": "Copier le markdown",
+    "error": "Erreur : {message}",
+    "errorOccurred": "Une erreur s'est produite",
+    "errorRetry": "Désolé, une erreur s'est produite. Veuillez réessayer.",
+    "connected": "Connecté",
+    "simulationMode": "Mode simulation",
+    "howCanIHelp": "Comment puis-je vous aider ?",
+    "askMeQuestions": "Posez-moi des questions sur ce dossier. Je peux analyser les documents, identifier les informations manquantes et vous guider dans vos vérifications.",
+    "askMeQuestionsNotarial": "Je suis votre assistant spécialisé en transactions notariales au Québec. Posez-moi vos questions sur les procédures, documents requis, calculs de frais, et plus encore.",
+    "keyboardHint": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour un saut de ligne",
+    "notarialSubtitle": "Posez vos questions sur les transactions notariales",
+    "suggestedQuestions": {
+      "missingDocs": "Quels documents sont manquants pour ce dossier ?",
+      "inconsistencies": "Y a-t-il des incohérences dans les informations extraites ?",
+      "nextSteps": "Quelles sont les prochaines étapes à effectuer ?",
+      "summarize": "Peux-tu résumer les points importants de ce dossier ?",
+      "transferTax": "Calcule les droits de mutation pour cette transaction.",
+      "requiredDocs": "Quels documents sont requis pour une vente immobilière au Québec ?",
+      "howToCalculate": "Comment calculer les droits de mutation (taxe de bienvenue) ?",
+      "typicalSteps": "Quelles sont les étapes d'une transaction notariale typique ?",
+      "usualDelays": "Quels sont les délais habituels pour une transaction immobilière ?",
+      "locationCert": "Comment vérifier un certificat de localisation ?",
+      "landRegistry": "Quelles vérifications effectuer au registre foncier ?"
+    },
+    "transcription": {
+      "couldNotLoadDocs": "Impossible de charger la liste des documents.",
+      "noAudioFile": "Je n'ai pas trouvé de fichier audio dans ce dossier.",
+      "noUntranscribedAudio": "Je n'ai pas trouvé de fichier audio non transcrit. Fichiers audio disponibles : {files}",
+      "notAudioFile": "Le fichier « {filename} » n'est pas un fichier audio.",
+      "success": "J'ai transcrit le fichier audio « {filename} » et créé un document markdown « {markdownName} » avec le contenu formaté.\n\nVoici un aperçu de la transcription :\n\n{preview}",
+      "error": "Erreur lors de la transcription : {error}"
+    },
+    "simulation": {
+      "note": "Note : Cette réponse est simulée. Le backend n'est pas connecté.",
+      "noteConnect": "Note : Le backend n'est pas connecté. Les réponses sont simulées. Démarrez le serveur backend pour des réponses IA réelles."
+    }
   },
   "settings": {
     "title": "Paramètres",

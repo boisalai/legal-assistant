@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { chatApi, settingsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
 import { useLocale } from "@/i18n/client";
+import { useTranslations } from "next-intl";
 
 interface Message {
   id: string;
@@ -36,15 +37,6 @@ interface Message {
   timestamp: Date;
   model?: string;
 }
-
-const SUGGESTED_QUESTIONS = [
-  "Quels documents sont requis pour une vente immobilière au Québec ?",
-  "Comment calculer les droits de mutation (taxe de bienvenue) ?",
-  "Quelles sont les étapes d'une transaction notariale typique ?",
-  "Quels sont les délais habituels pour une transaction immobilière ?",
-  "Comment vérifier un certificat de localisation ?",
-  "Quelles vérifications effectuer au registre foncier ?",
-];
 
 // Default models if API is unavailable
 const DEFAULT_MODELS: LLMModel[] = [
@@ -65,6 +57,17 @@ export default function AssistantPage() {
 
   // Get current locale for language-aware responses
   const { locale } = useLocale();
+  const t = useTranslations();
+
+  // Build suggested questions from translations
+  const suggestedQuestions = [
+    t("assistant.suggestedQuestions.requiredDocs"),
+    t("assistant.suggestedQuestions.howToCalculate"),
+    t("assistant.suggestedQuestions.typicalSteps"),
+    t("assistant.suggestedQuestions.usualDelays"),
+    t("assistant.suggestedQuestions.locationCert"),
+    t("assistant.suggestedQuestions.landRegistry"),
+  ];
 
   // Load available models from backend
   const loadModels = useCallback(async () => {
@@ -273,11 +276,11 @@ export default function AssistantPage() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur s'est produite");
+      setError(err instanceof Error ? err.message : t("assistant.errorOccurred"));
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Désolé, une erreur s'est produite. Veuillez réessayer.",
+        content: t("assistant.errorRetry"),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -311,9 +314,9 @@ export default function AssistantPage() {
               <MessageSquare className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Assistant IA</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{t("assistant.title")}</h1>
               <p className="text-muted-foreground">
-                Posez vos questions sur les transactions notariales
+                {t("assistant.notarialSubtitle")}
               </p>
             </div>
           </div>
@@ -321,7 +324,7 @@ export default function AssistantPage() {
             {messages.length > 0 && (
               <Button variant="outline" size="sm" onClick={clearChat}>
                 <Trash2 className="h-4 w-4 mr-2" />
-                Effacer
+                {t("assistant.clear")}
               </Button>
             )}
           </div>
@@ -331,18 +334,18 @@ export default function AssistantPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <span className="font-medium">Modèle IA</span>
+            <span className="font-medium">{t("assistant.selectModel")}</span>
             {apiConnected !== null && (
               <Badge variant={apiConnected ? "default" : "secondary"} className="gap-1">
                 {apiConnected ? (
                   <>
                     <Wifi className="h-3 w-3" />
-                    Connecté
+                    {t("assistant.connected")}
                   </>
                 ) : (
                   <>
                     <WifiOff className="h-3 w-3" />
-                    Mode simulation
+                    {t("assistant.simulationMode")}
                   </>
                 )}
               </Badge>
@@ -350,7 +353,7 @@ export default function AssistantPage() {
           </div>
           <Select value={selectedModel} onValueChange={setSelectedModel}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Sélectionner un modèle" />
+              <SelectValue placeholder={t("assistant.selectModel")} />
             </SelectTrigger>
             <SelectContent>
               {models.map((model) => (
@@ -372,9 +375,8 @@ export default function AssistantPage() {
           <Alert variant="default" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Backend non connecté. Les réponses sont simulées. Démarrez le serveur backend avec{" "}
-              <code className="bg-muted px-1 rounded">cd backend && uv run python main.py</code>{" "}
-              pour utiliser l'IA.
+              {t("assistant.backendSimulationWithCommand", { command: "" })}
+              <code className="bg-muted px-1 rounded">cd backend && uv run python main.py</code>
             </AlertDescription>
           </Alert>
         )}
@@ -393,13 +395,12 @@ export default function AssistantPage() {
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <Sparkles className="h-12 w-12 text-primary/50 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Comment puis-je vous aider ?</h3>
+                <h3 className="text-lg font-medium mb-2">{t("assistant.howCanIHelp")}</h3>
                 <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                  Je suis votre assistant spécialisé en transactions notariales au Québec.
-                  Posez-moi vos questions sur les procédures, documents requis, calculs de frais, et plus encore.
+                  {t("assistant.askMeQuestionsNotarial")}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-2xl">
-                  {SUGGESTED_QUESTIONS.map((question, i) => (
+                  {suggestedQuestions.map((question, i) => (
                     <Button
                       key={i}
                       variant="outline"
@@ -478,7 +479,7 @@ export default function AssistantPage() {
           <div className="border-t p-4">
             <div className="flex gap-2">
               <Textarea
-                placeholder="Posez votre question sur les transactions notariales..."
+                placeholder={t("assistant.placeholderNotarial")}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -495,7 +496,7 @@ export default function AssistantPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Appuyez sur Entrée pour envoyer, Maj+Entrée pour un saut de ligne
+              {t("assistant.keyboardHint")}
             </p>
           </div>
         </Card>
