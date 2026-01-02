@@ -20,8 +20,7 @@ import type { Course, Document } from "@/types";
 import { TranscriptionProgress, useTranscriptionProgress } from "../transcription-progress";
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 import { useActivityTracker } from "@/lib/activity-tracker";
-import { useLocale } from "@/i18n/client";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 // Import SVG logos for LLM providers
 import AnthropicLogo from "@/svg/anthropic.svg";
@@ -122,8 +121,8 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get current locale for language-aware responses
-  const { locale } = useLocale();
+  // Get current locale for language-aware responses (using next-intl)
+  const locale = useLocale();
   const t = useTranslations();
 
   // Build suggested questions from translations
