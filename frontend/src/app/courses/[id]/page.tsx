@@ -57,6 +57,7 @@ export default function CourseDetailPage() {
   const [studyDeck, setStudyDeck] = useState<FlashcardDeck | null>(null);
   const [audioDeck, setAudioDeck] = useState<FlashcardDeck | null>(null);
   const [viewModule, setViewModule] = useState<Module | null>(null);
+  const [previousModule, setPreviousModule] = useState<Module | null>(null); // Track module to return to after document preview
   const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
@@ -189,6 +190,8 @@ export default function CourseDetailPage() {
   const handlePreviewDocument = (docId: string) => {
     const doc = documents.find((d) => d.id === docId);
     if (doc) {
+      // Save current module to return to after closing document
+      setPreviousModule(viewModule);
       setPreviewDocument(doc);
       setPreviewDirectory(null); // Close directory preview if open
       setViewModule(null); // Close module view if open
@@ -208,13 +211,26 @@ export default function CourseDetailPage() {
   };
 
   const handleClosePreview = () => {
-    // If we're viewing a document, just close it and return to previous view
-    // (either directory tree or case details panel)
+    // If we're viewing a document, close it and return to previous view
     if (previewDocument) {
       setPreviewDocument(null);
-      // Keep previewDirectory as is - if it was set, we return to tree view
-      // If returning to main course view (no directory), track view_case
-      if (!previewDirectory && courseData) {
+
+      // Restore previous module if we came from one
+      if (previousModule) {
+        setViewModule(previousModule);
+        setPreviousModule(null);
+        // Track return to module view
+        trackActivity(courseId, "view_module", {
+          module_id: previousModule.id,
+          module_name: previousModule.name,
+        });
+      } else if (previewDirectory) {
+        // Keep previewDirectory as is - return to tree view
+        trackActivity(courseId, "view_directory", {
+          directory_path: previewDirectory.basePath,
+        });
+      } else if (courseData) {
+        // Return to main course view
         trackActivity(courseId, "view_case", {
           course_name: courseData.title,
         });
