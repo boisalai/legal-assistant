@@ -120,7 +120,8 @@
     "directoryContent": "Linked directory content",
     "directoryName": "Directory name",
     "viewTree": "View tree",
-    "unlinkDirectoryAction": "Unlink directory"
+    "unlinkDirectoryAction": "Unlink directory",
+    "noLinkedDirectories": "No linked directories."
   },
   "documents": {
     "title": "Documents",
@@ -194,12 +195,55 @@
   "assistant": {
     "title": "AI Assistant",
     "subtitle": "Ask questions about your courses",
-    "placeholder": "Ask a question...",
+    "placeholder": "Ask a question... (Enter to send, Shift+Enter for new line)",
+    "placeholderNotarial": "Ask your question about notarial transactions...",
     "send": "Send",
     "thinking": "Thinking...",
-    "welcome": "Hello! I'm your legal studies assistant. How can I help you?",
+    "welcome": "Hello! I'm your AI assistant. How can I help you with this course?",
     "selectModel": "AI Model",
-    "clearHistory": "Clear history"
+    "clearHistory": "Clear history",
+    "clear": "Clear",
+    "checkingBackend": "Checking backend connection...",
+    "backendNotConnected": "Backend not connected. Start the backend server and Ollama to use the AI assistant.",
+    "backendUnavailable": "The backend is not available. Start the backend server to use the AI assistant. Your question was: \"{message}\"",
+    "backendSimulation": "Backend not connected. Responses are simulated. Start the backend server to use AI.",
+    "backendSimulationWithCommand": "Backend not connected. Responses are simulated. Start the backend server with {command} to use AI.",
+    "copyMarkdown": "Copy markdown",
+    "error": "Error: {message}",
+    "errorOccurred": "An error occurred",
+    "errorRetry": "Sorry, an error occurred. Please try again.",
+    "connected": "Connected",
+    "simulationMode": "Simulation mode",
+    "howCanIHelp": "How can I help you?",
+    "askMeQuestions": "Ask me questions about this case. I can analyze documents, identify missing information, and guide you through your verifications.",
+    "askMeQuestionsNotarial": "I am your assistant specialized in notarial transactions in Quebec. Ask me your questions about procedures, required documents, fee calculations, and more.",
+    "keyboardHint": "Press Enter to send, Shift+Enter for a new line",
+    "notarialSubtitle": "Ask your questions about notarial transactions",
+    "suggestedQuestions": {
+      "missingDocs": "What documents are missing for this case?",
+      "inconsistencies": "Are there any inconsistencies in the extracted information?",
+      "nextSteps": "What are the next steps to take?",
+      "summarize": "Can you summarize the important points of this case?",
+      "transferTax": "Calculate the transfer tax for this transaction.",
+      "requiredDocs": "What documents are required for a real estate sale in Quebec?",
+      "howToCalculate": "How to calculate the transfer tax (welcome tax)?",
+      "typicalSteps": "What are the steps of a typical notarial transaction?",
+      "usualDelays": "What are the usual delays for a real estate transaction?",
+      "locationCert": "How to verify a location certificate?",
+      "landRegistry": "What verifications to perform at the land registry?"
+    },
+    "transcription": {
+      "couldNotLoadDocs": "Unable to load the document list.",
+      "noAudioFile": "I didn't find any audio file in this case.",
+      "noUntranscribedAudio": "I didn't find any untranscribed audio file. Available audio files: {files}",
+      "notAudioFile": "The file \"{filename}\" is not an audio file.",
+      "success": "I transcribed the audio file \"{filename}\" and created a markdown document \"{markdownName}\" with the formatted content.\n\nHere's a preview of the transcription:\n\n{preview}",
+      "error": "Error during transcription: {error}"
+    },
+    "simulation": {
+      "note": "Note: This response is simulated. The backend is not connected.",
+      "noteConnect": "Note: The backend is not connected. Responses are simulated. Start the backend server for real AI responses."
+    }
   },
   "settings": {
     "title": "Settings",

@@ -21,6 +21,7 @@ import { TranscriptionProgress, useTranscriptionProgress } from "../transcriptio
 import { useLLMSettings } from "@/hooks/use-llm-settings";
 import { useActivityTracker } from "@/lib/activity-tracker";
 import { useLocale } from "@/i18n/client";
+import { useTranslations } from "next-intl";
 
 // Import SVG logos for LLM providers
 import AnthropicLogo from "@/svg/anthropic.svg";
@@ -40,14 +41,6 @@ interface Message {
 interface AssistantTabProps {
   caseData: Course;
 }
-
-const SUGGESTED_QUESTIONS = [
-  "Quels documents sont manquants pour ce dossier ?",
-  "Y a-t-il des incohérences dans les informations extraites ?",
-  "Quelles sont les prochaines étapes à effectuer ?",
-  "Peux-tu résumer les points importants de ce dossier ?",
-  "Calcule les droits de mutation pour cette transaction.",
-];
 
 // Default models if API is unavailable
 const DEFAULT_MODELS: LLMModel[] = [
@@ -131,6 +124,16 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
 
   // Get current locale for language-aware responses
   const { locale } = useLocale();
+  const t = useTranslations();
+
+  // Build suggested questions from translations
+  const suggestedQuestions = [
+    t("assistant.suggestedQuestions.missingDocs"),
+    t("assistant.suggestedQuestions.inconsistencies"),
+    t("assistant.suggestedQuestions.nextSteps"),
+    t("assistant.suggestedQuestions.summarize"),
+    t("assistant.suggestedQuestions.transferTax"),
+  ];
 
   // LLM settings hook - persists to localStorage
   const { modelId: selectedModel, updateSetting: updateLLMSetting, isLoaded: llmSettingsLoaded } = useLLMSettings();
@@ -209,7 +212,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         currentDocs = await documentsApi.list(caseData.id);
         setDocuments(currentDocs);
       } catch {
-        return "Impossible de charger la liste des documents.";
+        return t("assistant.transcription.couldNotLoadDocs");
       }
     }
 
@@ -243,9 +246,9 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         // List available audio files
         const audioFiles = currentDocs.filter(d => isAudioFile(d.filename));
         if (audioFiles.length === 0) {
-          return "Je n'ai pas trouvé de fichier audio dans ce dossier.";
+          return t("assistant.transcription.noAudioFile");
         }
-        return `Je n'ai pas trouvé de fichier audio non transcrit. Fichiers audio disponibles: ${audioFiles.map(d => d.filename).join(", ")}`;
+        return t("assistant.transcription.noUntranscribedAudio", { files: audioFiles.map(d => d.filename).join(", ") });
       }
 
       console.log("[Transcription] Using first untranscribed audio:", audioDoc.filename);
@@ -253,12 +256,12 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
     }
 
     if (!isAudioFile(doc.filename)) {
-      return `Le fichier "${doc.filename}" n'est pas un fichier audio.`;
+      return t("assistant.transcription.notAudioFile", { filename: doc.filename });
     }
 
     console.log("[Transcription] Found document:", doc.filename);
     return await runTranscription(doc);
-  }, [documents, caseData.id]);
+  }, [documents, caseData.id, t]);
 
   const runTranscription = async (doc: Document): Promise<string> => {
     transcriptionProgress.startTranscription();
@@ -289,13 +292,18 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         await loadDocuments();
 
         const baseName = doc.filename.replace(/\.[^/.]+$/, "");
-        return `J'ai transcrit le fichier audio "${doc.filename}" et créé un document markdown "${baseName}_transcription.md" avec le contenu formaté.\n\nVoici un aperçu de la transcription:\n\n${result.transcript_text?.slice(0, 500)}${(result.transcript_text?.length || 0) > 500 ? "..." : ""}`;
+        const preview = result.transcript_text?.slice(0, 500) + ((result.transcript_text?.length || 0) > 500 ? "..." : "");
+        return t("assistant.transcription.success", {
+          filename: doc.filename,
+          markdownName: `${baseName}_transcription.md`,
+          preview: preview || ""
+        });
       } else {
-        return `Erreur lors de la transcription: ${result.error || "Erreur inconnue"}`;
+        return t("assistant.transcription.error", { error: result.error || "Unknown error" });
       }
     } catch (err) {
       transcriptionProgress.endTranscription(false);
-      return `Erreur lors de la transcription: ${err instanceof Error ? err.message : "Erreur inconnue"}`;
+      return t("assistant.transcription.error", { error: err instanceof Error ? err.message : "Unknown error" });
     }
   };
 
@@ -423,11 +431,11 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur s'est produite");
+      setError(err instanceof Error ? err.message : t("assistant.errorOccurred"));
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Désolé, une erreur s'est produite. Veuillez réessayer.",
+        content: t("assistant.errorRetry"),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -463,18 +471,18 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          <span className="font-medium">Assistant IA</span>
+          <span className="font-medium">{t("assistant.title")}</span>
           {apiConnected !== null && (
             <Badge variant={apiConnected ? "default" : "secondary"} className="gap-1">
               {apiConnected ? (
                 <>
                   <Wifi className="h-3 w-3" />
-                  Connecté
+                  {t("assistant.connected")}
                 </>
               ) : (
                 <>
                   <WifiOff className="h-3 w-3" />
-                  Mode simulation
+                  {t("assistant.simulationMode")}
                 </>
               )}
             </Badge>
@@ -482,7 +490,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         </div>
         <Select value={selectedModel} onValueChange={(value) => updateLLMSetting("modelId", value)}>
           <SelectTrigger className="w-[280px]">
-            <SelectValue placeholder="Sélectionner un modèle">
+            <SelectValue placeholder={t("assistant.selectModel")}>
               {(() => {
                 const selectedModelData = models.find(m => m.id === selectedModel);
                 if (selectedModelData) {
@@ -493,7 +501,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
                     </div>
                   );
                 }
-                return "Sélectionner un modèle";
+                return t("assistant.selectModel");
               })()}
             </SelectValue>
           </SelectTrigger>
@@ -515,7 +523,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         <Alert variant="default" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Backend non connecté. Les réponses sont simulées. Démarrez le serveur backend pour utiliser l'IA.
+            {t("assistant.backendSimulation")}
           </AlertDescription>
         </Alert>
       )}
@@ -534,13 +542,12 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <Sparkles className="h-12 w-12 text-primary/50 mb-4" />
-              <h3 className="text-lg font-medium mb-2">Comment puis-je vous aider ?</h3>
+              <h3 className="text-lg font-medium mb-2">{t("assistant.howCanIHelp")}</h3>
               <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                Posez-moi des questions sur ce dossier. Je peux analyser les documents,
-                identifier les informations manquantes et vous guider dans vos vérifications.
+                {t("assistant.askMeQuestions")}
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {SUGGESTED_QUESTIONS.map((question, i) => (
+                {suggestedQuestions.map((question, i) => (
                   <Button
                     key={i}
                     variant="outline"
@@ -580,7 +587,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
                           size="icon"
                           className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => handleCopyMessage(message.content, message.id)}
-                          title="Copier le markdown"
+                          title={t("assistant.copyMarkdown")}
                         >
                           {copiedMessageId === message.id ? (
                             <Check className="h-3.5 w-3.5 text-green-600" />
@@ -645,7 +652,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
         <div className="border-t p-4">
           <div className="flex gap-2">
             <Textarea
-              placeholder="Posez votre question..."
+              placeholder={t("assistant.placeholder")}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -662,7 +669,7 @@ export function AssistantTab({ caseData }: AssistantTabProps) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Appuyez sur Entrée pour envoyer, Maj+Entrée pour un saut de ligne
+            {t("assistant.keyboardHint")}
           </p>
         </div>
       </Card>

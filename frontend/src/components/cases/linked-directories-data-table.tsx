@@ -165,7 +165,7 @@ export function LinkedDirectoriesDataTable({
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-24 text-center text-black">
-                Aucun répertoire lié.
+                {t("courses.noLinkedDirectories")}
               </TableCell>
             </TableRow>
           )}
