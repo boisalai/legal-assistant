@@ -393,6 +393,9 @@ Nombre de documents disponibles: {num_docs}
 
 {activity_context}
 
+**CRITICAL - RESPONSE LANGUAGE**:
+You MUST respond in ENGLISH. Even if the course content, documents, or user messages are in French, you MUST write your response entirely in English. This is non-negotiable.
+
 **ABSOLUTE RULE - ANSWERS BASED ONLY ON DOCUMENTS**:
 - You must ALWAYS search for the answer in available documents using `semantic_search`
 - NEVER answer with your own general knowledge
@@ -429,6 +432,9 @@ Be encouraging, patient, and adapt to the student's pace.
 {context_specific}
 
 {activity_context}
+
+**CRITIQUE - LANGUE DE RÉPONSE**:
+Tu DOIS répondre en FRANÇAIS. Même si le contenu du cours, les documents ou les messages de l'utilisateur sont en anglais, tu DOIS écrire ta réponse entièrement en français. C'est non négociable.
 
 **RÈGLE ABSOLUE - RÉPONSES BASÉES UNIQUEMENT SUR LES DOCUMENTS**:
 - Tu dois TOUJOURS chercher la réponse dans les documents disponibles en utilisant `semantic_search`
@@ -472,8 +478,7 @@ async def chat(request: ChatRequest):
     The assistant can respond to general questions or questions about a specific case
     if a course_id is provided.
     """
-    logger.info(f"Chat request: model={request.model_id}, course_id={request.course_id}")
-    logger.info(f"DEBUG - model_id type: {type(request.model_id)}, value: '{request.model_id}'")
+    logger.info(f"Chat request: model={request.model_id}, course_id={request.course_id}, language={request.language}")
     logger.info(f"DEBUG - Checking if model_id starts with mlx/vllm/huggingface...")
 
     sources_list = []  # Track sources used in RAG
