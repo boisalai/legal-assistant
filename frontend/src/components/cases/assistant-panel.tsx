@@ -22,6 +22,7 @@ import {
   loadLLMConfig,
   saveLLMConfig,
 } from "@/lib/llm-models";
+import { useLocale } from "@/i18n/client";
 
 export interface Message {
   role: "user" | "assistant";
@@ -50,13 +51,20 @@ export function AssistantPanel({
   messages: controlledMessages,
   setMessages: controlledSetMessages
 }: AssistantPanelProps) {
+  // Get current locale for language-aware responses
+  const { locale } = useLocale();
+
+  // Language-aware greeting messages
+  const getGreeting = (lang: string) => lang === "en"
+    ? "Hello! I'm your AI assistant. How can I help you with this case?"
+    : "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?";
+
   // If messages/setMessages are provided as props, use them (controlled mode)
   // Otherwise, use local state (uncontrolled mode)
   const [internalMessages, internalSetMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content:
-        "Bonjour! Je suis votre assistant IA. Comment puis-je vous aider avec ce dossier?",
+      content: getGreeting("fr"), // Default to French, will update after mount
     },
   ]);
 
@@ -68,10 +76,22 @@ export function AssistantPanel({
   const [backendConnected, setBackendConnected] = useState(false);
   const [checkingBackend, setCheckingBackend] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [greetingUpdated, setGreetingUpdated] = useState(false);
 
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Update greeting message when locale changes (only if using internal messages and only once)
+  useEffect(() => {
+    if (!controlledMessages && !greetingUpdated && messages.length === 1 && messages[0].role === "assistant") {
+      const newGreeting = getGreeting(locale);
+      if (messages[0].content !== newGreeting) {
+        internalSetMessages([{ role: "assistant", content: newGreeting }]);
+        setGreetingUpdated(true);
+      }
+    }
+  }, [locale, controlledMessages, greetingUpdated, messages]);
 
   // Load config from localStorage on mount (client-side only)
   useEffect(() => {
@@ -148,6 +168,7 @@ export function AssistantPanel({
             caseId,
             model: config.model,
             history,
+            language: locale,
           });
 
           // Read SSE stream
@@ -218,6 +239,7 @@ export function AssistantPanel({
             caseId,
             model: config.model,
             history,
+            language: locale,
           });
 
           const assistantMessage: Message = {

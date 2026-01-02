@@ -27,6 +27,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { chatApi, settingsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
+import { useLocale } from "@/i18n/client";
 
 interface Message {
   id: string;
@@ -61,6 +62,9 @@ export default function AssistantPage() {
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get current locale for language-aware responses
+  const { locale } = useLocale();
 
   // Load available models from backend
   const loadModels = useCallback(async () => {
@@ -247,6 +251,7 @@ export default function AssistantPage() {
         const response = await chatApi.send(userMessage.content, {
           model: selectedModel,
           history: buildHistory(),
+          language: locale,
         });
         responseContent = response.message;
         usedModel = response.model || selectedModel;
