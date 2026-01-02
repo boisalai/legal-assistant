@@ -96,11 +96,10 @@
 
 11. **Fiches de révision (Flashcards)**
     - Génération automatique de fiches depuis documents markdown
-    - 4 types de fiches : **définition**, **concept**, **jurisprudence**, **question**
     - Interface de révision avec animation flip recto/verso
-    - Système de progression : new → learning → mastered
-    - Raccourcis clavier : `Espace` (flip), `1/2/3` (À revoir/Correct/Facile)
+    - Raccourcis clavier : `Espace` (flip), flèches (navigation)
     - TTS audio avec voix canadienne-française (fr-CA-SylvieNeural)
+    - Audio récapitulatif de toutes les fiches (questions + réponses)
     - Sélection granulaire des documents sources (ex: modules 1-4 pour intra)
     - Streaming SSE pour progression génération en temps réel
 
@@ -143,7 +142,39 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ---
 
-## Session actuelle (2026-01-01) - Simplification des modules ✅
+## Session actuelle (2026-01-02) - Simplification des flashcards ✅
+
+**Objectif** : Simplifier le système de fiches de révision en supprimant les fonctionnalités inutilisées.
+
+### Fonctionnalités supprimées
+
+**Backend** :
+- `CardType` enum (définition, concept, jurisprudence, question)
+- `CardStatus` enum (new, learning, mastered) et `ReviewResult` enum
+- Endpoint `/review` pour enregistrer les révisions
+- Champs de progression : `mastered_cards`, `learning_cards`, `new_cards`, `progress_percent`
+- Champs de révision : `status`, `review_count`, `last_reviewed`
+
+**Frontend** :
+- Sélection des types de fiches dans le modal de création
+- Colonne "Progression" dans la DataTable des decks
+- Boutons de révision (À revoir/Correct/Facile) et raccourcis 1/2/3
+- Barre de progression et badges de statut
+- État "Session terminée" avec statistiques
+
+### Interface simplifiée ✅
+
+- `create-flashcard-deck-modal.tsx` - Sans sélection de types de fiches
+- `flashcards-data-table.tsx` - Colonnes : Nom, # docs, # cartes, Date
+- `flashcard-study-panel.tsx` - Consultation simple avec flip et navigation
+
+### Commits
+
+- `4131113` - refactor: Simplify flashcards by removing card types and progress tracking
+
+---
+
+## Session précédente (2026-01-01) - Simplification des modules ✅
 
 **Objectif** : Simplifier le système de modules en supprimant les fonctionnalités inutilisées.
 
@@ -173,45 +204,40 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 ---
 
-## Session précédente (2025-12-30) - Fiches de révision (Flashcards) ✅
+## Session (2025-12-30) - Fiches de révision (Flashcards) ✅
 
-**Objectif** : Système complet de fiches de révision pour études juridiques.
+**Objectif** : Système de fiches de révision pour études juridiques.
 
-### Phase 1 - Backend API ✅
+> **Note** : Simplifié le 2026-01-02 - Types de fiches et progression supprimés
 
-**Commits** : `ccdd83a` (Backend)
+### Backend API ✅
 
-- ✅ Création `backend/models/flashcard_models.py` - 8 modèles Pydantic
-- ✅ Création `backend/routes/flashcards.py` - 9 endpoints CRUD + génération
+- ✅ Création `backend/models/flashcard_models.py` - Modèles Pydantic
+- ✅ Création `backend/routes/flashcards.py` - Endpoints CRUD + génération
 - ✅ Création `backend/services/flashcard_service.py` - Agent LLM avec Agno
 - ✅ Tables SurrealDB SCHEMALESS : `flashcard_deck`, `flashcard`
 
 **Endpoints API** :
 - `POST /api/flashcards/decks` - Créer un deck
 - `GET /api/flashcards/decks/{course_id}` - Lister les decks d'un cours
-- `GET /api/flashcards/deck/{deck_id}` - Détails d'un deck avec stats
+- `GET /api/flashcards/deck/{deck_id}` - Détails d'un deck
 - `DELETE /api/flashcards/deck/{deck_id}` - Supprimer (cascade)
 - `POST /api/flashcards/deck/{deck_id}/generate` - Générer fiches (SSE)
 - `GET /api/flashcards/deck/{deck_id}/study` - Session d'étude
-- `POST /api/flashcards/card/{card_id}/review` - Enregistrer révision
 - `GET/POST /api/flashcards/card/{card_id}/tts/{side}` - Audio TTS
 
-### Phase 2 - Frontend UI ✅
-
-**Commit** : `6f83ca4` (Frontend)
+### Frontend UI ✅
 
 - ✅ Types TypeScript dans `frontend/src/types/index.ts`
 - ✅ API client dans `frontend/src/lib/api.ts` (flashcardsApi)
-- ✅ `flashcards-section.tsx` - Liste des decks avec progression
+- ✅ `flashcards-section.tsx` - Liste des decks
 - ✅ `create-flashcard-deck-modal.tsx` - Création avec sélection documents
 - ✅ `flashcard-study-panel.tsx` - Interface flip avec animation CSS 3D
 - ✅ Intégration dans `course-details-panel.tsx` et `page.tsx`
 
 **Fonctionnalités UI** :
 - Animation flip card (CSS 3D transform)
-- Raccourcis clavier : `Espace` (flip), `1/2/3` (révision)
-- Progression visuelle par deck
-- Badges de statut (Nouveau, En cours, Maîtrisé)
+- Raccourcis clavier : `Espace` (flip), flèches (navigation)
 - TTS audio (voix canadienne-française)
 
 ### Bugs corrigés
@@ -536,8 +562,9 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 **Ensuite** : Logos providers + Épingler cours (amélioration UX immédiatement visible)
 
 **Nouvelles fonctionnalités complétées** :
+- ✅ **Simplification flashcards** (2026-01-02) - Suppression types de fiches et progression
 - ✅ **Simplification modules** (2026-01-01) - Suppression progression/auto-detect, DataTable simple
-- ✅ **Fiches de révision** (2025-12-30) - Génération LLM, flip cards, progression, TTS
+- ✅ **Fiches de révision** (2025-12-30) - Génération LLM, flip cards, TTS audio
 - ✅ **Tuteur IA pédagogique** (2025-12-26) - Résumés, mind maps, quiz, explications
 
 ---
