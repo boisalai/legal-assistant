@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
-import type { Document, CardType, FlashcardGenerationProgress, Module } from "@/types";
+import type { Document, FlashcardGenerationProgress, Module } from "@/types";
 
 interface CreateFlashcardDeckModalProps {
   open: boolean;
@@ -41,8 +41,6 @@ interface CreateFlashcardDeckModalProps {
   modules: Module[];
   onSuccess: () => void;
 }
-
-const CARD_TYPE_KEYS: CardType[] = ["definition", "concept", "case", "question"];
 
 export function CreateFlashcardDeckModal({
   open,
@@ -58,12 +56,6 @@ export function CreateFlashcardDeckModal({
   // Form state
   const [name, setName] = useState("");
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
-  const [selectedCardTypes, setSelectedCardTypes] = useState<CardType[]>([
-    "definition",
-    "concept",
-    "case",
-    "question",
-  ]);
   const [cardCount, setCardCount] = useState(50);
   const [generateAudio, setGenerateAudio] = useState(false);
 
@@ -103,7 +95,6 @@ export function CreateFlashcardDeckModal({
     if (open) {
       setName("");
       setSelectedModuleIds([]);
-      setSelectedCardTypes(["definition", "concept", "case", "question"]);
       setCardCount(50);
       setGenerateAudio(false);
       setIsCreating(false);
@@ -119,12 +110,6 @@ export function CreateFlashcardDeckModal({
       prev.includes(moduleId)
         ? prev.filter((id) => id !== moduleId)
         : [...prev, moduleId]
-    );
-  };
-
-  const handleCardTypeToggle = (type: CardType) => {
-    setSelectedCardTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
   };
 
@@ -151,10 +136,6 @@ export function CreateFlashcardDeckModal({
       toast.error(t("noDocsInModules"));
       return;
     }
-    if (selectedCardTypes.length === 0) {
-      toast.error(t("selectCardType"));
-      return;
-    }
 
     setIsCreating(true);
     setGenerationError(null);
@@ -164,7 +145,6 @@ export function CreateFlashcardDeckModal({
       const deck = await flashcardsApi.createDeck(courseId, {
         name: name.trim(),
         source_document_ids: selectedDocIds,
-        card_types: selectedCardTypes,
         card_count: cardCount,
         generate_audio: generateAudio,
       });
@@ -209,7 +189,6 @@ export function CreateFlashcardDeckModal({
     name.trim() &&
     selectedModuleIds.length > 0 &&
     selectedDocCount > 0 &&
-    selectedCardTypes.length > 0 &&
     !isCreating &&
     !isGenerating;
 
@@ -353,25 +332,6 @@ export function CreateFlashcardDeckModal({
               <p className="text-xs text-muted-foreground">
                 {t("modulesSelected", { count: selectedModuleIds.length })} ({selectedDocCount} documents)
               </p>
-            </div>
-
-            {/* Card types */}
-            <div className="space-y-2">
-              <Label>{t("cardTypes")}</Label>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                {CARD_TYPE_KEYS.map((typeKey) => (
-                  <label
-                    key={typeKey}
-                    className="flex items-center gap-2 cursor-pointer hover:text-foreground"
-                  >
-                    <Checkbox
-                      checked={selectedCardTypes.includes(typeKey)}
-                      onCheckedChange={() => handleCardTypeToggle(typeKey)}
-                    />
-                    <span className="text-sm">{t(`types.${typeKey}`)}</span>
-                  </label>
-                ))}
-              </div>
             </div>
 
             {/* Card count and audio option - side by side */}

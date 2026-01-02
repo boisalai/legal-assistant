@@ -34,19 +34,17 @@ IMPORTANT: Tu dois retourner un objet JSON avec une clé "cards" contenant un ta
 
 Exemple de format attendu (avec 3 fiches):
 {{"cards": [
-  {{"card_type": "definition", "front": "Question 1?", "back": "Réponse 1"}},
-  {{"card_type": "concept", "front": "Question 2?", "back": "Réponse 2"}},
-  {{"card_type": "definition", "front": "Question 3?", "back": "Réponse 3"}}
+  {{"front": "Question 1?", "back": "Réponse 1"}},
+  {{"front": "Question 2?", "back": "Réponse 2"}},
+  {{"front": "Question 3?", "back": "Réponse 3"}}
 ]}}
-
-Types de fiches: {card_types}
 
 Contenu source (résumé):
 {content}
 
 RÈGLES STRICTES:
 1. Génère EXACTEMENT {card_count} fiches, pas plus, pas moins
-2. Chaque fiche DOIT avoir: card_type, front (question), back (réponse)
+2. Chaque fiche DOIT avoir: front (question), back (réponse)
 3. front = question claire et concise
 4. back = réponse en 1-2 phrases
 5. Réponds UNIQUEMENT avec le JSON, rien d'autre
@@ -145,7 +143,6 @@ class FlashcardService:
         self,
         deck_id: str,
         source_document_ids: List[str],
-        card_types: List[str],
         card_count: int = 50,
         model_id: Optional[str] = None
     ) -> AsyncGenerator[Dict, None]:
@@ -155,7 +152,6 @@ class FlashcardService:
         Args:
             deck_id: ID of the deck to add cards to
             source_document_ids: List of document IDs to generate from
-            card_types: Types of cards to generate
             card_count: Target number of cards
             model_id: LLM model to use (optional)
 
@@ -237,9 +233,6 @@ class FlashcardService:
             "message": f"Génération de {card_count} fiches en {chunks_needed} parties..."
         }
 
-        # Format card types for prompt
-        card_types_str = ", ".join(card_types)
-
         # Generate cards for each chunk (only process chunks we need)
         all_cards = []
         chunks_processed = 0
@@ -266,7 +259,6 @@ class FlashcardService:
             # Build prompt for this chunk
             prompt = FLASHCARD_GENERATION_PROMPT.format(
                 card_count=chunk_cards,
-                card_types=card_types_str,
                 content=chunk_content
             )
 
@@ -342,15 +334,11 @@ class FlashcardService:
                 card_data = {
                     "deck_id": f"flashcard_deck:{deck_record_id}",
                     "document_id": source_doc_id,
-                    "card_type": card.get("card_type", "question"),
                     "front": card.get("front", ""),
                     "back": card.get("back", ""),
                     "source_excerpt": card.get("source_excerpt"),
                     "source_location": card.get("source_location"),
-                    "status": "new",
-                    "review_count": 0,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "last_reviewed": None
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
 
                 await service.query(
@@ -367,14 +355,12 @@ class FlashcardService:
             await service.query(
                 """
                 UPDATE flashcard_deck
-                SET source_documents = $source_docs,
-                    card_types = $card_types
+                SET source_documents = $source_docs
                 WHERE id = type::thing('flashcard_deck', $deck_id)
                 """,
                 {
                     "deck_id": deck_record_id,
-                    "source_docs": source_docs_info,
-                    "card_types": card_types
+                    "source_docs": source_docs_info
                 }
             )
         except Exception as e:
@@ -634,7 +620,6 @@ class FlashcardService:
                 break
 
         # Copy other fields as-is
-        normalized["card_type"] = card.get("card_type", card.get("type", "question"))
         normalized["source_excerpt"] = card.get("source_excerpt", card.get("extrait", card.get("excerpt")))
         normalized["source_location"] = card.get("source_location", card.get("source", card.get("location")))
 

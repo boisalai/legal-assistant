@@ -1155,7 +1155,7 @@ import type { LinkedDirectoryScanResult, LinkedDirectoryProgressEvent } from "@/
 // Flashcards API
 // ============================================
 
-import type { FlashcardDeck, Flashcard, StudySession, CardType, ReviewResult, FlashcardGenerationProgress } from "@/types";
+import type { FlashcardDeck, Flashcard, StudySession, FlashcardGenerationProgress } from "@/types";
 
 export interface FlashcardDeckListResponse {
   decks: FlashcardDeck[];
@@ -1165,12 +1165,6 @@ export interface FlashcardDeckListResponse {
 export interface FlashcardListResponse {
   cards: Flashcard[];
   total: number;
-}
-
-export interface ReviewResponse {
-  card_id: string;
-  new_status: string;
-  review_count: number;
 }
 
 export const flashcardsApi = {
@@ -1195,7 +1189,6 @@ export const flashcardsApi = {
     data: {
       name: string;
       source_document_ids: string[];
-      card_types?: CardType[];
       card_count?: number;
       generate_audio?: boolean;
     }
@@ -1309,18 +1302,6 @@ export const flashcardsApi = {
     const cleanId = deckId.replace("flashcard_deck:", "");
     return fetchApi<StudySession>(
       `/api/flashcard-decks/${encodeURIComponent(cleanId)}/study?limit=${limit}`
-    );
-  },
-
-  // Review a card
-  async reviewCard(cardId: string, result: ReviewResult): Promise<ReviewResponse> {
-    const cleanId = cardId.replace("flashcard:", "");
-    return fetchApi<ReviewResponse>(
-      `/api/flashcards/${encodeURIComponent(cleanId)}/review`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ result }),
-      }
     );
   },
 
