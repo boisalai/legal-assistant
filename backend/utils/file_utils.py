@@ -32,6 +32,68 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB - Pour supporter les enregistrements 
 MAX_LINKED_FILES = 50  # Limite de fichiers lors de la liaison d'un répertoire
 
 
+class FileValidationError(Exception):
+    """Exception for file validation errors."""
+
+    def __init__(self, message: str, allowed_extensions: str = ""):
+        self.message = message
+        self.allowed_extensions = allowed_extensions
+        super().__init__(message)
+
+
+def validate_file_for_upload(
+    filename: str,
+    file_size: int,
+    validation_type: str = "upload",
+) -> str:
+    """
+    Centralized file validation for upload, register, and link operations.
+
+    Args:
+        filename: Name of the file
+        file_size: Size in bytes
+        validation_type: One of "upload", "link", "audio"
+
+    Returns:
+        The file extension (lowercase, with dot)
+
+    Raises:
+        FileValidationError: If validation fails
+    """
+    if not filename:
+        raise FileValidationError("Filename is required")
+
+    ext = get_file_extension(filename)
+
+    # Extension validation based on type
+    if validation_type == "upload":
+        if ext not in ALLOWED_EXTENSIONS:
+            raise FileValidationError(
+                f"Unsupported file type. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS.keys())}",
+                ', '.join(ALLOWED_EXTENSIONS.keys())
+            )
+    elif validation_type == "link":
+        if ext not in LINKABLE_EXTENSIONS:
+            raise FileValidationError(
+                f"Unsupported file type. Allowed extensions: {', '.join(LINKABLE_EXTENSIONS)}",
+                ', '.join(LINKABLE_EXTENSIONS)
+            )
+    elif validation_type == "audio":
+        if ext not in AUDIO_EXTENSIONS:
+            raise FileValidationError(
+                f"Unsupported audio format. Allowed extensions: {', '.join(AUDIO_EXTENSIONS)}",
+                ', '.join(AUDIO_EXTENSIONS)
+            )
+
+    # Size validation
+    if file_size > MAX_FILE_SIZE:
+        raise FileValidationError(
+            f"File too large. Max size: {MAX_FILE_SIZE // (1024 * 1024)} MB"
+        )
+
+    return ext
+
+
 def calculate_file_hash(file_path: Path) -> str:
     """
     Calculate SHA-256 hash of a file.
