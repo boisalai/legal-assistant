@@ -9,7 +9,6 @@ Endpoints:
 - POST /api/flashcard-decks/{deck_id}/generate - Générer les fiches (streaming SSE)
 - GET /api/flashcard-decks/{deck_id}/cards - Lister les fiches d'un deck
 - GET /api/flashcard-decks/{deck_id}/study - Session de révision
-- PATCH /api/flashcards/{card_id}/review - Enregistrer résultat révision
 - POST /api/flashcards/{card_id}/tts - Générer audio TTS
 """
 
@@ -32,12 +31,9 @@ from models.flashcard_models import (
     FlashcardResponse,
     FlashcardListResponse,
     StudySessionResponse,
-    ReviewRequest,
-    ReviewResponse,
     TTSRequest,
     TTSResponse,
     SourceDocument,
-    CardStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,50 +65,23 @@ async def get_deck_by_id(service, deck_id: str) -> Optional[dict]:
     return None
 
 
-async def get_deck_statistics(service, deck_id: str) -> dict:
-    """Calcule les statistiques d'un deck."""
+async def get_deck_card_count(service, deck_id: str) -> int:
+    """Compte le nombre de fiches d'un deck."""
     # Normaliser le deck_id (avec préfixe)
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
-    # Compter les fiches par statut (deck_id est stocké comme string)
     result = await service.query(
-        """
-        SELECT
-            count() as total,
-            count(status = 'new' OR status = null) as new_cards,
-            count(status = 'learning') as learning_cards,
-            count(status = 'mastered') as mastered_cards
-        FROM flashcard
-        WHERE deck_id = $deck_id
-        GROUP ALL
-        """,
+        "SELECT count() as total FROM flashcard WHERE deck_id = $deck_id GROUP ALL",
         {"deck_id": deck_id}
     )
 
-    # SurrealDB retourne une liste de dicts directement
     if result and len(result) > 0:
-        stats = result[0]
-        total = stats.get("total", 0)
-        mastered = stats.get("mastered_cards", 0)
-        return {
-            "total_cards": total,
-            "new_cards": stats.get("new_cards", 0),
-            "learning_cards": stats.get("learning_cards", 0),
-            "mastered_cards": mastered,
-            "progress_percent": round((mastered / total * 100) if total > 0 else 0, 1)
-        }
-
-    return {
-        "total_cards": 0,
-        "new_cards": 0,
-        "learning_cards": 0,
-        "mastered_cards": 0,
-        "progress_percent": 0.0
-    }
+        return result[0].get("total", 0)
+    return 0
 
 
-def format_deck_response(deck: dict, stats: dict) -> FlashcardDeckResponse:
+def format_deck_response(deck: dict, total_cards: int) -> FlashcardDeckResponse:
     """Formate un deck pour la réponse API."""
     # Parser source_documents
     source_docs = []
@@ -131,10 +100,6 @@ def format_deck_response(deck: dict, stats: dict) -> FlashcardDeckResponse:
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
 
-    last_studied = deck.get("last_studied")
-    if last_studied and hasattr(last_studied, "isoformat"):
-        last_studied = last_studied.isoformat()
-
     deck_id = deck.get("id", "")
     if hasattr(deck_id, "__str__"):
         deck_id = str(deck_id)
@@ -148,14 +113,8 @@ def format_deck_response(deck: dict, stats: dict) -> FlashcardDeckResponse:
         course_id=str(deck.get("course_id", "")),
         name=deck.get("name", ""),
         source_documents=source_docs,
-        card_types=deck.get("card_types", []),
-        total_cards=stats.get("total_cards", 0),
-        mastered_cards=stats.get("mastered_cards", 0),
-        learning_cards=stats.get("learning_cards", 0),
-        new_cards=stats.get("new_cards", 0),
-        progress_percent=stats.get("progress_percent", 0.0),
+        total_cards=total_cards,
         created_at=created_at,
-        last_studied=last_studied,
         has_summary_audio=has_summary_audio
     )
 
@@ -166,10 +125,6 @@ def format_card_response(card: dict) -> FlashcardResponse:
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
 
-    last_reviewed = card.get("last_reviewed")
-    if last_reviewed and hasattr(last_reviewed, "isoformat"):
-        last_reviewed = last_reviewed.isoformat()
-
     card_id = card.get("id", "")
     if hasattr(card_id, "__str__"):
         card_id = str(card_id)
@@ -178,14 +133,10 @@ def format_card_response(card: dict) -> FlashcardResponse:
         id=card_id,
         deck_id=str(card.get("deck_id", "")),
         document_id=str(card.get("document_id", "")),
-        card_type=card.get("card_type", "question"),
         front=card.get("front", ""),
         back=card.get("back", ""),
         source_excerpt=card.get("source_excerpt"),
         source_location=card.get("source_location"),
-        status=card.get("status", "new"),
-        review_count=card.get("review_count", 0),
-        last_reviewed=last_reviewed,
         created_at=created_at
     )
 
@@ -261,7 +212,6 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
         "course_id": f"course:{course_record_id}",
         "name": request.name,
         "source_documents": source_documents,
-        "card_types": [ct.value for ct in request.card_types],
         "card_count_requested": request.card_count,
         "generate_audio": request.generate_audio,
         "created_at": now.isoformat(),
@@ -280,11 +230,11 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
         )
 
     created_deck = result[0]
-    stats = await get_deck_statistics(service, f"flashcard_deck:{deck_id}")
+    total_cards = await get_deck_card_count(service, f"flashcard_deck:{deck_id}")
 
     logger.info(f"Deck créé: {deck_id} pour cours {course_id} avec {len(source_documents)} documents")
 
-    return format_deck_response(created_deck, stats)
+    return format_deck_response(created_deck, total_cards)
 
 
 @router.get(
@@ -313,8 +263,8 @@ async def list_flashcard_decks(course_id: str):
     if result and len(result) > 0:
         for deck in result:
             deck_id = str(deck.get("id", ""))
-            stats = await get_deck_statistics(service, deck_id)
-            decks.append(format_deck_response(deck, stats))
+            total_cards = await get_deck_card_count(service, deck_id)
+            decks.append(format_deck_response(deck, total_cards))
 
     return FlashcardDeckListResponse(decks=decks, total=len(decks))
 
@@ -325,7 +275,7 @@ async def list_flashcard_decks(course_id: str):
     summary="Détails d'un deck"
 )
 async def get_flashcard_deck(deck_id: str):
-    """Récupère les détails d'un deck avec ses statistiques."""
+    """Récupère les détails d'un deck."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -335,8 +285,8 @@ async def get_flashcard_deck(deck_id: str):
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    stats = await get_deck_statistics(service, deck_id)
-    return format_deck_response(deck, stats)
+    total_cards = await get_deck_card_count(service, deck_id)
+    return format_deck_response(deck, total_cards)
 
 
 @router.delete(
@@ -406,12 +356,8 @@ async def delete_flashcard_deck(deck_id: str):
     response_model=FlashcardListResponse,
     summary="Lister les fiches d'un deck"
 )
-async def list_flashcards(
-    deck_id: str,
-    status_filter: Optional[str] = Query(None, alias="status"),
-    card_type: Optional[str] = Query(None)
-):
-    """Liste toutes les fiches d'un deck avec filtres optionnels."""
+async def list_flashcards(deck_id: str):
+    """Liste toutes les fiches d'un deck."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -425,21 +371,10 @@ async def list_flashcards(
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
-    # Construire la requête avec filtres (deck_id est stocké comme string)
-    query = "SELECT * FROM flashcard WHERE deck_id = $deck_id"
-    params = {"deck_id": deck_id}
-
-    if status_filter:
-        query += " AND status = $status"
-        params["status"] = status_filter
-
-    if card_type:
-        query += " AND card_type = $card_type"
-        params["card_type"] = card_type
-
-    query += " ORDER BY created_at ASC"
-
-    result = await service.query(query, params)
+    result = await service.query(
+        "SELECT * FROM flashcard WHERE deck_id = $deck_id ORDER BY created_at ASC",
+        {"deck_id": deck_id}
+    )
 
     cards = []
     if result and len(result) > 0:
@@ -454,15 +389,8 @@ async def list_flashcards(
     response_model=StudySessionResponse,
     summary="Démarrer une session de révision"
 )
-async def start_study_session(
-    deck_id: str,
-    limit: int = Query(default=20, ge=1, le=100)
-):
-    """
-    Récupère les fiches pour une session de révision.
-
-    Priorité: new > learning > mastered
-    """
+async def start_study_session(deck_id: str):
+    """Récupère les fiches pour une session de révision."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -476,138 +404,22 @@ async def start_study_session(
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
-    # Récupérer les fiches avec priorité (deck_id est stocké comme string)
-    # Note: SurrealDB ne supporte pas les expressions booléennes complexes dans ORDER BY
-    # On récupère toutes les fiches et on trie en Python
+    # Récupérer toutes les fiches
     result = await service.query(
-        """
-        SELECT * FROM flashcard
-        WHERE deck_id = $deck_id
-        """,
+        "SELECT * FROM flashcard WHERE deck_id = $deck_id ORDER BY created_at ASC",
         {"deck_id": deck_id}
     )
 
-    # Trier côté Python avec priorité: new > learning > mastered
-    def card_sort_key(card):
-        status = card.get("status", "new") or "new"
-        # Priorité: new=0, learning=1, mastered=2
-        priority = {"new": 0, "learning": 1, "mastered": 2}.get(status, 3)
-        # Secondaire: last_reviewed (None en premier)
-        last_reviewed = card.get("last_reviewed") or ""
-        return (priority, last_reviewed)
-
-    if result:
-        result = sorted(result, key=card_sort_key)[:limit]
-
     cards = []
-    new_count = 0
-    learning_count = 0
-
     if result and len(result) > 0:
         for card in result:
-            formatted = format_card_response(card)
-            cards.append(formatted)
-
-            card_status = card.get("status", "new")
-            if card_status == "new" or card_status is None:
-                new_count += 1
-            elif card_status == "learning":
-                learning_count += 1
-
-    # Mettre à jour last_studied sur le deck
-    record_id = deck_id.replace("flashcard_deck:", "")
-    await service.query(
-        """
-        UPDATE flashcard_deck
-        SET last_studied = time::now()
-        WHERE id = type::thing('flashcard_deck', $record_id)
-        """,
-        {"record_id": record_id}
-    )
+            cards.append(format_card_response(card))
 
     return StudySessionResponse(
         deck_id=deck_id,
         deck_name=deck.get("name", ""),
         cards=cards,
-        total_cards=len(cards),
-        new_cards=new_count,
-        learning_cards=learning_count,
-        review_cards=len(cards) - new_count - learning_count
-    )
-
-
-@router.patch(
-    "/api/flashcards/{card_id}/review",
-    response_model=ReviewResponse,
-    summary="Enregistrer le résultat d'une révision"
-)
-async def review_flashcard(card_id: str, request: ReviewRequest):
-    """
-    Enregistre le résultat d'une révision et met à jour le statut de la fiche.
-
-    - again: Repasse en "learning"
-    - correct: Passe en "learning" si new, reste en "learning" sinon
-    - easy: Passe en "mastered"
-    """
-    service = get_surreal_service()
-
-    record_id = card_id.replace("flashcard:", "")
-
-    # Récupérer la fiche
-    result = await service.query(
-        "SELECT * FROM flashcard WHERE id = type::thing('flashcard', $card_id)",
-        {"card_id": record_id}
-    )
-
-    if not result or len(result) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Fiche non trouvée: {card_id}"
-        )
-
-    card = result[0]
-    current_status = card.get("status", "new")
-    review_count = card.get("review_count", 0) + 1
-
-    # Déterminer le nouveau statut
-    if request.result == "again":
-        new_status = "learning"
-    elif request.result == "easy":
-        new_status = "mastered"
-    else:  # correct
-        if current_status == "new" or current_status is None:
-            new_status = "learning"
-        elif current_status == "learning":
-            # Après 3 révisions correctes, passer en mastered
-            if review_count >= 3:
-                new_status = "mastered"
-            else:
-                new_status = "learning"
-        else:
-            new_status = current_status
-
-    # Mettre à jour la fiche
-    await service.query(
-        """
-        UPDATE flashcard
-        SET status = $status,
-            review_count = $review_count,
-            last_reviewed = time::now()
-        WHERE id = type::thing('flashcard', $card_id)
-        """,
-        {
-            "card_id": record_id,
-            "status": new_status,
-            "review_count": review_count
-        }
-    )
-
-    logger.info(f"Fiche {card_id} révisée: {current_status} -> {new_status}")
-
-    return ReviewResponse(
-        card_id=card_id,
-        new_status=new_status,
-        review_count=review_count
+        total_cards=len(cards)
     )
 
 
@@ -813,7 +625,6 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
 
     # Récupérer les informations du deck
     source_docs = deck.get("source_documents", [])
-    card_types = deck.get("card_types", ["definition", "concept", "case", "question"])
     card_count = deck.get("card_count_requested", 50)
     generate_audio = deck.get("generate_audio", False)
     deck_name = deck.get("name", "Révision")
@@ -851,7 +662,6 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
             async for update in flashcard_service.generate_flashcards(
                 deck_id=deck_id,
                 source_document_ids=source_doc_ids,
-                card_types=card_types,
                 card_count=card_count,
                 model_id=model_id
             ):

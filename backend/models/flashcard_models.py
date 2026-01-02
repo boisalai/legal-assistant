@@ -2,30 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, List
-from enum import Enum
 from pydantic import BaseModel, Field
-
-
-class CardType(str, Enum):
-    """Types de fiches disponibles."""
-    DEFINITION = "definition"
-    CONCEPT = "concept"
-    CASE = "case"  # Jurisprudence
-    QUESTION = "question"
-
-
-class CardStatus(str, Enum):
-    """Statut de révision d'une fiche."""
-    NEW = "new"
-    LEARNING = "learning"
-    MASTERED = "mastered"
-
-
-class ReviewResult(str, Enum):
-    """Résultat d'une révision."""
-    AGAIN = "again"  # À revoir
-    CORRECT = "correct"  # Correct
-    EASY = "easy"  # Facile
 
 
 # ============================================================================
@@ -47,9 +24,6 @@ class FlashcardDeckCreate(BaseModel):
     """Requête pour créer un nouveau deck de révision."""
     name: str = Field(..., min_length=1, max_length=200)
     source_document_ids: List[str] = Field(..., min_items=1)
-    card_types: List[CardType] = Field(
-        default=[CardType.DEFINITION, CardType.CONCEPT, CardType.CASE, CardType.QUESTION]
-    )
     card_count: int = Field(default=50, ge=5, le=200)
     generate_audio: bool = Field(default=False, description="Générer un audio récapitulatif")
 
@@ -60,14 +34,8 @@ class FlashcardDeckResponse(BaseModel):
     course_id: str
     name: str
     source_documents: List[SourceDocument] = []
-    card_types: List[str] = []
     total_cards: int = 0
-    mastered_cards: int = 0
-    learning_cards: int = 0
-    new_cards: int = 0
-    progress_percent: float = 0.0
     created_at: str
-    last_studied: Optional[str] = None
     has_summary_audio: bool = False
 
 
@@ -85,7 +53,6 @@ class FlashcardCreate(BaseModel):
     """Requête pour créer une fiche (utilisé en interne)."""
     deck_id: str
     document_id: str
-    card_type: CardType
     front: str
     back: str
     source_excerpt: Optional[str] = None
@@ -97,14 +64,10 @@ class FlashcardResponse(BaseModel):
     id: str
     deck_id: str
     document_id: str
-    card_type: str
     front: str
     back: str
     source_excerpt: Optional[str] = None
     source_location: Optional[str] = None
-    status: str = "new"
-    review_count: int = 0
-    last_reviewed: Optional[str] = None
     created_at: str
 
 
@@ -124,21 +87,6 @@ class StudySessionResponse(BaseModel):
     deck_name: str
     cards: List[FlashcardResponse]
     total_cards: int
-    new_cards: int
-    learning_cards: int
-    review_cards: int
-
-
-class ReviewRequest(BaseModel):
-    """Requête pour enregistrer le résultat d'une révision."""
-    result: ReviewResult
-
-
-class ReviewResponse(BaseModel):
-    """Réponse après une révision."""
-    card_id: str
-    new_status: str
-    review_count: int
 
 
 # ============================================================================
@@ -172,7 +120,6 @@ class GenerationProgress(BaseModel):
 
 class GeneratedCard(BaseModel):
     """Fiche générée par le LLM (avant sauvegarde)."""
-    card_type: CardType
     front: str
     back: str
     source_excerpt: Optional[str] = None

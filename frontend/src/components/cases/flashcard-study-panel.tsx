@@ -3,13 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import {
   X,
-  RotateCcw,
-  Check,
-  Zap,
   Volume2,
   Loader2,
   ChevronLeft,
@@ -20,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
-import type { FlashcardDeck, Flashcard, StudySession, ReviewResult } from "@/types";
+import type { FlashcardDeck, StudySession } from "@/types";
 
 interface FlashcardStudyPanelProps {
   deck: FlashcardDeck;
@@ -39,9 +34,7 @@ export function FlashcardStudyPanel({
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isReviewing, setIsReviewing] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<"front" | "back" | null>(null);
-  const [completedCards, setCompletedCards] = useState<Set<string>>(new Set());
   const [isPlayingSummary, setIsPlayingSummary] = useState(false);
   const summaryAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -64,36 +57,10 @@ export function FlashcardStudyPanel({
 
   const currentCard = session?.cards[currentIndex];
   const totalCards = session?.cards.length || 0;
-  const progressPercent =
-    totalCards > 0 ? (completedCards.size / totalCards) * 100 : 0;
 
   const handleFlip = useCallback(() => {
     setIsFlipped((prev) => !prev);
   }, []);
-
-  const handleReview = async (result: ReviewResult) => {
-    if (!currentCard || isReviewing) return;
-
-    setIsReviewing(true);
-    try {
-      await flashcardsApi.reviewCard(currentCard.id, result);
-      setCompletedCards((prev) => new Set(prev).add(currentCard.id));
-
-      // Move to next card
-      if (currentIndex < totalCards - 1) {
-        setCurrentIndex((prev) => prev + 1);
-        setIsFlipped(false);
-      } else {
-        // Session complete
-        toast.success(t("sessionComplete"));
-        onDeckUpdate();
-      }
-    } catch (error) {
-      toast.error(t("reviewError"));
-    } finally {
-      setIsReviewing(false);
-    }
-  };
 
   const handlePlayAudio = async (side: "front" | "back") => {
     if (!currentCard || playingAudio) return;
@@ -188,37 +155,13 @@ export function FlashcardStudyPanel({
       } else if (e.key === "ArrowLeft") {
         handlePrevious();
       } else if (e.key === "ArrowRight") {
-        if (isFlipped) {
-          handleReview("correct");
-        } else {
-          handleNext();
-        }
-      } else if (e.key === "1" && isFlipped) {
-        handleReview("again");
-      } else if (e.key === "2" && isFlipped) {
-        handleReview("correct");
-      } else if (e.key === "3" && isFlipped) {
-        handleReview("easy");
+        handleNext();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFlipped, currentIndex, handleFlip]);
-
-  const getCardTypeBadge = (type: string) => {
-    const colors: Record<string, string> = {
-      definition: "bg-purple-500",
-      concept: "bg-blue-500",
-      case: "bg-amber-500",
-      question: "bg-green-500",
-    };
-    return (
-      <Badge className={colors[type] || "bg-gray-500"}>
-        {t(`types.${type}`)}
-      </Badge>
-    );
-  };
+  }, [currentIndex, handleFlip]);
 
   if (loading) {
     return (
@@ -256,12 +199,10 @@ export function FlashcardStudyPanel({
     );
   }
 
-  const isSessionComplete = completedCards.size === totalCards;
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-4 pt-3 pb-1 border-b bg-background shrink-0 min-h-[65px]">
+      <div className="px-4 pt-3 pb-3 border-b bg-background shrink-0 min-h-[65px]">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold truncate">{deck.name}</h2>
           <div className="flex items-center gap-1">
@@ -284,211 +225,135 @@ export function FlashcardStudyPanel({
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Progress value={progressPercent} className="flex-1 h-2" />
-        </div>
       </div>
 
-      {/* Session complete */}
-      {isSessionComplete ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
-          <div className="text-6xl">🎉</div>
-          <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">{t("sessionComplete")}</h3>
-            <p className="text-muted-foreground">
-              {t("cardsReviewed", { count: totalCards })}
-            </p>
+      {/* Card */}
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="max-w-2xl mx-auto">
+          {/* Card navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-muted-foreground">
+              {t("cardOf", { current: currentIndex + 1, total: totalCards })}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePrevious}
+                disabled={currentIndex === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNext}
+                disabled={currentIndex === totalCards - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose}>
-              {t("backToCourse")}
-            </Button>
-            <Button
-              onClick={() => {
-                setCompletedCards(new Set());
-                setCurrentIndex(0);
-                setIsFlipped(false);
+
+          {/* Flip card */}
+          <div
+            className="relative cursor-pointer perspective-1000"
+            onClick={handleFlip}
+            style={{ perspective: "1000px" }}
+          >
+            <div
+              className={`relative transition-transform duration-500 transform-style-preserve-3d ${
+                isFlipped ? "rotate-y-180" : ""
+              }`}
+              style={{
+                transformStyle: "preserve-3d",
+                transform: isFlipped ? "rotateY(180deg)" : "rotateY(0)",
               }}
             >
-              {t("restart")}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Card */}
-          <div className="flex-1 p-6 overflow-auto">
-            <div className="max-w-2xl mx-auto">
-              {/* Card type and navigation */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  {currentCard && getCardTypeBadge(currentCard.card_type)}
-                  <span className="text-sm text-muted-foreground">
-                    {t("cardOf", { current: currentIndex + 1, total: totalCards })}
-                  </span>
+              {/* Front */}
+              <div
+                className="bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden"
+                style={{ backfaceVisibility: "hidden" }}
+              >
+                <div className="flex-1 flex items-center justify-center overflow-auto py-2">
+                  <p className="text-xl text-center leading-relaxed">
+                    {currentCard?.front}
+                  </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    onClick={handlePrevious}
-                    disabled={currentIndex === 0}
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayAudio("front");
+                    }}
+                    disabled={playingAudio !== null}
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    {playingAudio === "front" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleNext}
-                    disabled={currentIndex === totalCards - 1}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <p className="text-center text-xs text-muted-foreground mt-1">
+                    {t("clickToFlip")}
+                  </p>
                 </div>
               </div>
 
-              {/* Flip card */}
+              {/* Back */}
               <div
-                className="relative cursor-pointer perspective-1000"
-                onClick={handleFlip}
-                style={{ perspective: "1000px" }}
+                className="absolute inset-0 bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden rotate-y-180"
+                style={{
+                  backfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                }}
               >
-                <div
-                  className={`relative transition-transform duration-500 transform-style-preserve-3d ${
-                    isFlipped ? "rotate-y-180" : ""
-                  }`}
-                  style={{
-                    transformStyle: "preserve-3d",
-                    transform: isFlipped ? "rotateY(180deg)" : "rotateY(0)",
-                  }}
-                >
-                  {/* Front */}
-                  <div
-                    className="bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden"
-                    style={{ backfaceVisibility: "hidden" }}
-                  >
-                    <div className="flex-1 flex items-center justify-center overflow-auto py-2">
-                      <p className="text-xl text-center leading-relaxed">
-                        {currentCard?.front}
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayAudio("front");
-                        }}
-                        disabled={playingAudio !== null}
-                      >
-                        {playingAudio === "front" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Volume2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <p className="text-center text-xs text-muted-foreground mt-1">
-                        {t("clickToFlip")}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Back */}
-                  <div
-                    className="absolute inset-0 bg-card border rounded-xl p-6 min-h-[300px] max-h-[500px] flex flex-col backface-hidden rotate-y-180"
-                    style={{
-                      backfaceVisibility: "hidden",
-                      transform: "rotateY(180deg)",
+                <div className="flex-1 flex items-center justify-center overflow-auto py-2">
+                  <p className="text-lg text-center leading-relaxed whitespace-pre-wrap">
+                    {currentCard?.back}
+                  </p>
+                </div>
+                <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
+                  {currentCard?.source_location && (
+                    <p className="text-xs text-muted-foreground text-center mb-2">
+                      {t("source")}: {currentCard.source_location}
+                    </p>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayAudio("back");
                     }}
+                    disabled={playingAudio !== null}
                   >
-                    <div className="flex-1 flex items-center justify-center overflow-auto py-2">
-                      <p className="text-lg text-center leading-relaxed whitespace-pre-wrap">
-                        {currentCard?.back}
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex flex-col items-center pt-4 border-t mt-2">
-                      {currentCard?.source_location && (
-                        <p className="text-xs text-muted-foreground text-center mb-2">
-                          {t("source")}: {currentCard.source_location}
-                        </p>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayAudio("back");
-                        }}
-                        disabled={playingAudio !== null}
-                      >
-                        {playingAudio === "back" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Volume2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                    {playingAudio === "back" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Review buttons */}
-          <div className="p-4 border-t bg-background shrink-0">
-            {isFlipped ? (
-              <div className="flex items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleReview("again")}
-                  disabled={isReviewing}
-                  className="flex-1 max-w-[150px] gap-2 border-red-200 hover:bg-red-50 hover:border-red-300"
-                >
-                  <RotateCcw className="h-4 w-4 text-red-500" />
-                  <span>{t("review.again")}</span>
-                  <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
-                    1
-                  </kbd>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleReview("correct")}
-                  disabled={isReviewing}
-                  className="flex-1 max-w-[150px] gap-2 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                >
-                  <Check className="h-4 w-4 text-blue-500" />
-                  <span>{t("review.correct")}</span>
-                  <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
-                    2
-                  </kbd>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleReview("easy")}
-                  disabled={isReviewing}
-                  className="flex-1 max-w-[150px] gap-2 border-green-200 hover:bg-green-50 hover:border-green-300"
-                >
-                  <Zap className="h-4 w-4 text-green-500" />
-                  <span>{t("review.easy")}</span>
-                  <kbd className="hidden sm:inline-block text-xs bg-muted px-1 rounded">
-                    3
-                  </kbd>
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center">
-                <Button onClick={handleFlip} className="gap-2">
-                  {t("showAnswer")}
-                  <kbd className="text-xs bg-primary-foreground/20 px-1.5 rounded">
-                    ⎵
-                  </kbd>
-                </Button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {/* Footer with flip button */}
+      <div className="p-4 border-t bg-background shrink-0">
+        <div className="text-center">
+          <Button onClick={handleFlip} className="gap-2">
+            {t("showAnswer")}
+            <kbd className="text-xs bg-primary-foreground/20 px-1.5 rounded">
+              ⎵
+            </kbd>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

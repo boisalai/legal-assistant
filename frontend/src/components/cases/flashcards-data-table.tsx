@@ -26,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   Play,
   Trash2,
@@ -91,24 +90,6 @@ export function FlashcardsDataTable({
       cell: ({ row }) => (
         <span className="text-[14px] text-[#000000]">{row.original.total_cards}</span>
       ),
-    },
-    {
-      id: "progress",
-      header: () => t("progress"),
-      cell: ({ row }) => {
-        const deck = row.original;
-        if (deck.total_cards === 0) {
-          return <span className="text-[14px] text-[#000000]">-</span>;
-        }
-        return (
-          <div className="w-24 space-y-1">
-            <Progress value={deck.progress_percent} className="h-1.5" />
-            <span className="text-[14px] text-[#000000]">
-              {Math.round(deck.progress_percent)}%
-            </span>
-          </div>
-        );
-      },
     },
     {
       accessorKey: "created_at",
