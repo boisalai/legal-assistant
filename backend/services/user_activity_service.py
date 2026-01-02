@@ -21,6 +21,11 @@ class ActivityType(str, Enum):
     VIEW_CASE = "view_case"
     VIEW_DOCUMENT = "view_document"
     CLOSE_DOCUMENT = "close_document"
+    VIEW_MODULE = "view_module"
+    CLOSE_MODULE = "close_module"
+    VIEW_FLASHCARD_STUDY = "view_flashcard_study"
+    VIEW_FLASHCARD_AUDIO = "view_flashcard_audio"
+    VIEW_DIRECTORY = "view_directory"
 
     # Communication
     SEND_MESSAGE = "send_message"
@@ -227,9 +232,14 @@ class UserActivityService:
         """
         # Map action types to French descriptions
         action_labels = {
-            "view_case": "Ouverture du cours",
+            "view_case": "Consultation du cours",
             "view_document": "Visualisation du document",
             "close_document": "Fermeture du document",
+            "view_module": "Consultation du module",
+            "close_module": "Fermeture du module",
+            "view_flashcard_study": "Étude des fiches de révision",
+            "view_flashcard_audio": "Écoute audio des fiches",
+            "view_directory": "Consultation du répertoire",
             "send_message": "Message envoyé",
             "upload_document": "Upload de document",
             "delete_document": "Suppression du document",
@@ -249,6 +259,14 @@ class UserActivityService:
                 return f"{base_label} '{metadata['document_name']}'"
             elif "document_id" in metadata:
                 return f"{base_label} (ID: {metadata['document_id']})"
+            elif "deck_name" in metadata:
+                return f"{base_label} '{metadata['deck_name']}'"
+            elif "module_name" in metadata:
+                return f"{base_label} '{metadata['module_name']}'"
+            elif "directory_path" in metadata:
+                return f"{base_label} '{metadata['directory_path']}'"
+            elif "course_name" in metadata:
+                return f"{base_label} '{metadata['course_name']}'"
             elif "message" in metadata:
                 # Truncate long messages
                 msg = metadata["message"]
@@ -302,7 +320,7 @@ class UserActivityService:
             # Get count of activities
             result = await self.service.query(
                 """
-                SELECT count() as total FROM user_activity
+                SELECT case_id, count() as total FROM user_activity
                 WHERE case_id = $case_id
                 GROUP BY case_id
                 """,

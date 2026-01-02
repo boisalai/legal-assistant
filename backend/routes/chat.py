@@ -66,6 +66,17 @@ class ChatResponse(BaseModel):
 
 # Helper functions for tutor mode
 
+# Activity types that indicate the user has left the document/module view
+_VIEW_CHANGE_ACTIONS = (
+    "close_document",
+    "close_module",
+    "view_case",
+    "view_flashcard_study",
+    "view_flashcard_audio",
+    "view_directory",
+)
+
+
 def _get_current_document_from_activities(activities: list) -> Optional[str]:
     """
     Parse activities to find the currently open document.
@@ -83,11 +94,39 @@ def _get_current_document_from_activities(activities: list) -> Optional[str]:
         if action_type == "view_document":
             # Found most recent view_document → document is open
             return metadata.get("document_id")
-        elif action_type == "close_document":
-            # User closed a document, so no document is currently open
+        elif action_type in _VIEW_CHANGE_ACTIONS:
+            # User switched to another view, so no document is currently open
             return None
 
     return None  # No document viewing activity found
+
+
+def _get_current_module_from_activities(activities: list) -> Optional[dict]:
+    """
+    Parse activities to find the currently open module.
+
+    Args:
+        activities: List of activity dictionaries (newest first)
+
+    Returns:
+        dict with module_id and module_name if a module is open, None otherwise
+    """
+    for activity in activities:
+        action_type = activity.get("action_type")
+        metadata = activity.get("metadata", {})
+
+        if action_type == "view_module":
+            # Found most recent view_module → module is open
+            return {
+                "module_id": metadata.get("module_id"),
+                "module_name": metadata.get("module_name"),
+                "document_count": metadata.get("document_count", 0),
+            }
+        elif action_type in _VIEW_CHANGE_ACTIONS:
+            # User switched to another view, so no module is currently open
+            return None
+
+    return None  # No module viewing activity found
 
 
 def _parse_surreal_record(record: dict) -> Optional[dict]:
@@ -118,7 +157,8 @@ def _build_tutor_system_prompt(
     activity_context: str,
     current_document_id: Optional[str],
     current_document: Optional[dict],
-    tools_desc: str
+    tools_desc: str,
+    current_module: Optional[dict] = None
 ) -> str:
     """
     Build context-aware tutor system prompt.
@@ -130,6 +170,7 @@ def _build_tutor_system_prompt(
         current_document_id: ID of currently open document (if any)
         current_document: Full document data (if any)
         tools_desc: Description of available tools
+        current_module: Info about currently viewed module (if any)
 
     Returns:
         Complete system prompt for tutor mode
@@ -175,6 +216,43 @@ Ton rôle est d'aider l'étudiant à comprendre, mémoriser et maîtriser le con
 
 **CONTENU DU DOCUMENT ACTUEL** (aperçu):
 {doc_preview}...
+"""
+    elif current_module:
+        # TUTOR MODE: Module-focused
+        module_name = current_module.get("module_name", "module")
+        module_id = current_module.get("module_id", "")
+        doc_count = current_module.get("document_count", 0)
+
+        # Get documents belonging to this module
+        module_docs = [doc for doc in documents if doc.get("module_id") == module_id]
+        module_doc_names = ", ".join([doc.get("nom_fichier", "") for doc in module_docs[:10]])
+
+        context_specific = f"""
+
+📁 **CONTEXTE ACTUEL**: L'étudiant consulte le module "{module_name}"
+Documents dans ce module: {doc_count}
+{f"Fichiers: {module_doc_names}" if module_doc_names else ""}
+
+**MODE TUTEUR - MODULE SPÉCIFIQUE**:
+- L'étudiant étudie CE module en particulier
+- Focalise tes réponses sur les documents de ce module
+- Utilise `semantic_search` pour chercher uniquement dans les documents de ce module
+- Propose des outils pédagogiques pour le module entier:
+  - 📝 Résumés du module (use tool: generate_summary)
+  - 🗺️ Cartes mentales du module (use tool: generate_mindmap)
+  - ❓ Quiz sur le module (use tool: generate_quiz)
+  - 💡 Explications de concepts (use tool: explain_concept)
+
+**APPROCHE PÉDAGOGIQUE**:
+1. Aider l'étudiant à comprendre la structure du module
+2. Proposer un parcours logique à travers les documents du module
+3. Connecter les concepts entre les différents documents du module
+4. Suggérer quel document consulter pour approfondir un sujet
+
+**RÈGLES SPÉCIFIQUES**:
+- Quand l'étudiant pose une question, cherche d'abord dans les documents de ce module
+- Utilise `semantic_search` pour identifier les documents pertinents dans ce module
+- Suggère d'ouvrir un document spécifique du module si nécessaire
 """
     else:
         # TUTOR MODE: Course-wide
@@ -534,9 +612,10 @@ Contenu des documents:"""
 
                         logger.info(f"Added case context for {case_name} with {len(documents)} documents")
 
-                        # NEW: Detect currently open document from activities
+                        # NEW: Detect currently open document or module from activities
                         current_document_id = None
                         current_document = None
+                        current_module = None
 
                         if activity_context:
                             try:
@@ -546,6 +625,7 @@ Contenu des documents:"""
                                     limit=20
                                 )
                                 current_document_id = _get_current_document_from_activities(activities_raw)
+                                current_module = _get_current_module_from_activities(activities_raw)
 
                                 # If document is open, fetch full document data
                                 if current_document_id:
@@ -553,10 +633,12 @@ Contenu des documents:"""
                                     if doc_result and len(doc_result) > 0:
                                         current_document = _parse_surreal_record(doc_result[0])
                                         logger.info(f"✅ Tutor mode: Document '{current_document.get('nom_fichier')}' is currently open")
+                                elif current_module:
+                                    logger.info(f"✅ Tutor mode: Module '{current_module.get('module_name')}' is currently open")
                                 else:
-                                    logger.info("✅ Tutor mode: No document open, course-wide context")
+                                    logger.info("✅ Tutor mode: No document or module open, course-wide context")
                             except Exception as e:
-                                logger.warning(f"Could not detect current document: {e}")
+                                logger.warning(f"Could not detect current document/module: {e}")
 
                         # Replace system_content with tutor-aware prompt
                         system_content = _build_tutor_system_prompt(
@@ -565,7 +647,8 @@ Contenu des documents:"""
                             activity_context=activity_context,
                             current_document_id=current_document_id,
                             current_document=current_document,
-                            tools_desc=tools_desc
+                            tools_desc=tools_desc,
+                            current_module=current_module
                         )
 
             except Exception as e:
@@ -579,7 +662,8 @@ Contenu des documents:"""
                 activity_context=activity_context,
                 current_document_id=None,
                 current_document=None,
-                tools_desc=tools_desc
+                tools_desc=tools_desc,
+                current_module=None
             )
 
         # Build the conversation prompt

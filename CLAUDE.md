@@ -140,9 +140,98 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 - `frontend/src/components/cases/modules-section.tsx` - Section modules avec DataTable
 - `frontend/src/components/cases/modules-data-table.tsx` - DataTable des modules
 
+### Activity Tracking (Contexte IA)
+
+Le système d'activity tracking permet à l'assistant IA de savoir ce que l'utilisateur consulte dans la zone centrale.
+
+**Fichiers clés :**
+- `frontend/src/lib/activity-tracker.ts` - Fonction `trackActivity()` et hook `useActivityTracker()`
+- `frontend/src/types/index.ts` - Type `ActivityType`
+- `backend/services/user_activity_service.py` - Service de tracking + enum `ActivityType`
+- `backend/routes/chat.py` - Parsing des activités (`_VIEW_CHANGE_ACTIONS`, `_get_current_document_from_activities`)
+
+**Types d'activité actuels :**
+
+| Type | Description | Composant |
+|------|-------------|-----------|
+| `view_case` | Page principale du cours | `page.tsx` |
+| `view_document` | Document ouvert | `document-preview-panel.tsx` |
+| `view_module` | Module ouvert | `module-details-panel.tsx` |
+| `view_flashcard_study` | Étude des flashcards | `flashcard-study-panel.tsx` |
+| `view_flashcard_audio` | Audio des flashcards | `flashcard-audio-panel.tsx` |
+| `view_directory` | Répertoire lié | `page.tsx` (handlePreviewDirectory) |
+
+**⚠️ Ajouter une nouvelle vue dans la zone centrale :**
+
+1. **TypeScript** - Ajouter le type dans `frontend/src/types/index.ts` :
+   ```typescript
+   export type ActivityType =
+     | "view_case"
+     | "view_my_new_view"  // ← Ajouter ici
+     | ...
+   ```
+
+2. **Backend enum** - Ajouter dans `backend/services/user_activity_service.py` :
+   ```python
+   class ActivityType(str, Enum):
+       VIEW_MY_NEW_VIEW = "view_my_new_view"  # ← Ajouter ici
+   ```
+
+3. **Backend labels** - Ajouter le label français dans `_format_activity_description()` :
+   ```python
+   action_labels = {
+       "view_my_new_view": "Consultation de ma nouvelle vue",  # ← Ajouter ici
+   }
+   ```
+
+4. **Backend parsing** - Ajouter dans `_VIEW_CHANGE_ACTIONS` (`backend/routes/chat.py`) :
+   ```python
+   _VIEW_CHANGE_ACTIONS = (
+       "view_my_new_view",  # ← Ajouter ici
+       ...
+   )
+   ```
+
+5. **Frontend tracking** - Appeler `trackActivity()` au montage du composant :
+   ```typescript
+   useEffect(() => {
+     trackActivity(courseId, "view_my_new_view", {
+       // metadata optionnelle
+     });
+   }, [courseId]);
+   ```
+
 ---
 
-## Session actuelle (2026-01-02) - Simplification des flashcards ✅
+## Session actuelle (2026-01-02) - Activity Tracking complet ✅
+
+**Objectif** : Permettre à l'assistant IA de toujours savoir ce que l'utilisateur consulte dans la zone centrale.
+
+### Problème résolu
+
+L'assistant IA répondait incorrectement "Vous consultez le document Module_1.mp3" alors que l'utilisateur était sur la page principale du cours.
+
+**Cause** : Le frontend ne trackait pas `view_case` et les anciennes activités (`view_document`) persistaient.
+
+### Modifications
+
+**Frontend** :
+- `page.tsx` : Track `view_case` au chargement + à la fermeture des autres vues
+- `flashcard-study-panel.tsx` : Track `view_flashcard_study` au montage
+- `flashcard-audio-panel.tsx` : Track `view_flashcard_audio` au montage
+- `types/index.ts` : 3 nouveaux types (`view_flashcard_study`, `view_flashcard_audio`, `view_directory`)
+
+**Backend** :
+- `user_activity_service.py` : Nouveaux types dans enum + labels français
+- `chat.py` : `_VIEW_CHANGE_ACTIONS` tuple pour centraliser les types de changement de vue
+
+### Documentation
+
+Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide pas-à-pas pour ajouter de nouvelles vues.
+
+---
+
+## Session précédente (2026-01-02) - Simplification des flashcards ✅
 
 **Objectif** : Simplifier le système de fiches de révision en supprimant les fonctionnalités inutilisées.
 
