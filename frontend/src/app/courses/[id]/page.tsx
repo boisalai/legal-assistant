@@ -20,11 +20,13 @@ import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import { CreateFlashcardDeckModal } from "@/components/cases/create-flashcard-deck-modal";
 import { FlashcardStudyPanel } from "@/components/cases/flashcard-study-panel";
 import { FlashcardAudioPanel } from "@/components/cases/flashcard-audio-panel";
+import { ModuleDetailsPanel } from "@/components/cases/module-details-panel";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
 import type { FlashcardDeck } from "@/types";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { coursesApi, documentsApi, modulesApi } from "@/lib/api";
+import { trackActivity } from "@/lib/activity-tracker";
 import type { Course, Checklist, Document, Module } from "@/types";
 
 export default function CourseDetailPage() {
@@ -54,6 +56,7 @@ export default function CourseDetailPage() {
   const [createDeckModalOpen, setCreateDeckModalOpen] = useState(false);
   const [studyDeck, setStudyDeck] = useState<FlashcardDeck | null>(null);
   const [audioDeck, setAudioDeck] = useState<FlashcardDeck | null>(null);
+  const [viewModule, setViewModule] = useState<Module | null>(null);
   const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
@@ -93,6 +96,15 @@ export default function CourseDetailPage() {
   useEffect(() => {
     if (courseId) fetchCaseDetails();
   }, [courseId, fetchCaseDetails]);
+
+  // Track view_case activity when course data is loaded
+  useEffect(() => {
+    if (courseData && courseId) {
+      trackActivity(courseId, "view_case", {
+        course_name: courseData.title,
+      });
+    }
+  }, [courseData?.id]); // Only track once when course is loaded
 
   // Poll for updates during analysis
   useEffect(() => {
@@ -185,6 +197,11 @@ export default function CourseDetailPage() {
   const handlePreviewDirectory = (directory: LinkedDirectory) => {
     setPreviewDirectory(directory);
     setPreviewDocument(null); // Close document preview if open
+    // Track directory view activity
+    trackActivity(courseId, "view_directory", {
+      directory_path: directory.basePath,
+      document_count: directory.documents.length,
+    });
   };
 
   const handleClosePreview = () => {
@@ -193,9 +210,21 @@ export default function CourseDetailPage() {
     if (previewDocument) {
       setPreviewDocument(null);
       // Keep previewDirectory as is - if it was set, we return to tree view
+      // If returning to main course view (no directory), track view_case
+      if (!previewDirectory && courseData) {
+        trackActivity(courseId, "view_case", {
+          course_name: courseData.title,
+        });
+      }
     } else {
       // If we're viewing directory tree, close it and return to case details
       setPreviewDirectory(null);
+      // Track return to course view
+      if (courseData) {
+        trackActivity(courseId, "view_case", {
+          course_name: courseData.title,
+        });
+      }
     }
   };
 
@@ -213,6 +242,12 @@ export default function CourseDetailPage() {
 
   const handleCloseStudy = () => {
     setStudyDeck(null);
+    // Track return to course view
+    if (courseData) {
+      trackActivity(courseId, "view_case", {
+        course_name: courseData.title,
+      });
+    }
   };
 
   const handleListenFlashcardAudio = (deck: FlashcardDeck) => {
@@ -224,11 +259,36 @@ export default function CourseDetailPage() {
 
   const handleCloseAudio = () => {
     setAudioDeck(null);
+    // Track return to course view
+    if (courseData) {
+      trackActivity(courseId, "view_case", {
+        course_name: courseData.title,
+      });
+    }
   };
 
   const handleFlashcardsUpdated = async () => {
     // Refresh deck list by incrementing refresh key
     setFlashcardsRefreshKey((prev) => prev + 1);
+  };
+
+  // Module handlers
+  const handleViewModule = (module: Module) => {
+    setViewModule(module);
+    setStudyDeck(null);
+    setAudioDeck(null);
+    setPreviewDocument(null);
+    setPreviewDirectory(null);
+  };
+
+  const handleCloseModule = () => {
+    setViewModule(null);
+    // Track return to course view
+    if (courseData) {
+      trackActivity(courseId, "view_case", {
+        course_name: courseData.title,
+      });
+    }
   };
 
   if (loading) {
@@ -267,9 +327,22 @@ export default function CourseDetailPage() {
         {/* Split View */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <PanelGroup direction="horizontal" className="h-full">
-            {/* Left Panel: Case Details, Document Preview, Directory Tree, Flashcard Study, or Flashcard Audio */}
+            {/* Left Panel: Case Details, Document Preview, Directory Tree, Module View, Flashcard Study, or Flashcard Audio */}
             <Panel defaultSize={60} minSize={30} className="overflow-hidden">
-              {studyDeck ? (
+              {viewModule ? (
+                <ModuleDetailsPanel
+                  module={viewModule}
+                  documents={documents}
+                  courseId={courseId}
+                  onClose={handleCloseModule}
+                  onPreviewDocument={handlePreviewDocument}
+                  onDeleteDocument={handleDeleteDocument}
+                  onDocumentsChange={fetchCaseDetails}
+                  onUploadDocuments={handleUploadDocuments}
+                  onRecordAudio={handleRecordAudio}
+                  onYouTubeImport={handleYouTubeImport}
+                />
+              ) : studyDeck ? (
                 <FlashcardStudyPanel
                   deck={studyDeck}
                   onClose={handleCloseStudy}
@@ -373,6 +446,7 @@ export default function CourseDetailPage() {
                   onCreateDeck={handleCreateDeck}
                   onListenFlashcardAudio={handleListenFlashcardAudio}
                   flashcardsRefreshKey={flashcardsRefreshKey}
+                  onViewModule={handleViewModule}
                 />
               )}
             </Panel>

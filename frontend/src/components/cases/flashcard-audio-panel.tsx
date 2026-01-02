@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Music } from "lucide-react";
 import { flashcardsApi } from "@/lib/api";
+import { trackActivity } from "@/lib/activity-tracker";
 import type { FlashcardDeck } from "@/types";
 
 interface FlashcardAudioPanelProps {
@@ -16,6 +18,14 @@ export function FlashcardAudioPanel({
   courseId,
   onClose,
 }: FlashcardAudioPanelProps) {
+  // Track activity when viewing flashcard audio
+  useEffect(() => {
+    trackActivity(courseId, "view_flashcard_audio", {
+      deck_id: deck.id,
+      deck_name: deck.name,
+    });
+  }, [deck.id, courseId, deck.name]);
+
   const audioUrl = flashcardsApi.getSummaryAudioUrl(deck.id);
 
   // Build a readable file path for display

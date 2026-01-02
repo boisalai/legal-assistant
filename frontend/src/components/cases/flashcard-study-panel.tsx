@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { flashcardsApi } from "@/lib/api";
+import { trackActivity } from "@/lib/activity-tracker";
 import type { FlashcardDeck, StudySession } from "@/types";
 
 interface FlashcardStudyPanelProps {
@@ -37,6 +38,14 @@ export function FlashcardStudyPanel({
   const [playingAudio, setPlayingAudio] = useState<"front" | "back" | null>(null);
   const [isPlayingSummary, setIsPlayingSummary] = useState(false);
   const summaryAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Track activity when viewing flashcard study
+  useEffect(() => {
+    trackActivity(deck.course_id, "view_flashcard_study", {
+      deck_id: deck.id,
+      deck_name: deck.name,
+    });
+  }, [deck.id, deck.course_id, deck.name]);
 
   // Load study session
   useEffect(() => {
