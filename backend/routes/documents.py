@@ -1,12 +1,12 @@
 """
-Routes pour la gestion des documents d'un cours.
+Routes for course document management.
 
 Endpoints:
-- GET /api/courses/{course_id}/documents - Liste des documents
-- POST /api/courses/{course_id}/documents - Upload d'un document
-- GET /api/courses/{course_id}/documents/{doc_id} - Details d'un document
-- DELETE /api/courses/{course_id}/documents/{doc_id} - Supprimer un document
-- GET /api/courses/{course_id}/documents/{doc_id}/download - Telecharger un document
+- GET /api/courses/{course_id}/documents - List documents
+- POST /api/courses/{course_id}/documents - Upload a document
+- GET /api/courses/{course_id}/documents/{doc_id} - Get document details
+- DELETE /api/courses/{course_id}/documents/{doc_id} - Delete a document
+- GET /api/courses/{course_id}/documents/{doc_id}/download - Download a document
 """
 
 import logging
@@ -82,19 +82,19 @@ async def list_documents(
     course_id: str,
     verify_files: bool = True,
     auto_remove_missing: bool = True,
-    auto_discover: bool = False,  # Désactivé par défaut pour éviter les duplicatas
-    include_derived: bool = True,  # Inclure les fichiers dérivés par défaut (filtrage dans le frontend)
+    auto_discover: bool = False,  # Disabled by default to avoid duplicates
+    include_derived: bool = True,  # Include derived files by default (filtering done in frontend)
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Liste les documents d'un cours.
+    List documents for a course.
 
     Args:
-        course_id: ID du cours
-        verify_files: Si True, verifie que les fichiers existent sur le disque
-        auto_remove_missing: Si True, supprime automatiquement les documents dont le fichier n'existe plus
-        auto_discover: Si True, découvre et enregistre automatiquement les fichiers orphelins dans /data/uploads/[id]/
-        include_derived: Si True, inclut les fichiers dérivés (transcriptions, extractions, TTS). Par défaut False.
+        course_id: Course ID
+        verify_files: If True, verify that files exist on disk
+        auto_remove_missing: If True, automatically remove documents whose files no longer exist
+        auto_discover: If True, automatically discover and register orphaned files in /data/uploads/[id]/
+        include_derived: If True, include derived files (transcriptions, extractions, TTS). Default False.
     """
     try:
         # Use document service for main listing logic
@@ -201,18 +201,18 @@ async def upload_document(
     user_id: str = Depends(require_auth)
 ):
     """
-    Upload un document pour un cours.
-    Accepte: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
+    Upload a document for a course.
+    Accepts: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
 
     Args:
-        auto_extract_markdown: Si True, extrait automatiquement le contenu en markdown après l'upload (PDF uniquement)
-        module_id: Si fourni, assigne directement le document à ce module
+        auto_extract_markdown: If True, automatically extract content to markdown after upload (PDF only)
+        module_id: If provided, directly assign the document to this module
     """
     # Validate file type
     if not file.filename or not is_allowed_file(file.filename):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Type de fichier non supporte. Extensions acceptees: {', '.join(ALLOWED_EXTENSIONS.keys())}"
+            detail=f"Unsupported file type. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS.keys())}"
         )
 
     # Read file content
@@ -222,7 +222,7 @@ async def upload_document(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
+            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)} MB"
         )
 
     try:
@@ -243,7 +243,7 @@ async def upload_document(
         if not course_result or len(course_result) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Cours non trouvé: {course_id}"
+                detail=f"Course not found: {course_id}"
             )
 
         # Save file to disk
@@ -310,11 +310,11 @@ async def register_document(
     user_id: str = Depends(require_auth)
 ):
     """
-    Enregistre un document par son chemin de fichier (sans copie).
+    Register a document by its file path (without copying).
 
-    Le fichier reste a son emplacement d'origine sur le disque.
-    L'application stocke uniquement une reference vers ce fichier.
-    Le texte est automatiquement extrait pour permettre l'analyse par l'IA.
+    The file remains at its original location on disk.
+    The application only stores a reference to this file.
+    Text is automatically extracted to enable AI analysis.
     """
     file_path = Path(request.file_path)
 
@@ -322,13 +322,13 @@ async def register_document(
     if not file_path.exists():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Le fichier n'existe pas: {request.file_path}"
+            detail=f"File does not exist: {request.file_path}"
         )
 
     if not file_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Le chemin n'est pas un fichier: {request.file_path}"
+            detail=f"Path is not a file: {request.file_path}"
         )
 
     # Check file type
@@ -336,7 +336,7 @@ async def register_document(
     if not is_allowed_file(filename):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Type de fichier non supporte. Extensions acceptees: {', '.join(ALLOWED_EXTENSIONS.keys())}"
+            detail=f"Unsupported file type. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS.keys())}"
         )
 
     # Check file size
@@ -344,7 +344,7 @@ async def register_document(
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Fichier trop volumineux. Taille max: {MAX_FILE_SIZE // (1024*1024)} MB"
+            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)} MB"
         )
 
     try:
@@ -383,22 +383,22 @@ async def link_file_or_folder(
     user_id: str = Depends(require_auth)
 ):
     """
-    Lie un fichier ou un répertoire sans copie.
+    Link a file or directory without copying.
 
-    - Si le chemin est un fichier : lie ce fichier uniquement
-    - Si le chemin est un répertoire : lie tous les fichiers supportés du répertoire (non-récursif)
+    - If path is a file: link this file only
+    - If path is a directory: link all supported files in the directory (non-recursive)
 
-    Les fichiers sont référencés à leur emplacement d'origine.
-    Un hash SHA-256 et mtime sont stockés pour détecter les modifications.
+    Files are referenced at their original location.
+    A SHA-256 hash and mtime are stored to detect modifications.
 
-    Types supportés : .md, .mdx, .pdf, .txt, .docx
-    Limite : 50 fichiers maximum par répertoire
+    Supported types: .md, .mdx, .pdf, .txt, .docx
+    Limit: 50 files maximum per directory
     """
     # Validate path is not empty
     if not request.path or not request.path.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le chemin ne peut pas être vide"
+            detail="Path cannot be empty"
         )
 
     path = Path(request.path)
@@ -409,7 +409,7 @@ async def link_file_or_folder(
     if not path.exists():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Le chemin n'existe pas : {request.path}"
+            detail=f"Path does not exist: {request.path}"
         )
 
     try:
@@ -433,7 +433,7 @@ async def link_file_or_folder(
             if not is_linkable_file(path.name):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Type de fichier non supporté. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
+                    detail=f"Unsupported file type. Allowed extensions: {', '.join(LINKABLE_EXTENSIONS)}"
                 )
             files_to_link = [path]
 
@@ -444,16 +444,16 @@ async def link_file_or_folder(
             if len(files_to_link) == 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Aucun fichier supporté trouvé dans ce répertoire. Extensions acceptées : {', '.join(LINKABLE_EXTENSIONS)}"
+                    detail=f"No supported files found in this directory. Allowed extensions: {', '.join(LINKABLE_EXTENSIONS)}"
                 )
 
             if len(files_to_link) == MAX_LINKED_FILES:
-                warnings.append(f"Limite de {MAX_LINKED_FILES} fichiers atteinte. Certains fichiers ont été ignorés.")
+                warnings.append(f"Limit of {MAX_LINKED_FILES} files reached. Some files were ignored.")
 
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le chemin n'est ni un fichier ni un répertoire"
+                detail="Path is neither a file nor a directory"
             )
 
         # Link each file
@@ -468,7 +468,7 @@ async def link_file_or_folder(
 
                 # Check file size
                 if file_size > MAX_FILE_SIZE:
-                    warnings.append(f"Fichier ignoré (trop volumineux) : {file_path.name}")
+                    warnings.append(f"File ignored (too large): {file_path.name}")
                     continue
 
                 # Calculate hash and get mtime
@@ -533,12 +533,12 @@ async def link_file_or_folder(
 
             except Exception as e:
                 logger.error(f"Error linking file {file_path}: {e}")
-                warnings.append(f"Erreur lors de la liaison de {file_path.name} : {str(e)}")
+                warnings.append(f"Error linking {file_path.name}: {str(e)}")
 
         if len(linked_documents) == 0:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Aucun fichier n'a pu être lié. Vérifiez les warnings."
+                detail="No files could be linked. Check the warnings."
             )
 
         return LinkPathResponse(
@@ -563,7 +563,7 @@ async def link_file_or_folder(
 # ============================================================================
 
 class DiagnosticResult(BaseModel):
-    """Résultat du diagnostic de cohérence fichiers/base de données."""
+    """Result of file/database consistency diagnostic."""
     total_documents: int
     missing_files: list[dict]
     orphan_records: list[dict]
@@ -576,11 +576,11 @@ async def diagnose_documents(
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Diagnostic de cohérence entre base de données et système de fichiers.
+    Diagnostic of consistency between database and filesystem.
 
-    Identifie:
-    - Les enregistrements en base sans fichier physique (orphelins)
-    - Les fichiers physiques sans enregistrement en base (manquants)
+    Identifies:
+    - Database records without physical files (orphans)
+    - Physical files without database records (missing)
     """
     # Get all documents using document service (without auto-removal)
     doc_service = get_document_service()
@@ -599,7 +599,7 @@ async def diagnose_documents(
             missing_files.append({
                 "id": doc.id,
                 "filename": doc.filename,
-                "reason": "Aucun chemin de fichier enregistré"
+                "reason": "No file path registered"
             })
             continue
 
@@ -608,7 +608,7 @@ async def diagnose_documents(
                 "id": doc.id,
                 "filename": doc.filename,
                 "path": doc.file_path,
-                "reason": "Fichier physique manquant"
+                "reason": "Physical file missing"
             })
         else:
             ok_count += 1
@@ -616,7 +616,7 @@ async def diagnose_documents(
     return DiagnosticResult(
         total_documents=len(documents),
         missing_files=missing_files,
-        orphan_records=missing_files,  # Alias pour clarté
+        orphan_records=missing_files,  # Alias for clarity
         ok_count=ok_count
     )
 
@@ -632,10 +632,10 @@ async def get_derived_documents(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Récupère tous les fichiers dérivés d'un document source.
+    Retrieve all derived files from a source document.
 
-    Retourne les transcriptions, extractions PDF, fichiers TTS, etc.
-    créés à partir du document spécifié.
+    Returns transcriptions, PDF extractions, TTS files, etc.
+    created from the specified document.
     """
     try:
         # Get derived documents using document service
@@ -659,7 +659,7 @@ async def get_document(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Recupere les details d'un document.
+    Retrieve document details.
     """
     try:
         # Use document service
@@ -693,11 +693,11 @@ async def delete_document(
     user_id: str = Depends(require_auth)
 ):
     """
-    Supprime un document.
+    Delete a document.
 
     Args:
-        filename: Optional - nom du fichier à supprimer (utilisé si le document n'est pas en base)
-        file_path: Optional - chemin complet du fichier à supprimer (utilisé si le document n'est pas en base)
+        filename: Optional - filename to delete (used if document is not in database)
+        file_path: Optional - full path of the file to delete (used if document is not in database)
     """
     try:
         # Normalize IDs
@@ -812,11 +812,11 @@ async def download_document(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Telecharge un document ou l'affiche inline.
+    Download a document or display it inline.
 
     Args:
-        inline: Si True, affiche le fichier dans le navigateur (pour iframe/preview)
-                Si False, force le telechargement
+        inline: If True, display the file in the browser (for iframe/preview)
+                If False, force download
     """
     try:
         # Get document using document service
@@ -873,9 +873,9 @@ async def extract_document_text(
     user_id: str = Depends(require_auth)
 ):
     """
-    Extrait le texte d'un document (PDF, Word, texte, markdown).
+    Extract text from a document (PDF, Word, text, markdown).
 
-    Pour les fichiers audio, utilisez l'endpoint /transcribe.
+    For audio files, use the /transcribe endpoint.
     """
     try:
         # Get document using document service
@@ -962,9 +962,9 @@ async def clear_document_text(
     user_id: str = Depends(require_auth)
 ):
     """
-    Efface le texte extrait d'un document.
+    Clear the extracted text from a document.
 
-    Supprime le champ texte_extrait du document dans la base de données.
+    Removes the texte_extrait field from the document in the database.
     """
     try:
         # Verify document exists using document service
@@ -1017,12 +1017,12 @@ async def extract_pdf_to_markdown(
     user_id: str = Depends(require_auth)
 ):
     """
-    Extrait le texte d'un PDF et le formate en markdown avec sections détectées par LLM.
+    Extract text from a PDF and format it as markdown with LLM-detected sections.
 
     Args:
-        force_reextract: Si True, supprime le fichier markdown existant avant de réextraire
+        force_reextract: If True, delete existing markdown file before re-extracting
 
-    Retourne un stream SSE avec les événements de progression:
+    Returns an SSE stream with progress events:
     - progress: {step, message, percentage}
     - step_start: {step}
     - step_complete: {step, success}
@@ -1197,7 +1197,7 @@ async def extract_pdf_to_markdown(
                     # Generate document ID (remove hyphens for SurrealDB compatibility)
                     new_doc_id = uuid.uuid4().hex[:16]
                     doc_record = {
-                        # ❌ NE PAS inclure "id" dans doc_record car CREATE va l'ajouter automatiquement
+                        # ❌ DO NOT include "id" in doc_record as CREATE will add it automatically
                         "course_id": course_id,
                         "nom_fichier": markdown_filename,
                         "type_fichier": "md",
@@ -1214,10 +1214,10 @@ async def extract_pdf_to_markdown(
                         "updated_at": datetime.utcnow().isoformat(),
                     }
 
-                    # Utiliser service.create() avec record_id pour garantir le bon format
+                    # Use service.create() with record_id to ensure correct format
                     await service.create("document", doc_record, record_id=new_doc_id)
 
-                    # Index le document pour la recherche sémantique
+                    # Index the document for semantic search
                     try:
                         from services.document_indexing_service import get_document_indexing_service
 
@@ -1239,7 +1239,7 @@ async def extract_pdf_to_markdown(
                         else:
                             logger.warning(f"Indexing failed: {index_result.get('error', 'Unknown error')}")
                     except Exception as e:
-                        # Ne pas bloquer si l'indexation échoue
+                        # Don't block if indexing fails
                         logger.warning(f"Could not index document: {e}")
 
                     await progress_queue.put({
@@ -1305,9 +1305,9 @@ async def list_tts_voices(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Liste toutes les voix TTS disponibles.
+    List all available TTS voices.
 
-    Retourne la liste des voix supportées pour la synthèse vocale.
+    Returns the list of supported voices for text-to-speech synthesis.
     """
     try:
         from services.tts_service import get_tts_service, EDGE_TTS_AVAILABLE
@@ -1341,10 +1341,10 @@ async def generate_tts(
     user_id: str = Depends(require_auth)
 ):
     """
-    Génère un fichier audio TTS à partir du texte extrait d'un document.
+    Generate a TTS audio file from the extracted text of a document.
 
-    Le fichier audio est généré en MP3 et sauvegardé dans le répertoire du jugement.
-    Retourne l'URL pour télécharger/streamer l'audio.
+    The audio file is generated in MP3 format and saved in the case directory.
+    Returns the URL to download/stream the audio.
     """
     try:
         from services.tts_service import get_tts_service, EDGE_TTS_AVAILABLE
@@ -1441,8 +1441,8 @@ async def generate_tts(
             "user_id": user_id,
             "created_at": now,
             "is_tts": True,
-            "source_document": doc_id,  # Garder pour compatibilité
-            "source_document_id": doc_id,  # Nouveau champ
+            "source_document": doc_id,  # Keep for compatibility
+            "source_document_id": doc_id,  # New field
             "is_derived": False,  # Show in documents list for download
             "derivation_type": "tts",
             "source_type": "tts_audio",

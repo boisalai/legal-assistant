@@ -1,15 +1,15 @@
 """
-Routes pour la gestion des fiches de révision (flashcards).
+Routes for flashcard management.
 
 Endpoints:
-- POST /api/courses/{course_id}/flashcard-decks - Créer un deck
-- GET /api/courses/{course_id}/flashcard-decks - Lister les decks d'un cours
-- GET /api/flashcard-decks/{deck_id} - Détails d'un deck
-- DELETE /api/flashcard-decks/{deck_id} - Supprimer un deck
-- POST /api/flashcard-decks/{deck_id}/generate - Générer les fiches (streaming SSE)
-- GET /api/flashcard-decks/{deck_id}/cards - Lister les fiches d'un deck
-- GET /api/flashcard-decks/{deck_id}/study - Session de révision
-- POST /api/flashcards/{card_id}/tts - Générer audio TTS
+- POST /api/courses/{course_id}/flashcard-decks - Create a deck
+- GET /api/courses/{course_id}/flashcard-decks - List course decks
+- GET /api/flashcard-decks/{deck_id} - Deck details
+- DELETE /api/flashcard-decks/{deck_id} - Delete a deck
+- POST /api/flashcard-decks/{deck_id}/generate - Generate cards (streaming SSE)
+- GET /api/flashcard-decks/{deck_id}/cards - List deck cards
+- GET /api/flashcard-decks/{deck_id}/study - Study session
+- POST /api/flashcards/{card_id}/tts - Generate TTS audio
 """
 
 import json
@@ -46,12 +46,12 @@ router = APIRouter(tags=["Flashcards"])
 # ============================================================================
 
 def generate_hex_id() -> str:
-    """Génère un ID hexadécimal court compatible SurrealDB."""
+    """Generate a short hexadecimal ID compatible with SurrealDB."""
     return uuid.uuid4().hex[:8]
 
 
 async def get_deck_by_id(service, deck_id: str) -> Optional[dict]:
-    """Récupère un deck par son ID."""
+    """Retrieve a deck by its ID."""
     record_id = deck_id.replace("flashcard_deck:", "")
 
     result = await service.query(
@@ -59,15 +59,15 @@ async def get_deck_by_id(service, deck_id: str) -> Optional[dict]:
         {"record_id": record_id}
     )
 
-    # SurrealDB retourne une liste de dicts directement
+    # SurrealDB returns a list of dicts directly
     if result and len(result) > 0:
         return result[0]
     return None
 
 
 async def get_deck_card_count(service, deck_id: str) -> int:
-    """Compte le nombre de fiches d'un deck."""
-    # Normaliser le deck_id (avec préfixe)
+    """Count the number of cards in a deck."""
+    # Normalize deck_id (with prefix)
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
@@ -82,8 +82,8 @@ async def get_deck_card_count(service, deck_id: str) -> int:
 
 
 def format_deck_response(deck: dict, total_cards: int) -> FlashcardDeckResponse:
-    """Formate un deck pour la réponse API."""
-    # Parser source_documents
+    """Format a deck for API response."""
+    # Parse source_documents
     source_docs = []
     raw_sources = deck.get("source_documents", [])
     if raw_sources:
@@ -95,7 +95,7 @@ def format_deck_response(deck: dict, total_cards: int) -> FlashcardDeckResponse:
                     relative_path=src.get("relative_path")
                 ))
 
-    # Formatter dates
+    # Format dates
     created_at = deck.get("created_at", "")
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
@@ -120,7 +120,7 @@ def format_deck_response(deck: dict, total_cards: int) -> FlashcardDeckResponse:
 
 
 def format_card_response(card: dict) -> FlashcardResponse:
-    """Formate une fiche pour la réponse API."""
+    """Format a card for API response."""
     created_at = card.get("created_at", "")
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
@@ -149,17 +149,17 @@ def format_card_response(card: dict) -> FlashcardResponse:
     "/api/courses/{course_id}/flashcard-decks",
     response_model=FlashcardDeckResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Créer un deck de révision"
+    summary="Create a study deck"
 )
 async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
     """
-    Crée un nouveau deck de fiches de révision.
+    Create a new flashcard deck.
 
-    Les fiches seront générées ultérieurement via l'endpoint de génération.
+    Cards will be generated later via the generation endpoint.
     """
     service = get_surreal_service()
 
-    # Vérifier que le cours existe
+    # Verify that the course exists
     course_record_id = course_id.replace("course:", "")
     course_result = await service.query(
         "SELECT id FROM course WHERE id = type::thing('course', $record_id)",
@@ -172,7 +172,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
             detail=f"Cours non trouvé: {course_id}"
         )
 
-    # Récupérer les informations des documents sources
+    # Retrieve source document information
     source_documents = []
     for doc_id in request.source_document_ids:
         doc_record_id = doc_id.replace("document:", "")
@@ -181,7 +181,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
             {"record_id": doc_record_id}
         )
 
-        # SurrealDB retourne une liste de dicts directement
+        # SurrealDB returns a list of dicts directly
         if doc_result and len(doc_result) > 0:
             doc = doc_result[0]
             relative_path = None
@@ -189,7 +189,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
             if linked_source:
                 relative_path = linked_source.get("relative_path")
 
-            # Utiliser le filename ou le relative_path comme nom
+            # Use filename or relative_path as name
             filename = doc.get("filename") or relative_path or doc_id
 
             source_documents.append({
@@ -204,7 +204,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
             detail="Aucun document source valide trouvé"
         )
 
-    # Créer le deck
+    # Create the deck
     deck_id = generate_hex_id()
     now = datetime.now(timezone.utc)
 
@@ -232,7 +232,7 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
     created_deck = result[0]
     total_cards = await get_deck_card_count(service, f"flashcard_deck:{deck_id}")
 
-    logger.info(f"Deck créé: {deck_id} pour cours {course_id} avec {len(source_documents)} documents")
+    logger.info(f"Deck created: {deck_id} for course {course_id} with {len(source_documents)} documents")
 
     return format_deck_response(created_deck, total_cards)
 
@@ -240,13 +240,13 @@ async def create_flashcard_deck(course_id: str, request: FlashcardDeckCreate):
 @router.get(
     "/api/courses/{course_id}/flashcard-decks",
     response_model=FlashcardDeckListResponse,
-    summary="Lister les decks d'un cours"
+    summary="List course decks"
 )
 async def list_flashcard_decks(course_id: str):
-    """Liste tous les decks de révision d'un cours."""
+    """List all study decks for a course."""
     service = get_surreal_service()
 
-    # Normaliser le course_id (avec ou sans préfixe)
+    # Normalize course_id (with or without prefix)
     if not course_id.startswith("course:"):
         course_id = f"course:{course_id}"
 
@@ -272,10 +272,10 @@ async def list_flashcard_decks(course_id: str):
 @router.get(
     "/api/flashcard-decks/{deck_id}",
     response_model=FlashcardDeckResponse,
-    summary="Détails d'un deck"
+    summary="Deck details"
 )
 async def get_flashcard_deck(deck_id: str):
-    """Récupère les détails d'un deck."""
+    """Retrieve deck details."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -292,10 +292,10 @@ async def get_flashcard_deck(deck_id: str):
 @router.delete(
     "/api/flashcard-decks/{deck_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Supprimer un deck"
+    summary="Delete a deck"
 )
 async def delete_flashcard_deck(deck_id: str):
-    """Supprime un deck et toutes ses fiches."""
+    """Delete a deck and all its cards."""
     import os
 
     service = get_surreal_service()
@@ -309,16 +309,16 @@ async def delete_flashcard_deck(deck_id: str):
 
     record_id = deck_id.replace("flashcard_deck:", "")
 
-    # Normaliser le deck_id pour la comparaison string
+    # Normalize deck_id for string comparison
     full_deck_id = f"flashcard_deck:{record_id}"
 
-    # Supprimer toutes les fiches du deck (deck_id est stocké comme string)
+    # Delete all cards from the deck (deck_id is stored as string)
     await service.query(
         "DELETE flashcard WHERE deck_id = $deck_id",
         {"deck_id": full_deck_id}
     )
 
-    # Supprimer le document audio associé s'il existe
+    # Delete associated audio document if it exists
     summary_audio_doc_id = deck.get("summary_audio_document_id")
     if summary_audio_doc_id:
         doc_record_id = summary_audio_doc_id.replace("document:", "")
@@ -326,24 +326,24 @@ async def delete_flashcard_deck(deck_id: str):
             "DELETE document WHERE id = type::thing('document', $doc_id)",
             {"doc_id": doc_record_id}
         )
-        logger.info(f"Document audio supprimé: {summary_audio_doc_id}")
+        logger.info(f"Audio document deleted: {summary_audio_doc_id}")
 
-    # Supprimer le fichier audio du disque s'il existe
+    # Delete audio file from disk if it exists
     summary_audio_path = deck.get("summary_audio_path")
     if summary_audio_path and os.path.exists(summary_audio_path):
         try:
             os.remove(summary_audio_path)
-            logger.info(f"Fichier audio supprimé: {summary_audio_path}")
+            logger.info(f"Audio file deleted: {summary_audio_path}")
         except Exception as e:
-            logger.warning(f"Erreur lors de la suppression du fichier audio: {e}")
+            logger.warning(f"Error deleting audio file: {e}")
 
-    # Supprimer le deck
+    # Delete the deck
     await service.query(
         "DELETE flashcard_deck WHERE id = type::thing('flashcard_deck', $deck_id)",
         {"deck_id": record_id}
     )
 
-    logger.info(f"Deck supprimé: {deck_id}")
+    logger.info(f"Deck deleted: {deck_id}")
     return None
 
 
@@ -354,10 +354,10 @@ async def delete_flashcard_deck(deck_id: str):
 @router.get(
     "/api/flashcard-decks/{deck_id}/cards",
     response_model=FlashcardListResponse,
-    summary="Lister les fiches d'un deck"
+    summary="List deck cards"
 )
 async def list_flashcards(deck_id: str):
-    """Liste toutes les fiches d'un deck."""
+    """List all cards in a deck."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -367,7 +367,7 @@ async def list_flashcards(deck_id: str):
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    # Normaliser le deck_id
+    # Normalize deck_id
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
@@ -387,10 +387,10 @@ async def list_flashcards(deck_id: str):
 @router.get(
     "/api/flashcard-decks/{deck_id}/study",
     response_model=StudySessionResponse,
-    summary="Démarrer une session de révision"
+    summary="Start a study session"
 )
 async def start_study_session(deck_id: str):
-    """Récupère les fiches pour une session de révision."""
+    """Retrieve cards for a study session."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -400,11 +400,11 @@ async def start_study_session(deck_id: str):
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    # Normaliser le deck_id (avec préfixe)
+    # Normalize deck_id (with prefix)
     if not deck_id.startswith("flashcard_deck:"):
         deck_id = f"flashcard_deck:{deck_id}"
 
-    # Récupérer toutes les fiches
+    # Retrieve all cards
     result = await service.query(
         "SELECT * FROM flashcard WHERE deck_id = $deck_id ORDER BY created_at ASC",
         {"deck_id": deck_id}
@@ -430,23 +430,23 @@ async def start_study_session(deck_id: str):
 @router.post(
     "/api/flashcards/{card_id}/tts",
     response_model=TTSResponse,
-    summary="Générer l'audio d'une fiche"
+    summary="Generate card audio"
 )
 async def generate_flashcard_tts(card_id: str, request: TTSRequest):
     """
-    Génère l'audio TTS pour le recto ou verso d'une fiche.
+    Generate TTS audio for the front or back of a card.
 
-    Voix disponibles (canadien-français):
-    - fr-CA-SylvieNeural (femme, défaut)
-    - fr-CA-AntoineNeural (homme)
-    - fr-CA-JeanNeural (homme)
-    - fr-CA-ThierryNeural (homme)
+    Available voices (Canadian French):
+    - fr-CA-SylvieNeural (female, default)
+    - fr-CA-AntoineNeural (male)
+    - fr-CA-JeanNeural (male)
+    - fr-CA-ThierryNeural (male)
     """
     service = get_surreal_service()
 
     record_id = card_id.replace("flashcard:", "")
 
-    # Récupérer la fiche
+    # Retrieve the card
     result = await service.query(
         "SELECT * FROM flashcard WHERE id = type::thing('flashcard', $card_id)",
         {"card_id": record_id}
@@ -460,7 +460,7 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
 
     card = result[0]
 
-    # Récupérer le texte à synthétiser
+    # Get the text to synthesize
     if request.side == "front":
         text = card.get("front", "")
     else:
@@ -472,13 +472,13 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
             detail=f"Pas de texte à synthétiser pour le côté {request.side}"
         )
 
-    # Générer l'audio avec le service TTS
+    # Generate audio with TTS service
     try:
         from services.tts_service import TTSService
 
         tts_service = TTSService()
 
-        # Créer un fichier temporaire pour l'audio
+        # Create a temporary file for audio
         import tempfile
         import os
 
@@ -486,13 +486,13 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
         audio_filename = f"flashcard_{record_id}_{request.side}.mp3"
         audio_path = os.path.join(temp_dir, audio_filename)
 
-        # Générer l'audio
+        # Generate audio
         tts_result = await tts_service.text_to_speech(
             text=text,
             output_path=audio_path,
             voice=request.voice,
             language="fr",
-            clean_markdown=False  # Le texte des flashcards n'est pas du markdown
+            clean_markdown=False  # Flashcard text is not markdown
         )
 
         if not tts_result.success:
@@ -501,8 +501,8 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
                 detail=f"Erreur TTS: {tts_result.error}"
             )
 
-        # Retourner l'URL relative pour le frontend
-        # Note: En production, on pourrait utiliser un CDN ou stockage S3
+        # Return relative URL for frontend
+        # Note: In production, could use a CDN or S3 storage
         return TTSResponse(
             audio_url=f"/api/flashcards/{card_id}/audio/{request.side}",
             voice=request.voice,
@@ -515,7 +515,7 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
             detail="Service TTS non disponible"
         )
     except Exception as e:
-        logger.error(f"Erreur TTS: {e}")
+        logger.error(f"TTS error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la génération audio: {str(e)}"
@@ -524,10 +524,10 @@ async def generate_flashcard_tts(card_id: str, request: TTSRequest):
 
 @router.get(
     "/api/flashcards/{card_id}/audio/{side}",
-    summary="Récupérer l'audio d'une fiche"
+    summary="Get card audio"
 )
 async def get_flashcard_audio(card_id: str, side: str):
-    """Retourne le fichier audio généré pour une fiche."""
+    """Return the generated audio file for a card."""
     import tempfile
     import os
 
@@ -556,10 +556,10 @@ async def get_flashcard_audio(card_id: str, side: str):
 
 @router.get(
     "/api/flashcard-decks/{deck_id}/summary-audio",
-    summary="Récupérer l'audio récapitulatif d'un deck"
+    summary="Get deck summary audio"
 )
 async def get_deck_summary_audio(deck_id: str):
-    """Retourne le fichier audio récapitulatif d'un deck (toutes les Q&R)."""
+    """Return the summary audio file for a deck (all Q&A)."""
     service = get_surreal_service()
 
     deck = await get_deck_by_id(service, deck_id)
@@ -604,18 +604,18 @@ class GenerateRequest(BaseModel):
 
 @router.post(
     "/api/flashcard-decks/{deck_id}/generate",
-    summary="Générer les fiches d'un deck"
+    summary="Generate deck cards"
 )
 async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] = None):
     """
-    Génère les fiches de révision pour un deck existant.
+    Generate flashcards for an existing deck.
 
-    Utilise le LLM pour analyser les documents sources et créer des fiches.
-    Retourne un stream SSE avec la progression.
+    Uses LLM to analyze source documents and create cards.
+    Returns an SSE stream with progress.
     """
     service = get_surreal_service()
 
-    # Récupérer le deck
+    # Retrieve the deck
     deck = await get_deck_by_id(service, deck_id)
     if not deck:
         raise HTTPException(
@@ -623,18 +623,18 @@ async def generate_flashcards(deck_id: str, request: Optional[GenerateRequest] =
             detail=f"Deck non trouvé: {deck_id}"
         )
 
-    # Récupérer les informations du deck
+    # Retrieve deck information
     source_docs = deck.get("source_documents", [])
     card_count = deck.get("card_count_requested", 50)
     generate_audio = deck.get("generate_audio", False)
-    deck_name = deck.get("name", "Révision")
+    deck_name = deck.get("name", "Review")
     course_id = deck.get("course_id", "")
 
-    # Si pas de source_documents, récupérer depuis la création
+    # If no source_documents, retrieve from creation
     if not source_docs:
         logger.warning(f"No source_documents in deck {deck_id}, using fallback")
 
-    # Extraire les doc_ids
+    # Extract doc_ids
     source_doc_ids = []
     if source_docs:
         for doc in source_docs:

@@ -1,18 +1,18 @@
 """
-Routes pour la gestion des modules d'étude.
+Routes for study module management.
 
 Endpoints:
-- POST /api/courses/{course_id}/modules - Créer un module
-- GET /api/courses/{course_id}/modules - Lister les modules d'un cours
-- POST /api/courses/{course_id}/modules/bulk - Créer plusieurs modules
-- GET /api/modules/{module_id} - Détails d'un module
-- PATCH /api/modules/{module_id} - Mettre à jour un module
-- DELETE /api/modules/{module_id} - Supprimer un module
-- GET /api/modules/{module_id}/documents - Documents du module
-- POST /api/modules/{module_id}/documents - Assigner des documents
-- POST /api/modules/{module_id}/documents/upload - Upload direct vers module
-- DELETE /api/modules/{module_id}/documents - Désassigner des documents
-- GET /api/courses/{course_id}/documents/unassigned - Documents sans module
+- POST /api/courses/{course_id}/modules - Create a module
+- GET /api/courses/{course_id}/modules - List course modules
+- POST /api/courses/{course_id}/modules/bulk - Create multiple modules
+- GET /api/modules/{module_id} - Module details
+- PATCH /api/modules/{module_id} - Update a module
+- DELETE /api/modules/{module_id} - Delete a module
+- GET /api/modules/{module_id}/documents - Module documents
+- POST /api/modules/{module_id}/documents - Assign documents
+- POST /api/modules/{module_id}/documents/upload - Direct upload to module
+- DELETE /api/modules/{module_id}/documents - Unassign documents
+- GET /api/courses/{course_id}/documents/unassigned - Unassigned documents
 """
 
 import logging
@@ -52,14 +52,14 @@ router = APIRouter(tags=["Modules"])
     "/api/courses/{course_id}/modules",
     response_model=ModuleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Créer un module"
+    summary="Create a module"
 )
 async def create_module(course_id: str, request: ModuleCreate):
     """
-    Crée un nouveau module pour un cours.
+    Create a new module for a course.
 
-    Un module permet de grouper des documents par thème/chapitre
-    et de suivre la progression d'apprentissage.
+    A module allows grouping documents by theme/chapter
+    and tracking learning progress.
     """
     service = get_module_service()
 
@@ -72,7 +72,7 @@ async def create_module(course_id: str, request: ModuleCreate):
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Erreur création module: {e}")
+        logger.error(f"Error creating module: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la création du module: {str(e)}"
@@ -82,10 +82,10 @@ async def create_module(course_id: str, request: ModuleCreate):
 @router.get(
     "/api/courses/{course_id}/modules",
     response_model=ModuleListResponse,
-    summary="Lister les modules d'un cours"
+    summary="List course modules"
 )
 async def list_modules(course_id: str):
-    """Liste tous les modules d'un cours, ordonnés par order_index."""
+    """List all modules for a course, ordered by order_index."""
     service = get_module_service()
 
     modules, total = await service.list_modules(course_id)
@@ -97,13 +97,13 @@ async def list_modules(course_id: str):
     "/api/courses/{course_id}/modules/bulk",
     response_model=ModuleBulkCreateResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Créer plusieurs modules"
+    summary="Create multiple modules"
 )
 async def bulk_create_modules(course_id: str, request: ModuleBulkCreateRequest):
     """
-    Crée plusieurs modules en une seule requête.
+    Create multiple modules in a single request.
 
-    Utile pour configurer rapidement la structure d'un cours.
+    Useful for quickly setting up a course structure.
     """
     service = get_module_service()
 
@@ -118,7 +118,7 @@ async def bulk_create_modules(course_id: str, request: ModuleBulkCreateRequest):
             module = await service.create_module(course_id, module_data)
             created.append(module)
         except Exception as e:
-            logger.error(f"Erreur création module {item.name}: {e}")
+            logger.error(f"Error creating module {item.name}: {e}")
 
     return ModuleBulkCreateResponse(
         created_count=len(created),
@@ -128,13 +128,13 @@ async def bulk_create_modules(course_id: str, request: ModuleBulkCreateRequest):
 
 @router.get(
     "/api/courses/{course_id}/documents/unassigned",
-    summary="Documents sans module"
+    summary="Unassigned documents"
 )
 async def get_unassigned_documents(course_id: str):
     """
-    Récupère les documents du cours qui ne sont assignés à aucun module.
+    Retrieve course documents that are not assigned to any module.
 
-    Utile pour identifier les documents à organiser.
+    Useful for identifying documents to organize.
     """
     service = get_module_service()
 
@@ -153,10 +153,10 @@ async def get_unassigned_documents(course_id: str):
 @router.get(
     "/api/modules/{module_id}",
     response_model=ModuleResponse,
-    summary="Détails d'un module"
+    summary="Module details"
 )
 async def get_module(module_id: str):
-    """Récupère les détails d'un module."""
+    """Retrieve module details."""
     service = get_module_service()
 
     module = await service.get_module(module_id)
@@ -172,10 +172,10 @@ async def get_module(module_id: str):
 @router.patch(
     "/api/modules/{module_id}",
     response_model=ModuleResponse,
-    summary="Mettre à jour un module"
+    summary="Update a module"
 )
 async def update_module(module_id: str, request: ModuleUpdate):
-    """Met à jour les propriétés d'un module."""
+    """Update module properties."""
     service = get_module_service()
 
     module = await service.update_module(module_id, request)
@@ -191,13 +191,13 @@ async def update_module(module_id: str, request: ModuleUpdate):
 @router.delete(
     "/api/modules/{module_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Supprimer un module"
+    summary="Delete a module"
 )
 async def delete_module(module_id: str):
     """
-    Supprime un module.
+    Delete a module.
 
-    Les documents assignés ne sont pas supprimés, ils sont simplement désassignés.
+    Assigned documents are not deleted, they are simply unassigned.
     """
     service = get_module_service()
 
@@ -217,13 +217,13 @@ async def delete_module(module_id: str):
 
 @router.get(
     "/api/modules/{module_id}/documents",
-    summary="Documents du module"
+    summary="Module documents"
 )
 async def get_module_documents(module_id: str):
-    """Récupère tous les documents assignés à un module."""
+    """Retrieve all documents assigned to a module."""
     service = get_module_service()
 
-    # Vérifier que le module existe
+    # Verify module exists
     module = await service.get_module(module_id)
     if not module:
         raise HTTPException(
@@ -243,14 +243,14 @@ async def get_module_documents(module_id: str):
 @router.post(
     "/api/modules/{module_id}/documents",
     response_model=AssignDocumentsResponse,
-    summary="Assigner des documents"
+    summary="Assign documents"
 )
 async def assign_documents(module_id: str, request: AssignDocumentsRequest):
     """
-    Assigne des documents à un module.
+    Assign documents to a module.
 
-    Les documents seront déplacés de leur module actuel (s'il y en a un)
-    vers ce module.
+    Documents will be moved from their current module (if any)
+    to this module.
     """
     service = get_module_service()
 
@@ -270,13 +270,13 @@ async def assign_documents(module_id: str, request: AssignDocumentsRequest):
 
 @router.delete(
     "/api/modules/{module_id}/documents",
-    summary="Désassigner des documents"
+    summary="Unassign documents"
 )
 async def unassign_documents(module_id: str, request: AssignDocumentsRequest):
     """
-    Retire des documents d'un module.
+    Remove documents from a module.
 
-    Les documents ne seront plus associés à aucun module.
+    Documents will no longer be associated with any module.
     """
     service = get_module_service()
 
@@ -293,7 +293,7 @@ async def unassign_documents(module_id: str, request: AssignDocumentsRequest):
     "/api/modules/{module_id}/documents/upload",
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload direct vers un module"
+    summary="Direct upload to module"
 )
 async def upload_document_to_module(
     module_id: str,
@@ -302,19 +302,19 @@ async def upload_document_to_module(
     user_id: str = Depends(require_auth)
 ):
     """
-    Upload un document directement vers un module.
+    Upload a document directly to a module.
 
-    Le document est créé et automatiquement assigné au module spécifié.
-    Accepte: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
+    The document is created and automatically assigned to the specified module.
+    Accepts: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
 
     Args:
-        module_id: ID du module cible
-        file: Fichier à uploader
-        auto_extract_markdown: Si True, extrait automatiquement le contenu en markdown (PDF uniquement)
+        module_id: Target module ID
+        file: File to upload
+        auto_extract_markdown: If True, automatically extract content to markdown (PDF only)
     """
     module_service = get_module_service()
 
-    # Vérifier que le module existe et récupérer son course_id
+    # Verify module exists and get its course_id
     module = await module_service.get_module(module_id)
     if not module:
         raise HTTPException(

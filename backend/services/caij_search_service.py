@@ -1,7 +1,7 @@
 """
-Service de recherche CAIJ (Centre d'accès à l'information juridique du Québec)
+CAIJ Search Service (Centre d'accès à l'information juridique du Québec)
 
-Implémentation basée sur Playwright pour scraping des résultats de recherche.
+Playwright-based implementation for scraping search results.
 """
 
 import asyncio
@@ -16,84 +16,84 @@ from config.settings import settings
 
 
 class RateLimiter:
-    """Rate limiter simple pour respecter les serveurs CAIJ."""
+    """Simple rate limiter to respect CAIJ servers."""
 
     def __init__(self, max_requests: int = 10, time_window_seconds: int = 60):
         """
-        Initialiser le rate limiter.
+        Initialize the rate limiter.
 
         Args:
-            max_requests: Nombre maximum de requêtes
-            time_window_seconds: Fenêtre de temps en secondes
+            max_requests: Maximum number of requests
+            time_window_seconds: Time window in seconds
         """
         self.max_requests = max_requests
         self.time_window = time_window_seconds
         self.requests = []
 
     async def wait_if_needed(self):
-        """Attendre si la limite de requêtes est atteinte."""
+        """Wait if the request limit is reached."""
         now = time.time()
         window_start = now - self.time_window
 
-        # Nettoyer les anciennes requêtes
+        # Clean old requests
         self.requests = [req_time for req_time in self.requests if req_time > window_start]
 
-        # Si limite atteinte, attendre
+        # If limit reached, wait
         if len(self.requests) >= self.max_requests:
-            sleep_time = self.requests[0] - window_start + 1  # +1 pour marge
-            print(f"⏳ Rate limit atteint, pause de {sleep_time:.1f}s...")
+            sleep_time = self.requests[0] - window_start + 1  # +1 for margin
+            print(f"⏳ Rate limit reached, pausing for {sleep_time:.1f}s...")
             await asyncio.sleep(sleep_time)
 
-            # Re-nettoyer après l'attente
+            # Re-clean after waiting
             now = time.time()
             window_start = now - self.time_window
             self.requests = [req_time for req_time in self.requests if req_time > window_start]
 
-        # Enregistrer cette requête
+        # Record this request
         self.requests.append(now)
 
 
 class CAIJSearchService:
-    """Service de recherche sur CAIJ avec Playwright."""
+    """CAIJ search service with Playwright."""
 
     def __init__(self, credentials: Optional[CAIJCredentials] = None, headless: bool = True):
         """
-        Initialiser le service CAIJ.
+        Initialize the CAIJ service.
 
         Args:
-            credentials: Credentials CAIJ (email/password)
-            headless: Exécuter le navigateur en mode headless
+            credentials: CAIJ credentials (email/password)
+            headless: Run browser in headless mode
         """
-        # Credentials depuis env si non fournis
+        # Get credentials from env if not provided
         if credentials is None:
             email = os.getenv("CAIJ_EMAIL")
             password = os.getenv("CAIJ_PASSWORD")
             if not email or not password:
                 raise ValueError(
-                    "CAIJ credentials manquants! "
-                    "Définir CAIJ_EMAIL et CAIJ_PASSWORD dans .env ou passer credentials en paramètre"
+                    "Missing CAIJ credentials! "
+                    "Set CAIJ_EMAIL and CAIJ_PASSWORD in .env or pass credentials as parameter"
                 )
             credentials = CAIJCredentials(email=email, password=password)
 
         self.credentials = credentials
         self.headless = headless
 
-        # Session Playwright
+        # Playwright session
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self.authenticated = False
 
-        # Rate limiting (10 req/min par défaut)
+        # Rate limiting (10 req/min by default)
         self.rate_limiter = RateLimiter(max_requests=10, time_window_seconds=60)
 
     async def initialize(self):
-        """Initialiser la session Playwright et le navigateur."""
+        """Initialize the Playwright session and browser."""
         if self.browser is not None:
-            return  # Déjà initialisé
+            return  # Already initialized
 
-        print("🚀 Initialisation de la session CAIJ...")
+        print("🚀 Initializing CAIJ session...")
 
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(
@@ -109,10 +109,10 @@ class CAIJSearchService:
         )
 
         self.page = await self.context.new_page()
-        print("✅ Session initialisée")
+        print("✅ Session initialized")
 
     async def close(self):
-        """Fermer la session Playwright."""
+        """Close the Playwright session."""
         if self.browser:
             await self.browser.close()
             self.browser = None
@@ -124,24 +124,24 @@ class CAIJSearchService:
             await self.playwright.stop()
             self.playwright = None
 
-        print("🔚 Session CAIJ fermée")
+        print("🔚 CAIJ session closed")
 
     async def authenticate(self):
-        """Authentifier sur CAIJ."""
+        """Authenticate on CAIJ."""
         if self.authenticated:
-            return  # Déjà authentifié
+            return  # Already authenticated
 
         if not self.page:
             await self.initialize()
 
-        print("🔐 Authentification CAIJ...")
+        print("🔐 CAIJ authentication...")
 
         try:
-            # Naviguer vers page de connexion
+            # Navigate to login page
             await self.page.goto("https://app.caij.qc.ca", timeout=30000)
             await self.page.wait_for_load_state("networkidle")
 
-            # Étape 1: Email
+            # Step 1: Email
             email_input = await self.page.wait_for_selector("#identifier", timeout=10000)
             await email_input.fill(self.credentials.email)
 
@@ -149,65 +149,65 @@ class CAIJSearchService:
             await continue_button.click()
             await self.page.wait_for_timeout(2000)
 
-            # Étape 2: Mot de passe
+            # Step 2: Password
             password_input = await self.page.wait_for_selector('input[type="password"]', timeout=10000)
             await password_input.fill(self.credentials.password)
             await password_input.press("Enter")
 
-            # Attendre navigation
+            # Wait for navigation
             await self.page.wait_for_url(
                 lambda url: "connexion" not in url.lower() and "login" not in url.lower(),
                 timeout=15000
             )
             await self.page.wait_for_load_state("networkidle", timeout=15000)
 
-            # Fermer popup CGU si présent
+            # Close TOS popup if present
             try:
                 close_button = await self.page.wait_for_selector('button[class*="close"]', timeout=3000)
                 await close_button.click()
                 await self.page.wait_for_timeout(1000)
             except PlaywrightTimeoutError:
-                pass  # Pas de popup
+                pass  # No popup
 
             self.authenticated = True
-            print("✅ Authentification réussie")
+            print("✅ Authentication successful")
 
         except Exception as e:
-            print(f"❌ Échec authentification: {e}")
-            # Screenshot d'erreur
+            print(f"❌ Authentication failed: {e}")
+            # Error screenshot
             if self.page:
                 await self.page.screenshot(path="caij_auth_error.png")
             raise
 
     async def search(self, request: CAIJSearchRequest) -> CAIJSearchResponse:
         """
-        Effectuer une recherche sur CAIJ.
+        Perform a search on CAIJ.
 
         Args:
-            request: Requête de recherche
+            request: Search request
 
         Returns:
-            Réponse avec résultats
+            Response with results
         """
         start_time = time.time()
 
-        # S'assurer d'être authentifié
+        # Ensure authenticated
         if not self.authenticated:
             await self.authenticate()
 
         # Rate limiting
         await self.rate_limiter.wait_if_needed()
 
-        print(f"🔎 Recherche CAIJ: '{request.query}' (max {request.max_results} résultats)")
+        print(f"🔎 CAIJ search: '{request.query}' (max {request.max_results} results)")
 
         try:
-            # Toujours retourner à la page d'accueil pour réinitialiser le champ de recherche
-            # Cela évite les problèmes lors de recherches multiples
+            # Always return to home page to reset search field
+            # This avoids issues with multiple searches
             await self.page.goto("https://app.caij.qc.ca/fr", timeout=30000)
             await self.page.wait_for_load_state("networkidle", timeout=20000)
             await self.page.wait_for_timeout(1500)
 
-            # Fermer popup si présent
+            # Close popup if present
             try:
                 close_button = await self.page.wait_for_selector('button[class*="close"]', timeout=2000)
                 await close_button.click()
@@ -215,19 +215,19 @@ class CAIJSearchService:
             except:
                 pass
 
-            # Chercher le champ de recherche (timeout augmenté pour recherches multiples)
+            # Find search field (increased timeout for multiple searches)
             search_input = self.page.get_by_placeholder("Rechercher dans tout le contenu")
             await search_input.wait_for(timeout=20000)
 
-            # Remplir et soumettre
+            # Fill and submit
             await search_input.fill(request.query)
             await search_input.press("Enter")
 
-            # Attendre les résultats (timeout augmenté pour recherches multiples)
+            # Wait for results (increased timeout for multiple searches)
             await self.page.wait_for_timeout(3000)
             await self.page.wait_for_selector('div[class*="result"]', timeout=20000)
 
-            # Extraire les résultats
+            # Extract results
             results = await self._extract_results(request.max_results)
 
             execution_time = time.time() - start_time
@@ -240,33 +240,33 @@ class CAIJSearchService:
                 execution_time_seconds=round(execution_time, 2)
             )
 
-            print(f"✅ {len(results)} résultats extraits en {execution_time:.2f}s")
+            print(f"✅ {len(results)} results extracted in {execution_time:.2f}s")
 
             return response
 
         except Exception as e:
-            print(f"❌ Erreur lors de la recherche: {e}")
-            # Screenshot d'erreur
+            print(f"❌ Search error: {e}")
+            # Error screenshot
             if self.page:
                 await self.page.screenshot(path="caij_search_error.png")
             raise
 
     async def _extract_results(self, max_results: int) -> List[CAIJResult]:
         """
-        Extraire les résultats de recherche de la page actuelle.
+        Extract search results from the current page.
 
         Args:
-            max_results: Nombre maximum de résultats à extraire
+            max_results: Maximum number of results to extract
 
         Returns:
-            Liste des résultats
+            List of results
         """
         result_elements = await self.page.query_selector_all('div[class*="result"]')
 
         results = []
         for i, element in enumerate(result_elements[:max_results]):
             try:
-                # Titre
+                # Title
                 title = "N/A"
                 title_el = await element.query_selector('.section-title')
                 if not title_el:
@@ -284,7 +284,7 @@ class CAIJSearchService:
                     elif href:
                         url = href
 
-                # Type de document
+                # Document type
                 doc_type = "N/A"
                 type_el = await element.query_selector('.doc-type')
                 if type_el:
@@ -302,28 +302,28 @@ class CAIJSearchService:
                 if breadcrumb_el:
                     source = await breadcrumb_el.text_content()
 
-                # Extrait
+                # Excerpt
                 excerpt = "N/A"
                 excerpt_el = await element.query_selector('.section-excerpt, .excerpt')
                 if excerpt_el:
                     excerpt_text = await excerpt_el.text_content()
-                    excerpt = excerpt_text.strip()[:500]  # Limiter à 500 chars
+                    excerpt = excerpt_text.strip()[:500]  # Limit to 500 chars
 
-                # Nettoyer les données
+                # Clean data
                 clean_title = title.strip() if title != "N/A" else "N/A"
                 clean_url = url if url else "N/A"
                 clean_doc_type = doc_type.strip() if doc_type != "N/A" else "N/A"
                 clean_source = source.strip() if source != "N/A" else "N/A"
                 clean_date = date.strip() if date != "N/A" else "N/A"
 
-                # Déduire la rubrique
+                # Infer category
                 rubrique = infer_rubrique(
                     document_type=clean_doc_type,
                     source=clean_source,
                     url=clean_url
                 )
 
-                # Créer le résultat
+                # Create result
                 result = CAIJResult(
                     title=clean_title,
                     url=clean_url,
@@ -337,16 +337,16 @@ class CAIJSearchService:
                 results.append(result)
 
             except Exception as e:
-                print(f"  ⚠️  Erreur extraction résultat #{i+1}: {e}")
+                print(f"  ⚠️  Error extracting result #{i+1}: {e}")
                 continue
 
         return results
 
     async def __aenter__(self):
-        """Support du context manager asynchrone."""
+        """Support async context manager."""
         await self.initialize()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Fermer automatiquement à la sortie du context manager."""
+        """Automatically close on context manager exit."""
         await self.close()

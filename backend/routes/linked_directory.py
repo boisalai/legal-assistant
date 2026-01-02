@@ -1,10 +1,10 @@
 """
-Routes pour la liaison de répertoires locaux dans Legal Assistant.
+Routes for linking local directories in Legal Assistant.
 
 Endpoints:
-- POST /api/linked-directory/scan - Scanne un répertoire et retourne les statistiques
-- POST /api/courses/{course_id}/link-directory - Lie et indexe les fichiers d'un répertoire
-- POST /api/linked-directory/{link_id}/refresh - Rafraîchit les fichiers d'un répertoire lié
+- POST /api/linked-directory/scan - Scan a directory and return statistics
+- POST /api/courses/{course_id}/link-directory - Link and index files from a directory
+- POST /api/linked-directory/{link_id}/refresh - Refresh files from a linked directory
 """
 
 import logging
@@ -46,20 +46,20 @@ router = APIRouter(prefix="/api", tags=["Linked Directory"])
 # ============================================================================
 
 class ScanDirectoryRequest(BaseModel):
-    """Requête pour scanner un répertoire."""
+    """Request to scan a directory."""
     directory_path: str
 
 
 class LinkDirectoryRequest(BaseModel):
-    """Requête pour lier un répertoire."""
+    """Request to link a directory."""
     directory_path: str
-    file_paths: Optional[List[str]] = None  # Si None, importe tous les fichiers trouvés
-    auto_extract_markdown: bool = False  # Si True, extrait automatiquement PDF/DOCX/Audio en markdown
-    module_id: Optional[str] = None  # Si fourni, assigne tous les fichiers à ce module
+    file_paths: Optional[List[str]] = None  # If None, import all found files
+    auto_extract_markdown: bool = False  # If True, automatically extract PDF/DOCX/Audio to markdown
+    module_id: Optional[str] = None  # If provided, assign all files to this module
 
 
 class LinkedDirectoryMetadata(BaseModel):
-    """Métadonnées d'un répertoire lié."""
+    """Metadata for a linked directory."""
     base_path: str
     linked_at: str
     total_files: int
@@ -84,25 +84,25 @@ async def create_markdown_from_file(
     module_id: Optional[str] = None
 ) -> Optional[tuple[str, str]]:
     """
-    Extrait un fichier (PDF, Word, Audio) et crée un fichier Markdown dérivé.
+    Extract a file (PDF, Word, Audio) and create a derived Markdown file.
 
     Args:
-        service: Instance de SurrealService
-        source_file: Chemin du fichier source
-        course_id: ID du cours
-        user_id: ID de l'utilisateur
-        link_id: ID de liaison du répertoire
-        linked_source_metadata: Métadonnées de la source liée
+        service: SurrealService instance
+        source_file: Path to the source file
+        course_id: Course ID
+        user_id: User ID
+        link_id: Directory link ID
+        linked_source_metadata: Linked source metadata
 
     Returns:
-        Tuple (document_id, texte_extrait) ou None si l'extraction a échoué
+        Tuple (document_id, extracted_text) or None if extraction failed
     """
     from services.document_extraction_service import get_extraction_service
 
     extraction_service = get_extraction_service()
     extension = source_file.suffix.lower()
 
-    # Extraire le contenu
+    # Extract content
     try:
         extraction_result = await extraction_service.extract(
             file_path=source_file,
@@ -113,24 +113,24 @@ async def create_markdown_from_file(
             logger.warning(f"Extraction failed for {source_file.name}: {extraction_result.error}")
             return None
 
-        # Créer le fichier markdown dans le même répertoire que le fichier source
+        # Create markdown file in same directory as source file
         markdown_filename = source_file.stem + ".md"
         markdown_path = source_file.parent / markdown_filename
 
-        # Écrire le fichier markdown
+        # Write markdown file
         with open(markdown_path, "w", encoding="utf-8") as f:
             f.write(extraction_result.text)
 
-        # Créer l'enregistrement dans SurrealDB
+        # Create record in SurrealDB
         now = datetime.utcnow().isoformat()
         doc_id = str(uuid.uuid4())[:8]
 
-        # Déterminer le type de dérivation
+        # Determine derivation type
         derivation_type = "pdf_extraction" if extension == ".pdf" else \
                          "word_extraction" if extension in [".doc", ".docx"] else \
                          "audio_transcription"
 
-        # Créer les métadonnées de liaison pour le fichier markdown
+        # Create link metadata for markdown file
         md_linked_source = linked_source_metadata.copy()
         md_linked_source["absolute_path"] = str(markdown_path)
         md_linked_source["relative_path"] = str(Path(linked_source_metadata["relative_path"]).parent / markdown_filename)
@@ -157,7 +157,7 @@ async def create_markdown_from_file(
             "is_transcription": extraction_result.is_transcription,
         }
 
-        # Ajouter module_id si spécifié
+        # Add module_id if specified
         if module_id:
             document_data["module_id"] = module_id
 
@@ -181,9 +181,9 @@ async def scan_directory_endpoint(
     user_id: Optional[str] = Depends(get_current_user_id)
 ):
     """
-    Scanne un répertoire et retourne les statistiques des fichiers supportés.
+    Scan a directory and return statistics of supported files.
 
-    Fichiers supportés : .md, .mdx, .pdf, .txt, .docx, .doc
+    Supported files: .md, .mdx, .pdf, .txt, .docx, .doc
     """
     try:
         result = scan_directory(request.directory_path)
@@ -194,7 +194,7 @@ async def scan_directory_endpoint(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Erreur lors du scan du répertoire: {e}")
+        logger.error(f"Error scanning directory: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -208,28 +208,28 @@ async def link_directory_endpoint(
     user_id: str = Depends(require_auth)
 ):
     """
-    Lie un répertoire à un cours et indexe tous les fichiers.
+    Link a directory to a course and index all files.
 
-    Utilise Server-Sent Events (SSE) pour envoyer la progression en temps réel.
+    Uses Server-Sent Events (SSE) to send real-time progress.
 
     Events:
     - progress: {"indexed": 5, "total": 32, "current_file": "contrat.pdf"}
     - complete: {"success": true, "total_indexed": 32}
-    - error: {"error": "message d'erreur"}
+    - error: {"error": "error message"}
     """
     try:
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du cours
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
-        # Scanner le répertoire
+        # Scan the directory
         scan_result = scan_directory(request.directory_path)
 
-        # Déterminer les fichiers à indexer
+        # Determine files to index
         files_to_index = scan_result.files
         if request.file_paths:
             # Filtrer uniquement les fichiers sélectionnés
@@ -277,7 +277,7 @@ async def link_directory_endpoint(
                         # Générer un ID unique pour le document
                         doc_id = str(uuid.uuid4())[:8]
 
-                        # Extraire le contenu
+                        # Extract content
                         content = extract_text_from_file(source_file)
 
                         # Calculer le hash
@@ -322,7 +322,7 @@ async def link_directory_endpoint(
                             "indexed": False
                         }
 
-                        # Ajouter module_id si spécifié
+                        # Add module_id if specified
                         if target_module_id:
                             document_data["module_id"] = target_module_id
 
@@ -368,7 +368,7 @@ async def link_directory_endpoint(
                                         {"indexed": True}
                                     )
                             except Exception as e:
-                                logger.error(f"Erreur lors de l'indexation du document:{doc_id_to_index}: {e}")
+                                logger.error(f"Error indexing document:{doc_id_to_index}: {e}")
 
                         indexed += 1
 
@@ -382,7 +382,7 @@ async def link_directory_endpoint(
                         yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
 
                     except Exception as e:
-                        logger.error(f"Erreur lors du traitement du fichier {file_info.absolute_path}: {e}")
+                        logger.error(f"Error processing file {file_info.absolute_path}: {e}")
                         continue
 
                 # Envoyer le message de complétion
@@ -394,7 +394,7 @@ async def link_directory_endpoint(
                 yield f"event: complete\ndata: {json.dumps(complete_data)}\n\n"
 
             except Exception as e:
-                logger.error(f"Erreur lors de la liaison du répertoire: {e}")
+                logger.error(f"Error linking directory: {e}")
                 error_data = {"error": str(e)}
                 yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
 
@@ -413,7 +413,7 @@ async def link_directory_endpoint(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Erreur lors de la liaison du répertoire: {e}")
+        logger.error(f"Error linking directory: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -426,12 +426,12 @@ async def sync_linked_directories_endpoint(
     user_id: str = Depends(require_auth)
 ):
     """
-    Synchronise tous les répertoires liés d'un cours.
+    Synchronize all linked directories for a course.
 
-    Pour chaque répertoire lié:
-    - Détecte les nouveaux fichiers (ajoute et indexe)
-    - Détecte les fichiers modifiés (réindexe)
-    - Détecte les fichiers supprimés (retire de la BD)
+    For each linked directory:
+    - Detect new files (add and index)
+    - Detect modified files (reindex)
+    - Detect deleted files (remove from DB)
 
     Returns:
         {
@@ -446,7 +446,7 @@ async def sync_linked_directories_endpoint(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du cours
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -521,7 +521,7 @@ async def sync_linked_directories_endpoint(
                     doc_id = doc["id"]
                     await service.delete(doc_id)
                     total_removed += 1
-                    logger.info(f"Document {doc_id} supprimé (fichier absent)")
+                    logger.info(f"Document {doc_id} deleted (file missing)")
 
             # 2. Détecter les nouveaux fichiers et fichiers modifiés
             for file_path, file_info in scanned_files.items():
@@ -590,7 +590,7 @@ async def sync_linked_directories_endpoint(
                                 logger.error(f"Erreur lors de l'indexation du document:{doc_id}: {e}")
 
                         total_added += 1
-                        logger.info(f"Nouveau fichier ajouté: {file_path}")
+                        logger.info(f"New file added: {file_path}")
 
                     except Exception as e:
                         logger.error(f"Erreur lors de l'ajout de {file_path}: {e}")
@@ -646,7 +646,7 @@ async def sync_linked_directories_endpoint(
                                     logger.error(f"Erreur lors de la réindexation de {doc_id}: {e}")
 
                             total_updated += 1
-                            logger.info(f"Fichier mis à jour: {file_path}")
+                            logger.info(f"File updated: {file_path}")
 
                         except Exception as e:
                             logger.error(f"Erreur lors de la mise à jour de {file_path}: {e}")
@@ -664,7 +664,7 @@ async def sync_linked_directories_endpoint(
         }
 
     except Exception as e:
-        logger.error(f"Erreur lors de la synchronisation des répertoires liés: {e}")
+        logger.error(f"Error synchronizing linked directories: {e}")
         logger.error(f"Traceback complet:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -678,7 +678,7 @@ async def reindex_unindexed_documents_endpoint(
     user_id: str = Depends(require_auth)
 ):
     """
-    Réindexe tous les documents non-indexés d'un cours.
+    Reindex all unindexed documents for a course.
 
     Returns:
         {
@@ -692,7 +692,7 @@ async def reindex_unindexed_documents_endpoint(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du cours
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
@@ -752,7 +752,7 @@ async def reindex_unindexed_documents_endpoint(
         }
 
     except Exception as e:
-        logger.error(f"Erreur lors de la réindexation: {e}")
+        logger.error(f"Error during reindexing: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -766,24 +766,24 @@ async def cancel_link_directory(
     user_id: str = Depends(require_auth)
 ):
     """
-    Annule une liaison de répertoire en cours et nettoie tous les documents associés.
+    Cancel an ongoing directory link and clean up all associated documents.
 
-    Supprime :
-    - Tous les documents avec le link_id spécifié
-    - Tous les embeddings associés à ces documents
-    - Les fichiers markdown dérivés créés sur le disque (optionnel)
+    Deletes:
+    - All documents with the specified link_id
+    - All embeddings associated with these documents
+    - Derived markdown files created on disk (optional)
 
     Args:
-        course_id: ID du cours
-        link_id: ID de la liaison à annuler
-        user_id: ID de l'utilisateur (auth)
+        course_id: Course ID
+        link_id: Link ID to cancel
+        user_id: User ID (auth)
 
     Returns:
         {
             "success": true,
             "documents_deleted": 10,
             "embeddings_deleted": 150,
-            "message": "Liaison annulée avec succès"
+            "message": "Link cancelled successfully"
         }
     """
     try:
@@ -791,11 +791,11 @@ async def cancel_link_directory(
         if not service.db:
             await service.connect()
 
-        # Normaliser l'ID du cours
+        # Normalize course ID
         if not course_id.startswith("course:"):
             course_id = f"course:{course_id}"
 
-        logger.info(f"Annulation de la liaison {link_id} pour le cours {course_id}")
+        logger.info(f"Cancelling link {link_id} for course {course_id}")
 
         # Récupérer tous les documents avec ce link_id
         query = """
@@ -838,7 +838,7 @@ async def cancel_link_directory(
                     try:
                         Path(file_path).unlink()
                         markdown_files_deleted.append(file_path)
-                        logger.info(f"Supprimé le fichier markdown dérivé: {file_path}")
+                        logger.info(f"Deleted derived markdown file: {file_path}")
                     except Exception as e:
                         logger.warning(f"Impossible de supprimer le fichier {file_path}: {e}")
 
@@ -846,7 +846,7 @@ async def cancel_link_directory(
             await service.delete(doc_id)
             documents_deleted += 1
 
-        logger.info(f"Liaison {link_id} annulée: {documents_deleted} documents et {embeddings_deleted} embeddings supprimés")
+        logger.info(f"Link {link_id} cancelled: {documents_deleted} documents and {embeddings_deleted} embeddings deleted")
 
         return {
             "success": True,
@@ -857,7 +857,7 @@ async def cancel_link_directory(
         }
 
     except Exception as e:
-        logger.error(f"Erreur lors de l'annulation de la liaison: {e}")
+        logger.error(f"Error cancelling link: {e}")
         logger.error(f"Traceback complet:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

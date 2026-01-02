@@ -488,21 +488,21 @@ async def chat(request: ChatRequest):
             else:
                 # Both "vllm:" and deprecated "huggingface:" use vLLM
                 provider = "vLLM"
-            logger.info(f"🚀 Modèle {provider} détecté: {request.model_id}")
-            logger.info(f"⏳ Démarrage automatique du serveur {provider}...")
+            logger.info(f"🚀 {provider} model detected: {request.model_id}")
+            logger.info(f"⏳ Auto-starting {provider} server...")
 
             server_ready = await ensure_model_server(request.model_id)
 
             if not server_ready:
-                error_msg = f"❌ Échec du démarrage du serveur {provider}. "
+                error_msg = f"❌ Failed to start {provider} server. "
                 if provider == "MLX":
-                    error_msg += "Vérifiez que mlx-lm est installé (uv sync)."
+                    error_msg += "Check that mlx-lm is installed (uv sync)."
                 else:
-                    error_msg += "Vérifiez que vLLM est installé (pip install vllm)."
+                    error_msg += "Check that vLLM is installed (pip install vllm)."
                 logger.error(error_msg)
                 raise HTTPException(status_code=500, detail=error_msg)
 
-            logger.info(f"✅ Serveur {provider} prêt")
+            logger.info(f"✅ {provider} server ready")
         else:
             logger.info(f"DEBUG - Auto-startup condition FALSE - model_id: '{request.model_id}'")
             logger.info("DEBUG - This model does not require auto-startup (not MLX/vLLM/huggingface)")
@@ -642,16 +642,16 @@ Contexte actuel:
                                         break
 
                             system_content += f"""
-- Nombre de documents: {len(documents)}
+- Number of documents: {len(documents)}
 
-**IMPORTANT - Comprendre les relations entre documents:**
-- Les fichiers .md avec "[Transcription de X]" sont des versions TEXTE de fichiers audio X - L'AUDIO A DÉJÀ ÉTÉ TRANSCRIT
-- Les fichiers audio avec "[DÉJÀ TRANSCRIT → voir Y]" ont été traités - NE PAS RE-TRANSCRIRE
-- Les fichiers PDF avec "[DÉJÀ EXTRAIT → voir Z]" ont été traités - NE PAS RE-EXTRAIRE
-- Si un fichier audio montre "[DÉJÀ TRANSCRIT → voir Y]", cela signifie que le contenu audio est disponible dans Y
-- RÈGLE ABSOLUE: Si tu vois "[DÉJÀ TRANSCRIT]" ou "[DÉJÀ EXTRAIT]", NE JAMAIS proposer de refaire l'opération
+**IMPORTANT - Understanding document relationships:**
+- .md files with "[Transcription de X]" are TEXT versions of audio files X - AUDIO HAS ALREADY BEEN TRANSCRIBED
+- Audio files with "[DÉJÀ TRANSCRIT → voir Y]" have been processed - DO NOT RE-TRANSCRIBE
+- PDF files with "[DÉJÀ EXTRAIT → voir Z]" have been processed - DO NOT RE-EXTRACT
+- If an audio file shows "[DÉJÀ TRANSCRIT → voir Y]", it means the audio content is available in Y
+- ABSOLUTE RULE: If you see "[DÉJÀ TRANSCRIT]" or "[DÉJÀ EXTRAIT]", NEVER offer to redo the operation
 
-- Documents (liste résumée - utilise l'outil `list_documents` pour plus de détails):"""
+- Documents (summary list - use `list_documents` tool for more details):"""
                             # Collect document contents for context
                             doc_contents = []
                             sources_list = []  # Track sources for response
@@ -659,7 +659,7 @@ Contexte actuel:
                                 doc_name = doc.get("nom_fichier", "Document inconnu")
                                 doc_type = doc.get("type_fichier", "").upper()
                                 doc_size = doc.get("taille", 0)
-                                # Format size
+                                # Format file size
                                 if doc_size < 1024:
                                     size_str = f"{doc_size} B"
                                 elif doc_size < 1024 * 1024:
@@ -674,7 +674,7 @@ Contexte actuel:
                                 is_pdf = doc_type == "PDF"
                                 texte_extrait = doc.get("texte_extrait", "")
 
-                                # Build status note with relationships
+                                # Build status note showing document relationships
                                 if is_transcription and source_audio:
                                     status_note = f" [Transcription de {source_audio}]"
                                 elif is_audio:
@@ -704,7 +704,7 @@ Contexte actuel:
                                 system_content += f"""
   - {doc_name} ({doc_type}, {size_str}){status_note}"""
 
-                                # Collect extracted text for later inclusion
+                                # Collect extracted text for context inclusion
                                 if texte_extrait:
                                     word_count = len(texte_extrait.split())
                                     doc_contents.append({
@@ -723,7 +723,7 @@ Contexte actuel:
                                     # Add a note that this audio file hasn't been transcribed
                                     doc_contents.append({
                                         "name": doc_name,
-                                        "content": "[Ce fichier audio n'a pas encore été transcrit. Pour obtenir un résumé, veuillez d'abord transcrire le fichier audio.]",
+                                        "content": "[This audio file has not been transcribed yet. To get a summary, please first transcribe the audio file.]",
                                         "is_transcription": False,
                                         "is_pending": True
                                     })
@@ -732,24 +732,24 @@ Contexte actuel:
                             if doc_contents:
                                 system_content += """
 
-Contenu des documents:"""
+Document contents:"""
                                 for doc_info in doc_contents:
-                                    content_type = "Transcription" if doc_info["is_transcription"] else "Contenu"
+                                    content_type = "Transcription" if doc_info["is_transcription"] else "Content"
                                     # Limit content length to avoid context overflow
                                     content = doc_info["content"]
                                     if len(content) > 4000:
-                                        content = content[:4000] + "... [contenu tronqué]"
+                                        content = content[:4000] + "... [truncated]"
                                     system_content += f"""
 
 ### {doc_info["name"]} ({content_type}):
 {content}"""
                         else:
                             system_content += """
-- Nombre de documents: 0"""
+- Number of documents: 0"""
 
                         logger.info(f"Added case context for {case_name} with {len(documents)} documents")
 
-                        # NEW: Detect currently open document or module from activities
+                        # Detect currently open document or module from activities
                         current_document_id = None
                         current_document = None
                         current_module = None
@@ -764,7 +764,7 @@ Contenu des documents:"""
                                 current_document_id = _get_current_document_from_activities(activities_raw)
                                 current_module = _get_current_module_from_activities(activities_raw)
 
-                                # If document is open, fetch full document data
+                                # If a document is open, fetch the full document data
                                 if current_document_id:
                                     doc_result = await service.query(f"SELECT * FROM {current_document_id}")
                                     if doc_result and len(doc_result) > 0:
@@ -777,7 +777,7 @@ Contenu des documents:"""
                             except Exception as e:
                                 logger.warning(f"Could not detect current document/module: {e}")
 
-                        # Replace system_content with tutor-aware prompt
+                        # Build the context-aware tutor system prompt
                         system_content = _build_tutor_system_prompt(
                             case_data=case_data,
                             documents=documents,
@@ -888,7 +888,7 @@ Contenu des documents:"""
                 logger.warning(f"Failed to save conversation: {e}")
 
         # Detect if a document was created (transcription completed successfully)
-        # Check for successful transcription phrases in the response
+        # Check for successful transcription phrases in the response (French phrases for French UI)
         document_created = False
         transcription_success_phrases = [
             "J'ai transcrit le fichier audio",
@@ -1069,27 +1069,27 @@ async def _handle_regular_chat_stream(request: ChatRequest) -> AsyncGenerator[st
                 provider = "vLLM"
                 emoji = "🚀"
 
-            logger.info(f"{emoji} Modèle {provider} détecté: {request.model_id}")
-            logger.info(f"⏳ Démarrage automatique du serveur {provider}...")
+            logger.info(f"{emoji} {provider} model detected: {request.model_id}")
+            logger.info(f"⏳ Auto-starting {provider} server...")
 
-            # Envoyer un message de statut à l'utilisateur
-            yield f"event: message\ndata: {json.dumps({'content': f'{emoji} Démarrage du serveur {provider}...'})}\n\n"
+            # Send status message to user
+            yield f"event: message\ndata: {json.dumps({'content': f'{emoji} Starting {provider} server...'})}\n\n"
 
-            # Démarrer le serveur approprié
+            # Start the appropriate server
             from services.model_server_manager import ensure_model_server
             server_ready = await ensure_model_server(request.model_id)
 
             if not server_ready:
-                error_msg = f"❌ Échec du démarrage du serveur {provider}. "
+                error_msg = f"❌ Failed to start {provider} server. "
                 if provider == "MLX":
-                    error_msg += "Vérifiez que mlx-lm est installé (uv sync)."
+                    error_msg += "Check that mlx-lm is installed (uv sync)."
                 else:
-                    error_msg += "Vérifiez que vLLM est installé (pip install vllm)."
+                    error_msg += "Check that vLLM is installed (pip install vllm)."
                 logger.error(error_msg)
                 yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
                 return
 
-            yield f"event: message\ndata: {json.dumps({'content': f'✅ Serveur {provider} prêt\\n\\n'})}\n\n"
+            yield f"event: message\ndata: {json.dumps({'content': f'✅ {provider} server ready\\n\\n'})}\n\n"
 
         # Create the model
         model = create_model(request.model_id)
