@@ -581,13 +581,30 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
    - ✅ Import correct dans tous les fichiers de routes
    - Aucune définition locale restante
 
-3. **Simplification documents.py** (~4-6h)
-   - ❌ **À FAIRE** : Fichier trop long (~2100 lignes)
-   - Extraire logique métier en services dédiés :
-     - `services/document_service.py` - CRUD et gestion fichiers
-     - `services/linked_directory_service.py` - Logique répertoires liés
-     - `services/docusaurus_service.py` - Logique import Docusaurus
-   - Garder uniquement les endpoints et validations dans `routes/documents.py`
+3. **Simplifications code restantes** (identifiées 2026-01-02)
+
+   **Backend - Fichiers trop longs :**
+   - `routes/documents.py` (~1400 lignes) : Extraire logique PDF extraction (~300 lignes)
+   - `routes/chat.py` (~1250 lignes) : Extraire `_build_tutor_system_prompt()` (~250 lignes) vers `services/prompt_builder_service.py`
+   - `services/flashcard_service.py` (~920 lignes) : Externaliser prompts templates vers `config/`
+
+   **Frontend - Hook useFileDrop :**
+   - Code drag-and-drop dupliqué dans 3 modaux :
+     - `create-module-modal.tsx`
+     - `document-upload-modal.tsx`
+     - `import-docusaurus-modal.tsx`
+   - Créer `hooks/use-file-drop.ts` (~50 lignes économisées)
+
+   **Backend - Décorateur error handling :**
+   - Pattern try-except répété ~27 fois dans `documents.py`
+   - Créer décorateur `@handle_api_errors` dans `utils/decorators.py`
+
+   **Quick wins - Imports inutilisés :**
+   ```python
+   # backend/routes/documents.py
+   import asyncio  # NON UTILISÉ
+   import json     # NON UTILISÉ
+   ```
 
 4. **Nettoyer les logs de debug**
    - Retirer les `logger.info("🔍 ...")` ajoutés temporairement
