@@ -191,6 +191,9 @@ export default function CourseDetailPage() {
     if (doc) {
       setPreviewDocument(doc);
       setPreviewDirectory(null); // Close directory preview if open
+      setViewModule(null); // Close module view if open
+      setStudyDeck(null); // Close flashcard study if open
+      setAudioDeck(null); // Close flashcard audio if open
     }
   };
 

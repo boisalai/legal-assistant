@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
+  Eye,
   Pencil,
   Trash2,
   MoreVertical,
@@ -36,6 +37,7 @@ import type { Module } from "@/types";
 
 interface ModulesDataTableProps {
   modules: Module[];
+  onView: (module: Module) => void;
   onEdit: (module: Module) => void;
   onDelete: (module: Module) => void;
   deletingModuleId: string | null;
@@ -43,12 +45,14 @@ interface ModulesDataTableProps {
 
 export function ModulesDataTable({
   modules,
+  onView,
   onEdit,
   onDelete,
   deletingModuleId,
 }: ModulesDataTableProps) {
   const t = useTranslations("modules");
   const tCommon = useTranslations("common");
+  const tTable = useTranslations("table");
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "order_index", desc: false },
   ]);
@@ -121,6 +125,10 @@ export function ModulesDataTable({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => onView(module)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  {tTable("actions.open")}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEdit(module)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   {tCommon("edit")}

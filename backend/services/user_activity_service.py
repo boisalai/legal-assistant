@@ -320,9 +320,8 @@ class UserActivityService:
             # Get count of activities
             result = await self.service.query(
                 """
-                SELECT case_id, count() as total FROM user_activity
+                SELECT count() as total FROM user_activity
                 WHERE case_id = $case_id
-                GROUP BY case_id
                 """,
                 {"case_id": case_id}
             )
