@@ -27,8 +27,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { chatApi, settingsApi, type ChatMessage as ApiChatMessage, type LLMModel } from "@/lib/api";
-import { useLocale } from "@/i18n/client";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 interface Message {
   id: string;
@@ -55,8 +54,8 @@ export default function AssistantPage() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get current locale for language-aware responses
-  const { locale } = useLocale();
+  // Get current locale for language-aware responses (using next-intl)
+  const locale = useLocale();
   const t = useTranslations();
 
   // Build suggested questions from translations
