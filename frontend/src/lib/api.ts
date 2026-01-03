@@ -1640,6 +1640,31 @@ export const modulesApi = {
 };
 
 // ============================================
+// OCR API (Admin - Book Scanning)
+// ============================================
+
+export interface OCRResult {
+  filename: string;
+  size_bytes: number;
+  created_at: number;
+}
+
+export const ocrApi = {
+  // List available OCR results
+  async listResults(): Promise<{ results: OCRResult[] }> {
+    return fetchApi<{ results: OCRResult[] }>("/api/admin/ocr/results");
+  },
+
+  // Get download URL for a result
+  getDownloadUrl(filename: string): string {
+    return `${API_BASE_URL}/api/admin/ocr/download/${encodeURIComponent(filename)}`;
+  },
+
+  // Note: The main process endpoint uses SSE streaming and is handled
+  // directly in the admin/ocr/page.tsx component with fetch()
+};
+
+// ============================================
 // Export all APIs
 // ============================================
 
@@ -1656,6 +1681,7 @@ export const api = {
   linkedDirectory: linkedDirectoryApi,
   flashcards: flashcardsApi,
   modules: modulesApi,
+  ocr: ocrApi,
   // Backward compatibility
   cases: coursesApi,
 };

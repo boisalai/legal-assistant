@@ -49,6 +49,7 @@ dependencies = [
     # Web scraping pour recherche juridique
     "playwright>=1.48.0",
     "beautifulsoup4>=4.12.3",
+    "opencv-python>=4.11.0.86",
 ]
 
 [project.optional-dependencies]
