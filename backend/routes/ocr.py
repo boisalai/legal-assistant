@@ -28,13 +28,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/ocr", tags=["OCR"])
 
 
+def _parse_form_bool(value: str, default: bool = True) -> bool:
+    """Parse form boolean value (handles 'true'/'false' strings)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() == "true"
+    return default
+
+
 @router.post("/process", summary="Process scanned book (SSE)")
 async def process_ocr(
     file: UploadFile = File(..., description="ZIP file containing JPG page images"),
     title: Optional[str] = Form(default=None, description="Book title"),
     start_page: int = Form(default=1, ge=1, description="Starting page number"),
-    extract_images: bool = Form(default=True, description="Extract embedded images"),
-    post_process_with_llm: bool = Form(default=True, description="Clean with LLM"),
+    extract_images: str = Form(default="true", description="Extract embedded images"),
+    post_process_with_llm: str = Form(default="true", description="Clean with LLM"),
     model_id: Optional[str] = Form(default=None, description="LLM model ID"),
     _user_id: str = Depends(require_admin),
 ):
@@ -81,8 +90,8 @@ async def process_ocr(
                 zip_path=temp_zip,
                 title=title,
                 start_page=start_page,
-                extract_images=extract_images,
-                post_process_with_llm=post_process_with_llm,
+                extract_images=_parse_form_bool(extract_images, default=True),
+                post_process_with_llm=_parse_form_bool(post_process_with_llm, default=True),
                 model_id=model_id,
             ):
                 yield f"data: {json.dumps(event.model_dump())}\n\n"

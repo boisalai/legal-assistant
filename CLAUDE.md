@@ -109,6 +109,16 @@
     - Assignation de documents aux modules
     - Endpoint direct : `POST /api/modules/{module_id}/documents/upload`
 
+13. **OCR de livres scannés** 🆕
+    - Page admin (`/admin/ocr`) pour convertir livres scannés en Markdown
+    - Upload ZIP contenant images JPG/PNG ou PDF multi-pages
+    - OCR avec PaddleOCR-VL (modèle vision-language, ~5-10 sec/page)
+    - Conversion automatique PDF → images via PyMuPDF
+    - Détection et extraction des figures/illustrations
+    - Post-traitement LLM optionnel (correction OCR, détection chapitres)
+    - Progression temps réel via SSE
+    - Téléchargement résultat : ZIP avec `livre.md` + `images/`
+
 ### Architecture technique
 
 Voir **`ARCHITECTURE.md`** pour la documentation complète.
