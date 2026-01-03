@@ -1,6 +1,4 @@
 #V2
-SELECT count() as total FROM course GROUP ALL;
-SELECT id, title, created_at FROM course ORDER BY created_at DESC LIMIT 5;
 SELECT * FROM course ORDER BY pinned DESC, created_at DESC;
 SELECT count() as total FROM course GROUP ALL;
 INFO FOR ROOT;
@@ -99,3 +97,5 @@ DELETE flashcard_deck:96b2c0f4;
 SELECT count() FROM flashcard_deck;
 DELETE flashcard WHERE deck_id = "flashcard_deck:d93c545c";
 UPDATE flashcard_deck:d93c545c SET card_count_requested = 20;
+SELECT id, course_id, filename, linked_source.link_id, linked_source.base_path FROM document WHERE source_type = 'linked' AND linked_source.base_path CONTAINS 'DRT' LIMIT 5;
+SELECT id, email, role, actif FROM user LIMIT 10;
