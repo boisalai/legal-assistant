@@ -60,7 +60,12 @@
       "Bash(git check-ignore:*)",
       "Bash(sort:*)",
       "Bash(open:*)",
-      "Bash(docker-compose restart:*)"
+      "Bash(docker-compose restart:*)",
+      "Bash(git rm:*)",
+      "Bash(uv add:*)",
+      "Bash(unzip:*)",
+      "Bash(uv pip install:*)",
+      "Bash(uv remove:*)"
     ],
     "deny": [],
     "ask": []

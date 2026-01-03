@@ -54,8 +54,9 @@ export default function AdminOCRPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [startPage, setStartPage] = useState(1);
-  const [extractImages, setExtractImages] = useState(true);
-  const [postProcessLLM, setPostProcessLLM] = useState(true);
+  const [ocrEngine, setOcrEngine] = useState<"docling" | "paddleocr_vl">("docling");
+  const [extractImages, setExtractImages] = useState(false);
+  const [postProcessLLM, setPostProcessLLM] = useState(false);
 
   // Processing state
   const [status, setStatus] = useState<ProcessingStatus>("idle");
@@ -114,6 +115,7 @@ export default function AdminOCRPage() {
     formData.append("file", file);
     if (title) formData.append("title", title);
     formData.append("start_page", startPage.toString());
+    formData.append("ocr_engine", ocrEngine);
     formData.append("extract_images", extractImages.toString());
     formData.append("post_process_with_llm", postProcessLLM.toString());
 
@@ -226,6 +228,9 @@ export default function AdminOCRPage() {
     setFile(null);
     setTitle("");
     setStartPage(1);
+    setOcrEngine("docling");
+    setExtractImages(false);
+    setPostProcessLLM(false);
     setStatus("idle");
     setProgress(null);
     setError(null);
@@ -260,22 +265,24 @@ export default function AdminOCRPage() {
             <CardHeader>
               <CardTitle className="text-base">Instructions</CardTitle>
               <CardDescription>
-                Convertissez un livre scanne (images) en document Markdown avec
-                extraction d&apos;images.
+                Convertissez un livre scanne (images ou PDF) en document Markdown.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <ol className="list-decimal list-inside space-y-1">
                 <li>
-                  Preparez un fichier ZIP contenant les images JPG des pages
-                  (une image par page)
+                  Preparez un fichier ZIP contenant les images JPG/PNG des pages
+                  ou un PDF multi-pages
                 </li>
                 <li>
                   Nommez les fichiers pour un tri naturel (ex: page_001.jpg,
                   page_002.jpg...)
                 </li>
-                <li>Uploadez le ZIP et configurez les options ci-dessous</li>
-                <li>Le traitement prend environ 5 secondes par page</li>
+                <li>
+                  Choisissez le moteur OCR : Docling VLM est recommande pour
+                  Apple Silicon (acceleration MLX)
+                </li>
+                <li>Le traitement depend du modele et de la complexite des pages</li>
               </ol>
             </CardContent>
           </Card>
@@ -361,25 +368,88 @@ export default function AdminOCRPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-start space-x-2">
-                        <Checkbox
-                          id="extractImages"
-                          checked={extractImages}
-                          onCheckedChange={(checked) =>
-                            setExtractImages(checked as boolean)
-                          }
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <Label htmlFor="extractImages" className="text-sm">
-                            Extraire les images
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            Detecte et extrait les figures/illustrations. Desactiver pour accelerer.
-                          </p>
-                        </div>
+                    {/* OCR Engine Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Moteur OCR</Label>
+                      <div className="grid gap-2">
+                        <label
+                          className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            ocrEngine === "docling"
+                              ? "border-primary bg-primary/5"
+                              : "border-muted hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="ocrEngine"
+                            value="docling"
+                            checked={ocrEngine === "docling"}
+                            onChange={() => {
+                              setOcrEngine("docling");
+                              setExtractImages(false); // Docling handles images internally
+                            }}
+                            className="mt-1"
+                          />
+                          <div>
+                            <div className="font-medium text-sm">
+                              Docling VLM - Recommande
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Local, acceleration MLX sur Apple Silicon.
+                              100% gratuit, pas d&apos;API externe.
+                            </p>
+                          </div>
+                        </label>
+                        <label
+                          className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            ocrEngine === "paddleocr_vl"
+                              ? "border-primary bg-primary/5"
+                              : "border-muted hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="ocrEngine"
+                            value="paddleocr_vl"
+                            checked={ocrEngine === "paddleocr_vl"}
+                            onChange={() => setOcrEngine("paddleocr_vl")}
+                            className="mt-1"
+                          />
+                          <div>
+                            <div className="font-medium text-sm">
+                              PaddleOCR-VL
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              ~4 Go RAM.
+                              Supporte l&apos;extraction d&apos;images.
+                            </p>
+                          </div>
+                        </label>
                       </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Image extraction - only for PaddleOCR-VL */}
+                      {ocrEngine === "paddleocr_vl" && (
+                        <div className="flex items-start space-x-2">
+                          <Checkbox
+                            id="extractImages"
+                            checked={extractImages}
+                            onCheckedChange={(checked) =>
+                              setExtractImages(checked as boolean)
+                            }
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <Label htmlFor="extractImages" className="text-sm">
+                              Extraire les images
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Detecte et extrait les figures/illustrations.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <div className="flex items-start space-x-2">
                         <Checkbox
                           id="postProcessLLM"
@@ -394,7 +464,7 @@ export default function AdminOCRPage() {
                             Correction LLM du texte
                           </Label>
                           <p className="text-xs text-muted-foreground">
-                            Corrige les erreurs OCR avec un LLM. Tres gourmand en ressources - desactiver pour accelerer significativement.
+                            Corrige les erreurs OCR avec un LLM. Gourmand en ressources.
                           </p>
                         </div>
                       </div>
