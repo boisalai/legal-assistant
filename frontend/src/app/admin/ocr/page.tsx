@@ -119,7 +119,7 @@ export default function AdminOCRPage() {
 
     try {
       abortControllerRef.current = new AbortController();
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("auth_token");
 
       const response = await fetch(`${API_BASE_URL}/api/admin/ocr/process`, {
         method: "POST",
@@ -195,7 +195,7 @@ export default function AdminOCRPage() {
   // Download result
   const handleDownload = () => {
     if (!resultFilename) return;
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("auth_token");
     const url = `${API_BASE_URL}/api/admin/ocr/download/${encodeURIComponent(resultFilename)}`;
 
     // For authenticated download, we need to use fetch and create a blob
