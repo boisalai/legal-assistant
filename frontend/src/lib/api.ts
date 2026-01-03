@@ -1085,7 +1085,42 @@ export const adminApi = {
       );
     },
   },
+
+  // Password generation
+  passwords: {
+    async generate(params?: {
+      count?: number;
+      length?: number;
+      includeUppercase?: boolean;
+      includeLowercase?: boolean;
+      includeDigits?: boolean;
+      includeSymbols?: boolean;
+      excludeAmbiguous?: boolean;
+    }): Promise<PasswordGenerateResponse[]> {
+      return fetchApi<PasswordGenerateResponse[]>("/api/admin/passwords/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          count: params?.count ?? 20,
+          length: params?.length ?? 16,
+          include_uppercase: params?.includeUppercase ?? true,
+          include_lowercase: params?.includeLowercase ?? true,
+          include_digits: params?.includeDigits ?? true,
+          include_symbols: params?.includeSymbols ?? true,
+          exclude_ambiguous: params?.excludeAmbiguous ?? false,
+        }),
+      });
+    },
+  },
 };
+
+// Password generation interfaces
+export interface PasswordGenerateResponse {
+  password: string;
+  length: number;
+  strength: string;
+  score: number;
+  remarks: string[];
+}
 
 // ============================================
 // ============================================
