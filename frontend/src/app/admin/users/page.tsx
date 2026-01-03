@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  Plus,
   Pencil,
   Trash2,
   Search,
@@ -59,6 +58,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { adminApi, authApi, AdminUser } from "@/lib/api";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default function AdminUsersPage() {
   const t = useTranslations("admin");
@@ -296,120 +296,128 @@ export default function AdminUsersPage() {
 
   if (!currentUser) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <AppShell noPadding>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{t("users.title")}</h1>
-          <p className="text-muted-foreground">{t("users.description")}</p>
+    <AppShell noPadding>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Header - fixed 65px */}
+        <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
+          <h2 className="text-xl font-bold">{t("users.title")}</h2>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2">
-          <UserPlus className="h-4 w-4" />
-          {t("users.addUser")}
-        </Button>
-      </div>
 
-      {/* Error alert */}
-      {error && (
-        <div className="border border-destructive rounded-md p-4">
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            <p>{error}</p>
+        {/* Scrollable content */}
+        <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
+          {/* Error alert */}
+          {error && (
+            <div className="border border-destructive rounded-md p-3">
+              <div className="flex items-center gap-2 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <p>{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Users section */}
+          <div className="space-y-2">
+            {/* Section header */}
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {t("users.list")} ({total})
+              </h3>
+              <div className="flex items-center gap-2">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t("users.search")}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-8 text-sm"
+                  />
+                </div>
+                <Button size="sm" onClick={openCreateDialog} className="gap-1">
+                  <UserPlus className="h-3 w-3" />
+                  {t("users.addUser")}
+                </Button>
+              </div>
+            </div>
+
+            {/* Users table */}
+            <div className="border rounded-md">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    {searchTerm ? t("users.noResults") : t("users.noUsers")}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-sm">{t("users.columns.name")}</TableHead>
+                      <TableHead className="text-sm">{t("users.columns.email")}</TableHead>
+                      <TableHead className="text-sm">{t("users.columns.role")}</TableHead>
+                      <TableHead className="text-sm">{t("users.columns.status")}</TableHead>
+                      <TableHead className="text-sm">{t("users.columns.createdAt")}</TableHead>
+                      <TableHead className="text-right text-sm">{t("users.columns.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium text-sm">{user.name}</TableCell>
+                        <TableCell className="text-sm">{user.email}</TableCell>
+                        <TableCell>
+                          <RoleBadge role={user.role} />
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge actif={user.actif} />
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {user.created_at
+                            ? new Date(user.created_at).toISOString().split("T")[0]
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openDeleteDialog(user)}
+                              disabled={user.id === currentUser?.id}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Search bar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">{t("users.list")}</h2>
-          <p className="text-muted-foreground text-sm">
-            {t("users.totalUsers", { count: total })}
-          </p>
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={t("users.search")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-      </div>
-
-      {/* Users table */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12 border rounded-md">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <div className="flex items-center justify-center py-12 border rounded-md">
-          <p className="text-muted-foreground">
-            {searchTerm ? t("users.noResults") : t("users.noUsers")}
-          </p>
-        </div>
-      ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.name")}</TableHead>
-                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.email")}</TableHead>
-                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.role")}</TableHead>
-                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.status")}</TableHead>
-                <TableHead className="bg-blue-50 font-bold text-black">{t("users.columns.createdAt")}</TableHead>
-                <TableHead className="text-right bg-blue-50 font-bold text-black">{t("users.columns.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium text-black">{user.name}</TableCell>
-                  <TableCell className="text-black">{user.email}</TableCell>
-                  <TableCell>
-                    <RoleBadge role={user.role} />
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge actif={user.actif} />
-                  </TableCell>
-                  <TableCell className="text-black">
-                    {user.created_at
-                      ? new Date(user.created_at).toLocaleDateString()
-                      : "-"}
-                  </TableCell>
-                  <TableCell className="text-right text-black">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openDeleteDialog(user)}
-                        disabled={user.id === currentUser?.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
 
       {/* Create Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -639,6 +647,7 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -234,12 +234,9 @@ export default function AdminDatabasePage() {
 
   if (loading) {
     return (
-      <AppShell>
+      <AppShell noPadding>
         <div className="flex h-full items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-            <p className="mt-4 text-sm text-gray-500">{t("database.loading")}</p>
-          </div>
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </AppShell>
     );
@@ -247,156 +244,152 @@ export default function AdminDatabasePage() {
 
   if (error) {
     return (
-      <AppShell>
-        <div className="flex h-full items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600">
-                <AlertCircle className="h-5 w-5" />
-                Erreur
-              </CardTitle>
-              <CardDescription>{error}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={fetchTables} variant="outline">
+      <AppShell noPadding>
+        <div className="flex flex-col h-full overflow-hidden">
+          <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
+            <h2 className="text-xl font-bold">{t("database.title")}</h2>
+          </div>
+          <div className="px-6 py-2 flex-1 min-h-0 overflow-y-auto">
+            <div className="border border-destructive rounded-md p-3">
+              <div className="flex items-center gap-2 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <p>{error}</p>
+              </div>
+              <Button onClick={fetchTables} variant="outline" size="sm" className="mt-2">
                 Réessayer
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("database.title")}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {t("database.description")}
-            </p>
-          </div>
-
+    <AppShell noPadding>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Header - fixed 65px */}
+        <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
+          <h2 className="text-xl font-bold">{t("database.title")}</h2>
           {selectedTable && (
             <Button
               variant="outline"
+              size="sm"
               onClick={handleBackToTables}
-              className="flex items-center gap-2"
+              className="gap-1"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3 w-3" />
               Retour aux tables
             </Button>
           )}
         </div>
 
-        {/* Tables List OR Table Data View */}
-        {!selectedTable ? (
-          // Show tables list
-          tables.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Database className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-4 text-sm text-gray-500">
+        {/* Scrollable content */}
+        <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
+          {/* Tables List OR Table Data View */}
+          {!selectedTable ? (
+            // Show tables list
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Tables ({tables.length})
+              </h3>
+              {tables.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-muted-foreground">
                     {t("database.noTables")}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <DataTable columns={tablesColumns} data={tables} />
-          )
-        ) : (
-          // Show selected table data
-          <div className="space-y-4">
-            {/* Table header info */}
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                {selectedTable.displayName}
-              </h2>
-              <p className="text-muted-foreground text-sm font-mono mt-1">
-                {selectedTable.name} — {selectedTable.rowCount?.toLocaleString("fr-FR")} ligne(s)
-              </p>
+              ) : (
+                <DataTable columns={tablesColumns} data={tables} />
+              )}
             </div>
-
-            {/* Table content */}
-            {loadingData ? (
-              <div className="flex items-center justify-center py-12 border rounded-md">
-                <Loader2 className="h-8 w-8 animate-spin" />
+          ) : (
+            // Show selected table data
+            <div className="space-y-2">
+              {/* Table header info */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  {selectedTable.displayName}
+                  <span className="font-normal text-sm text-muted-foreground">
+                    ({selectedTable.rowCount?.toLocaleString("fr-FR")} ligne(s))
+                  </span>
+                </h3>
               </div>
-            ) : dataError ? (
-              <div className="flex items-center justify-center py-12 border rounded-md">
-                <div className="text-center">
-                  <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-2" />
-                  <p className="text-sm text-red-600">{dataError}</p>
+
+              {/* Table content */}
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              </div>
-            ) : tableData.length === 0 ? (
-              <div className="flex items-center justify-center py-12 border rounded-md">
-                <p className="text-sm text-muted-foreground">Aucune donnée</p>
-              </div>
-            ) : (
-              <div className="border rounded-md overflow-auto max-h-[600px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {(() => {
-                        // Get all unique keys from all rows (in case some rows have different fields)
-                        const allKeys = new Set<string>();
-                        tableData.forEach(row => {
-                          Object.keys(row).forEach(key => allKeys.add(key));
-                        });
+              ) : dataError ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <AlertCircle className="h-6 w-6 mx-auto text-destructive mb-2" />
+                    <p className="text-sm text-destructive">{dataError}</p>
+                  </div>
+                </div>
+              ) : tableData.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-muted-foreground">Aucune donnée</p>
+                </div>
+              ) : (
+                <div className="border rounded-md overflow-auto max-h-[600px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {(() => {
+                          // Get all unique keys from all rows (in case some rows have different fields)
+                          const allKeys = new Set<string>();
+                          tableData.forEach(row => {
+                            Object.keys(row).forEach(key => allKeys.add(key));
+                          });
 
-                        // Sort keys: id first, then alphabetically
+                          // Sort keys: id first, then alphabetically
+                          const sortedKeys = Array.from(allKeys).sort((a, b) => {
+                            if (a === 'id') return -1;
+                            if (b === 'id') return 1;
+                            return a.localeCompare(b);
+                          });
+
+                          return sortedKeys.map((key) => (
+                            <TableHead key={key} className="text-sm">
+                              {key}
+                            </TableHead>
+                          ));
+                        })()}
+                        <TableHead className="w-[50px] text-sm">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tableData.map((row, idx) => {
+                        // Get sorted keys for consistent column order
+                        const allKeys = new Set<string>();
+                        tableData.forEach(r => {
+                          Object.keys(r).forEach(key => allKeys.add(key));
+                        });
                         const sortedKeys = Array.from(allKeys).sort((a, b) => {
                           if (a === 'id') return -1;
                           if (b === 'id') return 1;
                           return a.localeCompare(b);
                         });
 
-                        return sortedKeys.map((key) => (
-                          <TableHead key={key} className="bg-blue-50 font-bold text-black">
-                            {key}
-                          </TableHead>
-                        ));
-                      })()}
-                      <TableHead className="w-[50px] bg-blue-50 font-bold text-black">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tableData.map((row, idx) => {
-                      // Get sorted keys for consistent column order
-                      const allKeys = new Set<string>();
-                      tableData.forEach(r => {
-                        Object.keys(r).forEach(key => allKeys.add(key));
-                      });
-                      const sortedKeys = Array.from(allKeys).sort((a, b) => {
-                        if (a === 'id') return -1;
-                        if (b === 'id') return 1;
-                        return a.localeCompare(b);
-                      });
-
-                      return (
-                        <TableRow key={idx}>
-                          {sortedKeys.map((key) => {
-                            const value = row[key];
-                            return (
-                              <TableCell key={key} className="text-black max-w-xs truncate">
-                                {value === null || value === undefined
-                                  ? <span className="text-muted-foreground italic">null</span>
-                                  : typeof value === "object"
-                                  ? JSON.stringify(value)
-                                  : String(value)}
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell>
+                        return (
+                          <TableRow key={idx}>
+                            {sortedKeys.map((key) => {
+                              const value = row[key];
+                              return (
+                                <TableCell key={key} className="text-sm max-w-xs truncate">
+                                  {value === null || value === undefined
+                                    ? <span className="text-muted-foreground italic">null</span>
+                                    : typeof value === "object"
+                                    ? JSON.stringify(value)
+                                    : String(value)}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -436,6 +429,7 @@ export default function AdminDatabasePage() {
             )}
           </div>
         )}
+        </div>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog
