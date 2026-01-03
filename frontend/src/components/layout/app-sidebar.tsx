@@ -15,6 +15,9 @@ import {
   ChevronUp,
   Scale,
   ShieldCheck,
+  Database,
+  KeyRound,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -151,10 +154,26 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/")}>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/users"}>
+                    <Link href="/admin/users">
+                      <Users className="h-4 w-4" />
+                      <span>Utilisateurs</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/database"}>
                     <Link href="/admin/database">
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>{t("nav.admin")}</span>
+                      <Database className="h-4 w-4" />
+                      <span>Base de données</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/admin/passwords"}>
+                    <Link href="/admin/passwords">
+                      <KeyRound className="h-4 w-4" />
+                      <span>Mots de passe</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
