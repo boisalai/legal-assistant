@@ -599,13 +599,6 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
    - Pattern try-except répété ~27 fois dans `documents.py`
    - Créer décorateur `@handle_api_errors` dans `utils/decorators.py`
 
-   **Quick wins - Imports inutilisés :**
-   ```python
-   # backend/routes/documents.py
-   import asyncio  # NON UTILISÉ
-   import json     # NON UTILISÉ
-   ```
-
 4. **Nettoyer les logs de debug**
    - Retirer les `logger.info("🔍 ...")` ajoutés temporairement
    - Garder uniquement les logs essentiels (erreurs, warnings)

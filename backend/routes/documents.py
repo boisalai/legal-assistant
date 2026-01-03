@@ -32,6 +32,7 @@ from models.transcription_models import ExtractionResponse
 from models.tts_models import TTSVoice, TTSRequest, TTSResponse
 from utils.file_utils import (
     LINKABLE_EXTENSIONS,
+    MAX_FILE_SIZE,
     MAX_LINKED_FILES,
     FileValidationError,
     calculate_file_hash,
@@ -518,9 +519,12 @@ async def link_file_or_folder(
                 warnings.append(f"Error linking {file_path.name}: {str(e)}")
 
         if len(linked_documents) == 0:
+            detail = "No files could be linked."
+            if warnings:
+                detail += f" Warnings: {'; '.join(warnings)}"
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No files could be linked. Check the warnings."
+                detail=detail
             )
 
         return LinkPathResponse(

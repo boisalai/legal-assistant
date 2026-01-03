@@ -59,7 +59,8 @@
       "Bash(git diff:*)",
       "Bash(git check-ignore:*)",
       "Bash(sort:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Bash(docker-compose restart:*)"
     ],
     "deny": [],
     "ask": []
