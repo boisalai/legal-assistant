@@ -102,65 +102,12 @@ class OCRService:
         self, image_path: Path, min_size: int = 100
     ) -> List[Tuple[int, int, int, int]]:
         """
-        Detect image regions in a page using OpenCV heuristics.
+        Detect image regions in a page.
 
-        Uses adaptive thresholding and contour detection to find
-        regions that are likely images (not text).
+        Uses PIL-based heuristic detection (lighter than OpenCV).
         """
-        try:
-            import cv2
-        except ImportError:
-            logger.warning("OpenCV not available, using simple detection")
-            return self._detect_image_regions_simple(image_path, min_size)
-
-        img = cv2.imread(str(image_path))
-        if img is None:
-            return []
-
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        height, width = gray.shape
-
-        regions = []
-
-        # Adaptive threshold
-        thresh = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
-        )
-
-        # Dilate to connect regions
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-        dilated = cv2.dilate(thresh, kernel, iterations=3)
-
-        # Find contours
-        contours, _ = cv2.findContours(
-            dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-
-            # Filter by size
-            if w < min_size or h < min_size:
-                continue
-            if w > width * 0.9 and h > height * 0.9:
-                continue
-
-            roi = gray[y : y + h, x : x + w]
-            variance = np.var(roi)
-            aspect_ratio = w / h
-
-            if (
-                variance > OCRConfig.IMAGE_VARIANCE_THRESHOLD
-                and 0.2 < aspect_ratio < 5
-            ):
-                hist = cv2.calcHist([roi], [0], None, [256], [0, 256])
-                hist = hist.flatten() / hist.sum()
-                extreme_ratio = hist[:30].sum() + hist[225:].sum()
-
-                if extreme_ratio < 0.5:
-                    regions.append((x, y, x + w, y + h))
-
-        return self._merge_overlapping_regions(regions)
+        # Use simple PIL-based detection (more reliable, less memory)
+        return self._detect_image_regions_simple(image_path, min_size)
 
     def _detect_image_regions_simple(
         self, image_path: Path, min_size: int = 100
@@ -364,15 +311,24 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
         images_created = 0
 
         for root, _dirs, files in os.walk(input_dir):
+            # Skip __MACOSX directories
+            if "__MACOSX" in root:
+                continue
+
             root_path = Path(root)
             for f in files:
+                # Skip macOS metadata files
+                if f.startswith("._"):
+                    continue
+
                 if Path(f).suffix.lower() in OCRConfig.PDF_EXTENSIONS:
                     pdf_path = root_path / f
                     try:
                         doc = fitz.open(pdf_path)
                         pdf_stem = pdf_path.stem
+                        num_pages = len(doc)
 
-                        for page_num in range(len(doc)):
+                        for page_num in range(num_pages):
                             page = doc[page_num]
                             # Render page to image at specified DPI
                             mat = fitz.Matrix(
@@ -387,9 +343,7 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
                             images_created += 1
 
                         doc.close()
-                        logger.info(
-                            f"Converted {pdf_path.name}: {len(doc)} pages"
-                        )
+                        logger.info(f"Converted {pdf_path.name}: {num_pages} pages")
 
                         # Remove original PDF after conversion
                         pdf_path.unlink()
