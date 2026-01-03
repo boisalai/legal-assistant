@@ -115,7 +115,7 @@ export function ModulesDataTable({
       data={modules}
       columns={columns}
       emptyMessage={t("noModules")}
-      initialSort={[{ id: "order_index", desc: false }]}
+      initialSort={[{ id: "created_at", desc: true }]}
     />
   );
 }
