@@ -63,6 +63,8 @@ export default function AdminOCRPage() {
   const [progress, setProgress] = useState<OCRProgressEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resultFilename, setResultFilename] = useState<string | null>(null);
+  const [processingDuration, setProcessingDuration] = useState<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   // Check auth on mount
   useEffect(() => {
@@ -97,6 +99,7 @@ export default function AdminOCRPage() {
     onDrop,
     accept: {
       "application/zip": [".zip"],
+      "application/pdf": [".pdf"],
     },
     maxFiles: 1,
     maxSize: 500 * 1024 * 1024, // 500 MB
@@ -110,6 +113,8 @@ export default function AdminOCRPage() {
     setError(null);
     setResultFilename(null);
     setProgress(null);
+    startTimeRef.current = Date.now();
+    setProcessingDuration(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -162,10 +167,12 @@ export default function AdminOCRPage() {
               setProgress(event);
 
               if (event.status === "completed") {
-                // The message contains the filename on completion
-                if (event.message && event.message.endsWith(".zip")) {
+                // The message contains the filename on completion (.zip or .md)
+                if (event.message && (event.message.endsWith(".zip") || event.message.endsWith(".md"))) {
                   setResultFilename(event.message);
                 }
+                // Calculate processing duration
+                setProcessingDuration(Date.now() - startTimeRef.current);
                 setStatus("completed");
               } else if (event.status === "error") {
                 setError(event.message);
@@ -235,6 +242,7 @@ export default function AdminOCRPage() {
     setProgress(null);
     setError(null);
     setResultFilename(null);
+    setProcessingDuration(null);
   };
 
   if (isAuthorized === null) {
@@ -259,7 +267,8 @@ export default function AdminOCRPage() {
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-6 flex-1 min-h-0 overflow-y-auto">
+        <div className="px-6 py-4 flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-3xl space-y-6">
           {/* Instructions */}
           <Card>
             <CardHeader>
@@ -271,11 +280,10 @@ export default function AdminOCRPage() {
             <CardContent className="text-sm text-muted-foreground">
               <ol className="list-decimal list-inside space-y-1">
                 <li>
-                  Preparez un fichier ZIP contenant les images JPG/PNG des pages
-                  ou un PDF multi-pages
+                  Chargez un fichier PDF multi-pages ou un ZIP contenant les images JPG/PNG
                 </li>
                 <li>
-                  Nommez les fichiers pour un tri naturel (ex: page_001.jpg,
+                  Pour les ZIP, nommez les fichiers pour un tri naturel (ex: page_001.jpg,
                   page_002.jpg...)
                 </li>
                 <li>
@@ -325,7 +333,7 @@ export default function AdminOCRPage() {
                     <p className="font-medium">
                       {isDragActive
                         ? "Deposez le fichier ici..."
-                        : "Glissez-deposez un fichier ZIP"}
+                        : "Glissez-deposez un fichier ZIP ou PDF"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       ou cliquez pour parcourir (max 500 MB)
@@ -523,9 +531,19 @@ export default function AdminOCRPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {progress && (
-                  <div className="text-sm text-muted-foreground">
-                    {progress.total_pages} pages traitees,{" "}
-                    {progress.images_extracted} images extraites
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <div>
+                      {progress.total_pages} pages traitees,{" "}
+                      {progress.images_extracted} images extraites
+                    </div>
+                    {processingDuration && processingDuration > 0 && (
+                      <div>
+                        Duree totale : {Math.floor(processingDuration / 60000)}m {Math.floor((processingDuration % 60000) / 1000)}s
+                        {progress.total_pages > 0 && (
+                          <> — Moyenne : {(processingDuration / 1000 / progress.total_pages).toFixed(1)}s/page</>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -560,6 +578,7 @@ export default function AdminOCRPage() {
               </CardContent>
             </Card>
           )}
+          </div>
         </div>
       </div>
     </AppShell>
