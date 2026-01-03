@@ -51,6 +51,7 @@ dependencies = [
     "beautifulsoup4>=4.12.3",
     "opencv-python>=4.11.0.86",
     "pymupdf>=1.26.7",
+    "einops>=0.8.1",
 ]
 
 [project.optional-dependencies]
