@@ -71,6 +71,7 @@ node_modules/
 .next/
 out/
 .turbo/
+*.tsbuildinfo
 
 # Build
 *.pyc
