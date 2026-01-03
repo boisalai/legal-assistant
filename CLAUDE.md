@@ -210,7 +210,54 @@ Le système d'activity tracking permet à l'assistant IA de savoir ce que l'util
 
 ---
 
-## Session actuelle (2026-01-02) - Simplification du codebase ✅
+## Session actuelle (2026-01-03) - Simplification backend et tests ✅
+
+**Objectif** : Continuer la simplification du codebase et valider avec les tests.
+
+### Corrections de bugs
+
+- **Import manquant** : `MAX_FILE_SIZE` ajouté dans `routes/documents.py` (cassait l'endpoint de liaison)
+- **Message d'erreur amélioré** : Warnings inclus dans l'erreur de liaison de fichiers
+- **Test corrigé** : `test_transcribe_with_invalid_course_id` attend 404 (plus correct que 403)
+
+### Extraction du prompt builder
+
+| Fichier | Avant | Après | Gain |
+|---------|-------|-------|------|
+| `routes/chat.py` | 1252 | 934 | -25% |
+
+**Nouveau fichier** :
+- `services/prompt_builder_service.py` - Construction des prompts tuteur (399 lignes)
+
+**Fonctions extraites** :
+- `build_tutor_system_prompt()` - Point d'entrée principal
+- `_build_context_specific_prompt()` - Contexte selon document/module/cours
+- `_build_document_context()` - Prompt mode document
+- `_build_module_context()` - Prompt mode module
+- `_build_course_context()` - Prompt mode cours complet
+- `_build_english_full_prompt()` - Assemblage prompt anglais
+- `_build_french_full_prompt()` - Assemblage prompt français
+
+### Tests d'intégration validés
+
+| Module | Tests | Résultat |
+|--------|-------|----------|
+| test_courses.py | 12 | ✅ |
+| test_documents.py | 12 | ✅ |
+| test_documents_refactored.py | 12 | ✅ |
+| test_chat.py | 13 | ✅ |
+| test_linked_directories.py | 12 | ✅ |
+| test_semantic_search.py | 8 | ✅ (4 skippés) |
+| test_transcription.py | 9 | ✅ |
+
+### Commits
+
+- `bd70f0e` - fix: Add missing MAX_FILE_SIZE import and improve error messages
+- `17373fb` - refactor: Extract tutor prompt builder to dedicated service
+
+---
+
+## Session précédente (2026-01-02) - Simplification du codebase ✅
 
 **Objectif** : Réduire la complexité et la duplication du code sans changer les fonctionnalités.
 
@@ -584,9 +631,9 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
 3. **Simplifications code restantes** (identifiées 2026-01-02)
 
    **Backend - Fichiers trop longs :**
-   - `routes/documents.py` (~1400 lignes) : Extraire logique PDF extraction (~300 lignes)
-   - `routes/chat.py` (~1250 lignes) : Extraire `_build_tutor_system_prompt()` (~250 lignes) vers `services/prompt_builder_service.py`
-   - `services/flashcard_service.py` (~920 lignes) : Externaliser prompts templates vers `config/`
+   - `routes/documents.py` (~1460 lignes) : Logique PDF extraction déjà déléguée aux services
+   - ~~`routes/chat.py` (~1250 lignes)~~ ✅ **FAIT** (2026-01-03) - Réduit à 934 lignes (-25%)
+   - `services/flashcard_service.py` (~920 lignes) : Prompt template minimal (~23 lignes)
 
    **Frontend - Hook useFileDrop :**
    - Code drag-and-drop dupliqué dans 3 modaux :
@@ -596,8 +643,7 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
    - Créer `hooks/use-file-drop.ts` (~50 lignes économisées)
 
    **Backend - Décorateur error handling :**
-   - Pattern try-except répété ~27 fois dans `documents.py`
-   - Créer décorateur `@handle_api_errors` dans `utils/decorators.py`
+   - ~~Pattern try-except répété~~ - Messages spécifiques utiles pour debug, pas de décorateur générique
 
 4. **Nettoyer les logs de debug**
    - Retirer les `logger.info("🔍 ...")` ajoutés temporairement
