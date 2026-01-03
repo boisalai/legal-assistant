@@ -30,10 +30,12 @@ class OCRConfig:
 
     MODEL_ID = "PaddlePaddle/PaddleOCR-VL"
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".bmp"}
+    PDF_EXTENSIONS = {".pdf"}
     MAX_NEW_TOKENS = 4096
     IMAGE_QUALITY = 95
     MIN_IMAGE_SIZE = 100
     IMAGE_VARIANCE_THRESHOLD = 500
+    PDF_DPI = 200  # Resolution for PDF to image conversion
 
 
 class OCRService:
@@ -346,8 +348,69 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
         response = await asyncio.to_thread(agent.run, prompt)
         return response.content if response else markdown_content
 
+    def _convert_pdfs_to_images(self, input_dir: Path) -> int:
+        """
+        Convert all PDF files in directory to images.
+
+        Each page of each PDF is saved as a separate JPG file.
+        Returns the number of images created.
+        """
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            logger.warning("PyMuPDF not installed, skipping PDF conversion")
+            return 0
+
+        images_created = 0
+
+        for root, _dirs, files in os.walk(input_dir):
+            root_path = Path(root)
+            for f in files:
+                if Path(f).suffix.lower() in OCRConfig.PDF_EXTENSIONS:
+                    pdf_path = root_path / f
+                    try:
+                        doc = fitz.open(pdf_path)
+                        pdf_stem = pdf_path.stem
+
+                        for page_num in range(len(doc)):
+                            page = doc[page_num]
+                            # Render page to image at specified DPI
+                            mat = fitz.Matrix(
+                                OCRConfig.PDF_DPI / 72, OCRConfig.PDF_DPI / 72
+                            )
+                            pix = page.get_pixmap(matrix=mat)
+
+                            # Save as JPG
+                            img_filename = f"{pdf_stem}_page_{page_num + 1:03d}.jpg"
+                            img_path = root_path / img_filename
+                            pix.save(str(img_path))
+                            images_created += 1
+
+                        doc.close()
+                        logger.info(
+                            f"Converted {pdf_path.name}: {len(doc)} pages"
+                        )
+
+                        # Remove original PDF after conversion
+                        pdf_path.unlink()
+
+                    except Exception as e:
+                        logger.error(f"Error converting PDF {pdf_path}: {e}")
+
+        return images_created
+
     def _collect_images_from_dir(self, input_dir: Path) -> List[Path]:
-        """Collect and sort image files from directory (including nested)."""
+        """
+        Collect and sort image files from directory (including nested).
+
+        Also converts any PDF files to images first.
+        """
+        # First, convert any PDFs to images
+        pdf_images = self._convert_pdfs_to_images(input_dir)
+        if pdf_images > 0:
+            logger.info(f"Converted PDFs to {pdf_images} images")
+
+        # Then collect all images
         images = []
         for root, _dirs, files in os.walk(input_dir):
             for f in files:
@@ -436,7 +499,12 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_dir)
 
-            # Collect images
+            # Collect images (also converts any PDFs to images)
+            yield OCRProgressEvent(
+                status=OCRJobStatus.EXTRACTING_ZIP,
+                message="Conversion des PDF en images...",
+                percentage=8,
+            )
             images = self._collect_images_from_dir(extract_dir)
 
             if not images:
