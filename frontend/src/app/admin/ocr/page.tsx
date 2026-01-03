@@ -361,30 +361,42 @@ export default function AdminOCRPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                      <div className="flex items-center space-x-2">
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-2">
                         <Checkbox
                           id="extractImages"
                           checked={extractImages}
                           onCheckedChange={(checked) =>
                             setExtractImages(checked as boolean)
                           }
+                          className="mt-0.5"
                         />
-                        <Label htmlFor="extractImages" className="text-sm">
-                          Extraire les images
-                        </Label>
+                        <div>
+                          <Label htmlFor="extractImages" className="text-sm">
+                            Extraire les images
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Detecte et extrait les figures/illustrations. Desactiver pour accelerer.
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-start space-x-2">
                         <Checkbox
                           id="postProcessLLM"
                           checked={postProcessLLM}
                           onCheckedChange={(checked) =>
                             setPostProcessLLM(checked as boolean)
                           }
+                          className="mt-0.5"
                         />
-                        <Label htmlFor="postProcessLLM" className="text-sm">
-                          Post-traitement LLM (correction OCR)
-                        </Label>
+                        <div>
+                          <Label htmlFor="postProcessLLM" className="text-sm">
+                            Correction LLM du texte
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Corrige les erreurs OCR avec un LLM. Tres gourmand en ressources - desactiver pour accelerer significativement.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
