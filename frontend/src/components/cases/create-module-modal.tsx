@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import { Loader2, FileText, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { modulesApi } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
+import { useFileDrop, FILE_TYPE_PRESETS } from "@/hooks/use-file-drop";
 import type { Module, Document } from "@/types";
 
 interface CreateModuleModalProps {
@@ -46,14 +47,23 @@ export function CreateModuleModal({
   const [orderIndex, setOrderIndex] = useState(0);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-
-  // File upload state
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!module;
+
+  // File drop hook
+  const {
+    files: pendingFiles,
+    isDragActive: isDragOver,
+    getRootProps,
+    getInputProps,
+    openFileDialog,
+    removeFile,
+    clearFiles,
+  } = useFileDrop({
+    accept: FILE_TYPE_PRESETS.all,
+    multiple: true,
+  });
 
   // Reset form when modal opens/closes or module changes
   useEffect(() => {
@@ -71,46 +81,10 @@ export function CreateModuleModal({
         setOrderIndex(0);
         setSelectedDocIds([]);
       }
-      setPendingFiles([]);
+      clearFiles();
       setUploadProgress({ current: 0, total: 0 });
     }
-  }, [open, module, documents]);
-
-  // Drag & drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      setPendingFiles((prev) => [...prev, ...files]);
-    }
-  }, []);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      setPendingFiles((prev) => [...prev, ...files]);
-    }
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }, []);
-
-  const removeFile = useCallback((index: number) => {
-    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  }, [open, module, documents, clearFiles]);
 
   // Filter to show unassigned documents + documents assigned to current module (if editing)
   // Deduplicate by filename and sort alphabetically
@@ -353,25 +327,16 @@ export function CreateModuleModal({
             <div className="space-y-2">
               <Label>{t("uploadNewFiles")}</Label>
               <div
+                {...getRootProps()}
                 className={`
-                  border-2 border-dashed rounded-lg p-6 text-center transition-colors
+                  border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
                   ${isDragOver
                     ? "border-primary bg-primary/5"
                     : "border-muted-foreground/25 hover:border-muted-foreground/50"
                   }
                 `}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileSelect}
-                  accept=".pdf,.doc,.docx,.md,.mdx,.txt,.mp3,.wav,.m4a"
-                />
+                <input {...getInputProps()} />
                 <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mb-2">
                   {t("dropFilesHere")}
@@ -380,7 +345,10 @@ export function CreateModuleModal({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openFileDialog();
+                  }}
                 >
                   {t("browseFiles")}
                 </Button>

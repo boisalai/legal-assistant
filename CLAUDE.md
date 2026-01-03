@@ -210,9 +210,24 @@ Le système d'activity tracking permet à l'assistant IA de savoir ce que l'util
 
 ---
 
-## Session actuelle (2026-01-03) - Simplification backend et tests ✅
+## Session actuelle (2026-01-03) - Simplification backend/frontend et tests ✅
 
 **Objectif** : Continuer la simplification du codebase et valider avec les tests.
+
+### Hook useFileDrop (Frontend)
+
+**Nouveau fichier** :
+- `hooks/use-file-drop.ts` (148 lignes) - Encapsule `react-dropzone` avec API simplifiée
+
+**Caractéristiques** :
+- Presets de types de fichiers (`FILE_TYPE_PRESETS.documents`, `.audio`, `.all`)
+- Gestion d'état des fichiers (ajout, suppression, clear)
+- Callbacks `onFilesAdded` et `onFilesRejected`
+
+**Refactoring** :
+- `create-module-modal.tsx` : 463 → 430 lignes (-7%)
+  - Suppression des 5 handlers manuels de drag-and-drop
+  - Utilisation du hook pour une implémentation plus propre
 
 ### Corrections de bugs
 
@@ -635,12 +650,10 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
    - ~~`routes/chat.py` (~1250 lignes)~~ ✅ **FAIT** (2026-01-03) - Réduit à 934 lignes (-25%)
    - `services/flashcard_service.py` (~920 lignes) : Prompt template minimal (~23 lignes)
 
-   **Frontend - Hook useFileDrop :**
-   - Code drag-and-drop dupliqué dans 3 modaux :
-     - `create-module-modal.tsx`
-     - `document-upload-modal.tsx`
-     - `import-docusaurus-modal.tsx`
-   - Créer `hooks/use-file-drop.ts` (~50 lignes économisées)
+   **Frontend - Hook useFileDrop :** ✅ **FAIT** (2026-01-03)
+   - ~~Code drag-and-drop dupliqué dans modaux~~ → `hooks/use-file-drop.ts` créé
+   - `create-module-modal.tsx` refactorisé (463 → 430 lignes, -7%)
+   - Note : `document-upload-modal.tsx` conserve `useDropzone` direct (logique de status tracking spécifique)
 
    **Backend - Décorateur error handling :**
    - ~~Pattern try-except répété~~ - Messages spécifiques utiles pour debug, pas de décorateur générique
