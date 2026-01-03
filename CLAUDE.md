@@ -835,6 +835,81 @@ DEFAULT_VOICES = {
 - ❌ Créer des variantes personnalisées de composants existants
 - ✅ Composer plusieurs composants shadcn/ui pour créer de nouvelles fonctionnalités
 
+### Spécifications de style UI
+
+**Règle générale** : Toutes les pages admin et vues de la zone centrale doivent suivre le même style que la page de consultation de cours (`CaseDetailsPanel`).
+
+#### Typographie
+
+| Élément | Classe Tailwind | Taille | Usage |
+|---------|-----------------|--------|-------|
+| **Titre de page** | `text-xl font-bold` | 20px | En-tête principal de la vue |
+| **Titre de section** | `text-base font-semibold` | 16px | Titres des DataTables et sections |
+| **Texte courant** | `text-sm` | 14px | Contenu, descriptions, cellules de tableau |
+| **Texte secondaire** | `text-sm text-muted-foreground` | 14px | Descriptions, compteurs, métadonnées |
+
+#### Structure de page (zone centrale)
+
+```tsx
+<AppShell noPadding>
+  <div className="flex flex-col h-full overflow-hidden">
+    {/* Header - hauteur fixe 65px */}
+    <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
+      <h2 className="text-xl font-bold">Titre de la page</h2>
+      {/* Menu optionnel (DropdownMenu) */}
+    </div>
+
+    {/* Contenu scrollable */}
+    <div className="px-6 py-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
+      {/* Sections avec DataTables */}
+    </div>
+  </div>
+</AppShell>
+```
+
+**Note** : Utiliser `noPadding` sur AppShell pour contrôler les marges manuellement.
+
+#### Structure de section (avec DataTable)
+
+```tsx
+<div className="space-y-2">
+  {/* En-tête de section */}
+  <div className="flex items-center justify-between">
+    <h3 className="font-semibold text-base flex items-center gap-2">
+      <Icon className="h-4 w-4" />
+      Titre de section ({count})
+    </h3>
+    <Button size="sm" className="gap-1">
+      <Plus className="h-3 w-3" />
+      Action
+    </Button>
+  </div>
+
+  {/* DataTable */}
+  <MyDataTable ... />
+</div>
+```
+
+#### Règles de style
+
+1. **Icônes** : Taille `h-4 w-4` dans les titres, `h-3 w-3` dans les boutons `size="sm"`
+2. **Espacement** : `space-y-4` entre sections, `space-y-2` à l'intérieur d'une section
+3. **Padding** : `px-6 py-4` pour le contenu principal, `px-4` pour le header
+4. **Bordures** : `border-b` pour séparer le header du contenu
+5. **Boutons d'action** : `size="sm"` avec `gap-1` pour icône + texte
+6. **États de chargement** : `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />`
+7. **Messages vides** : `text-sm text-muted-foreground` centré avec `py-8`
+
+#### Couleurs des badges
+
+| Type | Variant | Usage |
+|------|---------|-------|
+| Admin | `destructive` | Rôle administrateur |
+| Principal | `default` | Rôle principal (notaire) |
+| Secondaire | `secondary` | Rôle secondaire (assistant) |
+| Statut actif | `outline` + `text-green-600 border-green-600` | Utilisateur actif |
+| Statut inactif | `outline` + `text-red-600 border-red-600` | Utilisateur inactif |
+
 ---
 
 ## Ressources
