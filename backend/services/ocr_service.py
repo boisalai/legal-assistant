@@ -767,28 +767,33 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
                 except Exception as e:
                     logger.warning(f"LLM post-processing failed: {e}")
 
-            # Step 6: Save markdown and create output ZIP
-            markdown_path = output_dir / "livre.md"
-            markdown_path.write_text(markdown_content, encoding="utf-8")
-
-            # Create result ZIP
-            result_zip_path = work_dir / "result.zip"
-            with zipfile.ZipFile(
-                result_zip_path, "w", zipfile.ZIP_DEFLATED
-            ) as zf:
-                for file_path in output_dir.rglob("*"):
-                    if file_path.is_file():
-                        arcname = file_path.relative_to(output_dir)
-                        zf.write(file_path, arcname)
-
-            # Move result to permanent location
+            # Step 6: Save result (markdown only or ZIP with images)
             results_dir = Path(settings.upload_dir) / "ocr_results"
             results_dir.mkdir(parents=True, exist_ok=True)
-
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            final_filename = f"ocr_{timestamp}.zip"
-            final_path = results_dir / final_filename
-            shutil.move(str(result_zip_path), str(final_path))
+
+            if total_images_extracted > 0:
+                # Images extracted: create ZIP with markdown + images
+                markdown_path = output_dir / "livre.md"
+                markdown_path.write_text(markdown_content, encoding="utf-8")
+
+                result_zip_path = work_dir / "result.zip"
+                with zipfile.ZipFile(
+                    result_zip_path, "w", zipfile.ZIP_DEFLATED
+                ) as zf:
+                    for file_path in output_dir.rglob("*"):
+                        if file_path.is_file():
+                            arcname = file_path.relative_to(output_dir)
+                            zf.write(file_path, arcname)
+
+                final_filename = f"ocr_{timestamp}.zip"
+                final_path = results_dir / final_filename
+                shutil.move(str(result_zip_path), str(final_path))
+            else:
+                # No images: return markdown directly
+                final_filename = f"ocr_{timestamp}.md"
+                final_path = results_dir / final_filename
+                final_path.write_text(markdown_content, encoding="utf-8")
 
             yield OCRProgressEvent(
                 status=OCRJobStatus.COMPLETED,

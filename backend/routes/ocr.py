@@ -2,7 +2,7 @@
 Routes API for OCR book scanning.
 
 Endpoints:
-- POST /api/admin/ocr/process - Upload ZIP and start OCR (SSE streaming)
+- POST /api/admin/ocr/process - Upload ZIP or PDF and start OCR (SSE streaming)
 - GET /api/admin/ocr/download/{filename} - Download result ZIP
 - GET /api/admin/ocr/results - List available results
 """
@@ -12,6 +12,7 @@ import logging
 import shutil
 import tempfile
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Optional
 
@@ -39,7 +40,7 @@ def _parse_form_bool(value: str, default: bool = True) -> bool:
 
 @router.post("/process", summary="Process scanned book (SSE)")
 async def process_ocr(
-    file: UploadFile = File(..., description="ZIP file containing JPG page images"),
+    file: UploadFile = File(..., description="ZIP or PDF file"),
     title: Optional[str] = Form(default=None, description="Book title"),
     start_page: int = Form(default=1, ge=1, description="Starting page number"),
     extract_images: str = Form(default="true", description="Extract embedded images"),
@@ -52,9 +53,13 @@ async def process_ocr(
     _user_id: str = Depends(require_admin),
 ):
     """
-    Upload a ZIP file with scanned book pages and start OCR processing.
+    Upload a ZIP or PDF file with scanned book pages and start OCR processing.
 
     Returns SSE stream with progress updates.
+
+    Supported formats:
+    - ZIP containing JPG/PNG images or PDF files
+    - PDF file (multi-page)
 
     OCR Engines:
     - docling: Docling VLM - local, MLX accelerated on Apple Silicon (default, recommended)
@@ -71,20 +76,44 @@ async def process_ocr(
     - error: Error occurred
     """
     # Validate file type
-    if not file.filename or not file.filename.lower().endswith(".zip"):
+    if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le fichier doit etre au format ZIP",
+            detail="Nom de fichier manquant",
+        )
+
+    filename_lower = file.filename.lower()
+    is_zip = filename_lower.endswith(".zip")
+    is_pdf = filename_lower.endswith(".pdf")
+
+    if not is_zip and not is_pdf:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le fichier doit etre au format ZIP ou PDF",
         )
 
     # Save uploaded file to temp location
     temp_dir = Path(tempfile.mkdtemp(prefix="ocr_upload_"))
-    temp_zip = temp_dir / f"{uuid.uuid4().hex}.zip"
 
     try:
         content = await file.read()
-        temp_zip.write_bytes(content)
-        logger.info(f"Uploaded ZIP saved: {temp_zip} ({len(content)} bytes)")
+
+        if is_pdf:
+            # For PDF: create a ZIP containing the PDF (reuses existing processing logic)
+            pdf_path = temp_dir / file.filename
+            pdf_path.write_bytes(content)
+
+            temp_zip = temp_dir / f"{uuid.uuid4().hex}.zip"
+            with zipfile.ZipFile(temp_zip, "w") as zf:
+                zf.write(pdf_path, file.filename)
+
+            logger.info(f"Uploaded PDF packaged as ZIP: {temp_zip} ({len(content)} bytes)")
+        else:
+            # For ZIP: save directly
+            temp_zip = temp_dir / f"{uuid.uuid4().hex}.zip"
+            temp_zip.write_bytes(content)
+            logger.info(f"Uploaded ZIP saved: {temp_zip} ({len(content)} bytes)")
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -146,7 +175,7 @@ async def download_ocr_result(
     _user_id: str = Depends(require_admin),
 ):
     """
-    Download the processed OCR result ZIP file.
+    Download the processed OCR result file (ZIP or Markdown).
 
     The filename is returned in the 'completed' SSE event message.
     """
@@ -173,9 +202,15 @@ async def download_ocr_result(
             detail="Fichier non trouve",
         )
 
+    # Determine media type based on file extension
+    if filename.lower().endswith(".md"):
+        media_type = "text/markdown"
+    else:
+        media_type = "application/zip"
+
     return FileResponse(
         file_path,
-        media_type="application/zip",
+        media_type=media_type,
         filename=filename,
     )
 
@@ -191,15 +226,17 @@ async def list_ocr_results(
         return {"results": []}
 
     results = []
-    for f in results_dir.glob("ocr_*.zip"):
-        stat = f.stat()
-        results.append(
-            {
-                "filename": f.name,
-                "size_bytes": stat.st_size,
-                "created_at": stat.st_mtime,
-            }
-        )
+    # List both ZIP and Markdown files
+    for pattern in ["ocr_*.zip", "ocr_*.md"]:
+        for f in results_dir.glob(pattern):
+            stat = f.stat()
+            results.append(
+                {
+                    "filename": f.name,
+                    "size_bytes": stat.st_size,
+                    "created_at": stat.st_mtime,
+                }
+            )
 
     # Sort by creation time, newest first
     results.sort(key=lambda x: x["created_at"], reverse=True)
