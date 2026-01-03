@@ -10,11 +10,20 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class OCREngine(str, Enum):
+    """OCR engine choice."""
+
+    DOCLING = "docling"  # Docling with VLM - local, MLX accelerated on Apple Silicon (default)
+    PADDLEOCR_VL = "paddleocr_vl"  # PaddleOCR-VL (Transformers) - ~4 GB RAM
+    MLX_DOTS_OCR = "mlx_dots_ocr"  # dots.ocr via MLX - model unavailable
+
+
 class OCRJobStatus(str, Enum):
     """Status of an OCR job."""
 
     PENDING = "pending"
     EXTRACTING_ZIP = "extracting_zip"
+    LOADING_MODEL = "loading_model"
     PROCESSING_PAGES = "processing_pages"
     POST_PROCESSING = "post_processing"
     GENERATING_OUTPUT = "generating_output"

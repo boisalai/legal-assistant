@@ -1,13 +1,18 @@
 """
 OCR Service for book scanning.
 
-Uses PaddleOCR-VL for text extraction and OpenCV for image detection.
-Adapted from ocr_livre_images_light.py reference script.
+Supports OCR engines:
+- Docling: Local VLM with MLX acceleration on Apple Silicon (default, recommended)
+- PaddleOCR-VL: Local model (~5 sec/page), ~4 GB RAM, supports image extraction
+- MLX dots.ocr: Apple Silicon optimized - model currently unavailable
+
+Adapted from ocr_livre_images_light.py and ocr_livre_mlx.py reference scripts.
 """
 
 import asyncio
 import logging
 import os
+import platform
 import re
 import shutil
 import tempfile
@@ -19,8 +24,12 @@ from typing import AsyncGenerator, List, Optional, Tuple
 import numpy as np
 from PIL import Image
 
+# Increase PIL decompression bomb limit for high-resolution scanned books
+# Default is ~178M pixels, we allow up to 500M pixels (~22000x22000)
+Image.MAX_IMAGE_PIXELS = 500_000_000
+
 from config.settings import settings
-from models.ocr_models import OCRJobStatus, OCRPageResult, OCRProgressEvent
+from models.ocr_models import OCREngine, OCRJobStatus, OCRPageResult, OCRProgressEvent
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +37,17 @@ logger = logging.getLogger(__name__)
 class OCRConfig:
     """OCR configuration."""
 
-    MODEL_ID = "PaddlePaddle/PaddleOCR-VL"
+    # Docling config (local VLM with MLX acceleration)
+    DOCLING_VLM_MODEL = "granite_docling"  # GraniteDocling VLM for scanned documents
+
+    # PaddleOCR-VL config
+    PADDLE_MODEL_ID = "PaddlePaddle/PaddleOCR-VL"
+
+    # MLX dots.ocr config (model currently unavailable)
+    MLX_MODEL_ID = "mlx-community/dots.ocr-3B-4bit"
+    MLX_PROMPT = "Convert this page to Markdown. Preserve all text, paragraphs, and formatting."
+
+    # Common config
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".bmp"}
     PDF_EXTENSIONS = {".pdf"}
     MAX_NEW_TOKENS = 4096
@@ -37,18 +56,79 @@ class OCRConfig:
     IMAGE_VARIANCE_THRESHOLD = 500
     PDF_DPI = 200  # Resolution for PDF to image conversion
 
+    # Image resizing for large scans (prevents memory issues and speeds up OCR)
+    MAX_IMAGE_DIMENSION = 4000  # Max width or height in pixels
+    RESIZE_QUALITY = Image.Resampling.LANCZOS  # High quality downsampling
+
 
 class OCRService:
     """Service for OCR processing of scanned books."""
 
     def __init__(self):
-        self.model = None
-        self.processor = None
-        self.device = None
-        self._model_loaded = False
+        # Docling state
+        self._docling_converter = None
+        self._docling_loaded = False
+
+        # PaddleOCR-VL state
+        self._paddle_model = None
+        self._paddle_processor = None
+        self._paddle_device = None
+        self._paddle_loaded = False
+
+        # MLX dots.ocr state
+        self._mlx_model = None
+        self._mlx_processor = None
+        self._mlx_loaded = False
+
+        # Current engine
+        self._current_engine: Optional[OCREngine] = None
+
+    def _is_apple_silicon(self) -> bool:
+        """Check if running on Apple Silicon."""
+        return platform.system() == "Darwin" and platform.machine() == "arm64"
+
+    def _resize_image_if_needed(self, image_path: Path) -> Path:
+        """
+        Resize image if it exceeds MAX_IMAGE_DIMENSION.
+
+        Returns the path to the resized image (or original if no resize needed).
+        Creates a temporary file for resized images.
+        """
+        img = Image.open(image_path)
+        width, height = img.size
+        max_dim = OCRConfig.MAX_IMAGE_DIMENSION
+
+        # Check if resize is needed
+        if width <= max_dim and height <= max_dim:
+            img.close()
+            return image_path
+
+        # Calculate new dimensions maintaining aspect ratio
+        if width > height:
+            new_width = max_dim
+            new_height = int(height * (max_dim / width))
+        else:
+            new_height = max_dim
+            new_width = int(width * (max_dim / height))
+
+        logger.info(
+            f"Resizing image from {width}x{height} to {new_width}x{new_height} "
+            f"({width * height / 1_000_000:.1f}M -> {new_width * new_height / 1_000_000:.1f}M pixels)"
+        )
+
+        # Resize with high quality
+        img_resized = img.resize((new_width, new_height), OCRConfig.RESIZE_QUALITY)
+        img.close()
+
+        # Save to temp file
+        temp_path = image_path.parent / f"_resized_{image_path.name}"
+        img_resized.save(temp_path, quality=OCRConfig.IMAGE_QUALITY)
+        img_resized.close()
+
+        return temp_path
 
     def _get_device(self) -> str:
-        """Detect the best available device."""
+        """Detect the best available device for PyTorch."""
         import torch
 
         if torch.cuda.is_available():
@@ -67,36 +147,100 @@ class OCRService:
             return torch.bfloat16
         return torch.float32
 
-    async def load_model(self) -> None:
+    async def load_model(self, engine: OCREngine = OCREngine.DOCLING) -> None:
+        """Load the OCR model for the specified engine."""
+        if engine == OCREngine.DOCLING:
+            await self._load_docling()
+        elif engine == OCREngine.MLX_DOTS_OCR:
+            await self._load_mlx_model()
+        else:
+            await self._load_paddle_model()
+        self._current_engine = engine
+
+    async def _load_docling(self) -> None:
+        """Load the Docling converter with VLM pipeline."""
+        if self._docling_loaded:
+            return
+
+        logger.info("Loading Docling with VLM pipeline...")
+
+        def _init_docling():
+            from docling.datamodel.pipeline_options import VlmPipelineOptions
+            from docling.document_converter import DocumentConverter, PdfFormatOption
+            from docling.pipeline.vlm_pipeline import VlmPipeline
+
+            # Configure VLM pipeline for scanned documents
+            vlm_options = VlmPipelineOptions(
+                vlm_model=OCRConfig.DOCLING_VLM_MODEL,
+            )
+
+            converter = DocumentConverter(
+                format_options={
+                    "pdf": PdfFormatOption(
+                        pipeline_cls=VlmPipeline,
+                        pipeline_options=vlm_options,
+                    ),
+                }
+            )
+            return converter
+
+        self._docling_converter = await asyncio.to_thread(_init_docling)
+        self._docling_loaded = True
+        logger.info("Docling VLM pipeline loaded successfully")
+
+    async def _load_paddle_model(self) -> None:
         """Load the PaddleOCR-VL model."""
-        if self._model_loaded:
+        if self._paddle_loaded:
             return
 
         import torch
         from transformers import AutoModelForCausalLM, AutoProcessor
 
-        self.device = self._get_device()
-        dtype = self._get_dtype(self.device)
+        self._paddle_device = self._get_device()
+        dtype = self._get_dtype(self._paddle_device)
 
-        logger.info(f"Loading PaddleOCR-VL on {self.device}...")
+        logger.info(f"Loading PaddleOCR-VL on {self._paddle_device}...")
 
-        self.processor = AutoProcessor.from_pretrained(
-            OCRConfig.MODEL_ID, trust_remote_code=True
+        self._paddle_processor = AutoProcessor.from_pretrained(
+            OCRConfig.PADDLE_MODEL_ID, trust_remote_code=True
         )
 
-        self.model = (
+        self._paddle_model = (
             AutoModelForCausalLM.from_pretrained(
-                OCRConfig.MODEL_ID,
+                OCRConfig.PADDLE_MODEL_ID,
                 trust_remote_code=True,
                 torch_dtype=dtype,
                 low_cpu_mem_usage=True,
             )
-            .to(self.device)
+            .to(self._paddle_device)
             .eval()
         )
 
-        self._model_loaded = True
+        self._paddle_loaded = True
         logger.info("PaddleOCR-VL model loaded successfully")
+
+    async def _load_mlx_model(self) -> None:
+        """Load the MLX dots.ocr model."""
+        if self._mlx_loaded:
+            return
+
+        if not self._is_apple_silicon():
+            raise RuntimeError(
+                "MLX dots.ocr requires Apple Silicon (M1/M2/M3). "
+                "Use PaddleOCR-VL engine instead."
+            )
+
+        from mlx_vlm import load
+
+        logger.info(f"Loading MLX dots.ocr ({OCRConfig.MLX_MODEL_ID})...")
+
+        # Load model in thread to avoid blocking
+        self._mlx_model, self._mlx_processor = await asyncio.to_thread(
+            load, OCRConfig.MLX_MODEL_ID
+        )
+
+        self._mlx_loaded = True
+        logger.info("MLX dots.ocr model loaded successfully")
 
     def _detect_image_regions(
         self, image_path: Path, min_size: int = 100
@@ -200,34 +344,91 @@ class OCRService:
 
         return extracted
 
-    async def _ocr_page(self, image_path: Path) -> str:
-        """Perform OCR on a single page."""
+    async def _ocr_page(
+        self, image_path: Path, engine: OCREngine = OCREngine.DOCLING
+    ) -> str:
+        """Perform OCR on a single page using the specified engine."""
+        if engine == OCREngine.DOCLING:
+            return await self._ocr_page_docling(image_path)
+        elif engine == OCREngine.MLX_DOTS_OCR:
+            return await self._ocr_page_mlx(image_path)
+        return await self._ocr_page_paddle(image_path)
+
+    async def _ocr_page_paddle(self, image_path: Path) -> str:
+        """Perform OCR using PaddleOCR-VL."""
         import torch
 
         image = Image.open(image_path).convert("RGB")
 
         messages = [{"role": "user", "content": "OCR"}]
-        text = self.processor.apply_chat_template(
+        text = self._paddle_processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
 
-        inputs = self.processor(
+        inputs = self._paddle_processor(
             text=[text], images=[image], return_tensors="pt"
-        ).to(self.device)
+        ).to(self._paddle_device)
 
         with torch.no_grad():
-            generated = self.model.generate(
+            generated = self._paddle_model.generate(
                 **inputs,
                 max_new_tokens=OCRConfig.MAX_NEW_TOKENS,
                 do_sample=False,
-                pad_token_id=self.processor.tokenizer.pad_token_id,
+                pad_token_id=self._paddle_processor.tokenizer.pad_token_id,
             )
 
-        response = self.processor.batch_decode(
+        response = self._paddle_processor.batch_decode(
             generated[:, inputs["input_ids"].shape[1] :], skip_special_tokens=True
         )[0]
 
         return response.strip()
+
+    async def _ocr_page_mlx(self, image_path: Path) -> str:
+        """Perform OCR using MLX dots.ocr."""
+        from mlx_vlm import generate
+        from mlx_vlm.utils import load_image
+
+        # Load image using mlx_vlm utility
+        image = await asyncio.to_thread(load_image, str(image_path))
+
+        # Generate text using MLX
+        output = await asyncio.to_thread(
+            generate,
+            self._mlx_model,
+            self._mlx_processor,
+            image,
+            OCRConfig.MLX_PROMPT,
+            max_tokens=OCRConfig.MAX_NEW_TOKENS,
+            temperature=0.0,  # Deterministic for OCR
+            verbose=False,
+        )
+
+        return output.strip()
+
+    async def _ocr_page_docling(self, image_path: Path) -> str:
+        """Perform OCR using Docling VLM pipeline."""
+        from docling_core.types.doc import ImageRefMode
+
+        # Resize image if too large (prevents memory issues)
+        resized_path = self._resize_image_if_needed(image_path)
+        use_resized = resized_path != image_path
+
+        def _convert_image():
+            # Convert single image using Docling
+            result = self._docling_converter.convert(str(resized_path))
+            # Export to markdown
+            return result.document.export_to_markdown(image_mode=ImageRefMode.EMBEDDED)
+
+        try:
+            markdown = await asyncio.to_thread(_convert_image)
+            return markdown.strip()
+        finally:
+            # Cleanup resized temp file
+            if use_resized and resized_path.exists():
+                try:
+                    resized_path.unlink()
+                except Exception:
+                    pass
 
     async def process_page(
         self,
@@ -235,20 +436,21 @@ class OCRService:
         output_dir: Path,
         page_num: int,
         extract_images: bool = True,
+        engine: OCREngine = OCREngine.DOCLING,
     ) -> OCRPageResult:
         """Process a single page: OCR + optional image extraction."""
         result = OCRPageResult(page_num=page_num, text="", images=[])
 
         # OCR
         try:
-            result.text = await self._ocr_page(image_path)
+            result.text = await self._ocr_page(image_path, engine)
         except Exception as e:
             logger.error(f"OCR error on page {page_num}: {e}")
             result.error = str(e)
             result.text = f"*[OCR Error: {e}]*"
 
-        # Image extraction
-        if extract_images:
+        # Image extraction (only for PaddleOCR-VL engine - Docling handles images internally)
+        if extract_images and engine == OCREngine.PADDLEOCR_VL:
             try:
                 regions = self._detect_image_regions(image_path)
                 if regions:
@@ -383,6 +585,7 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
         pages_results: List[OCRPageResult],
         title: Optional[str] = None,
         start_page: int = 1,
+        engine: OCREngine = OCREngine.DOCLING,
     ) -> str:
         """Generate the final Markdown document."""
         lines = []
@@ -399,7 +602,15 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
 
         total_images = sum(len(r.images) for r in pages_results)
         lines.append(f"Images extraites : {total_images}")
-        lines.append("Modele OCR : PaddleOCR-VL")
+
+        # Show engine name
+        engine_names = {
+            OCREngine.DOCLING: "Docling VLM",
+            OCREngine.PADDLEOCR_VL: "PaddleOCR-VL",
+            OCREngine.MLX_DOTS_OCR: "dots.ocr (MLX)",
+        }
+        engine_name = engine_names.get(engine, str(engine))
+        lines.append(f"Modele OCR : {engine_name}")
         lines.append("---")
         lines.append("")
 
@@ -432,15 +643,29 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
         extract_images: bool = True,
         post_process_with_llm: bool = True,
         model_id: Optional[str] = None,
+        engine: OCREngine = OCREngine.DOCLING,
     ) -> AsyncGenerator[OCRProgressEvent, None]:
         """
         Process a ZIP file containing scanned pages.
+
+        Args:
+            zip_path: Path to the ZIP file
+            title: Optional book title
+            start_page: Starting page number
+            extract_images: Extract embedded images (only for PaddleOCR-VL)
+            post_process_with_llm: Clean OCR errors with LLM
+            model_id: LLM model ID for post-processing
+            engine: OCR engine to use (docling, paddleocr_vl, or mlx_dots_ocr)
 
         Yields OCRProgressEvent for SSE streaming.
         """
         work_dir = Path(tempfile.mkdtemp(prefix="ocr_"))
         extract_dir = work_dir / "pages"
         output_dir = work_dir / "output"
+
+        # For Docling and MLX engines, disable image extraction (handled internally or not supported)
+        if engine in (OCREngine.DOCLING, OCREngine.MLX_DOTS_OCR):
+            extract_images = False
 
         try:
             # Step 1: Extract ZIP
@@ -473,14 +698,20 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
             output_dir.mkdir(parents=True, exist_ok=True)
 
             # Step 2: Load model
+            engine_names = {
+                OCREngine.DOCLING: "Docling VLM",
+                OCREngine.PADDLEOCR_VL: "PaddleOCR-VL",
+                OCREngine.MLX_DOTS_OCR: "dots.ocr (MLX)",
+            }
+            engine_name = engine_names.get(engine, str(engine))
             yield OCRProgressEvent(
-                status=OCRJobStatus.PROCESSING_PAGES,
+                status=OCRJobStatus.LOADING_MODEL,
                 total_pages=total_pages,
-                message="Chargement du modele OCR...",
+                message=f"Chargement du modele {engine_name}...",
                 percentage=10,
             )
 
-            await self.load_model()
+            await self.load_model(engine)
 
             # Step 3: Process pages
             pages_results: List[OCRPageResult] = []
@@ -499,7 +730,7 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
                 )
 
                 result = await self.process_page(
-                    img_path, output_dir, page_num, extract_images
+                    img_path, output_dir, page_num, extract_images, engine
                 )
                 pages_results.append(result)
                 total_images_extracted += len(result.images)
@@ -514,7 +745,9 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
                 percentage=80,
             )
 
-            markdown_content = self._generate_markdown(pages_results, title, start_page)
+            markdown_content = self._generate_markdown(
+                pages_results, title, start_page, engine
+            )
 
             # Step 5: LLM post-processing (optional)
             if post_process_with_llm:

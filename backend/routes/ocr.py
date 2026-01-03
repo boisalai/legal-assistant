@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from auth.helpers import require_admin
 from config.settings import settings
-from models.ocr_models import OCRJobStatus, OCRProgressEvent
+from models.ocr_models import OCREngine, OCRJobStatus, OCRProgressEvent
 from services.ocr_service import get_ocr_service
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,12 @@ async def process_ocr(
     title: Optional[str] = Form(default=None, description="Book title"),
     start_page: int = Form(default=1, ge=1, description="Starting page number"),
     extract_images: str = Form(default="true", description="Extract embedded images"),
-    post_process_with_llm: str = Form(default="true", description="Clean with LLM"),
+    post_process_with_llm: str = Form(default="false", description="Clean with LLM"),
     model_id: Optional[str] = Form(default=None, description="LLM model ID"),
+    ocr_engine: str = Form(
+        default="docling",
+        description="OCR engine: docling (recommended), paddleocr_vl, or mlx_dots_ocr",
+    ),
     _user_id: str = Depends(require_admin),
 ):
     """
@@ -52,8 +56,14 @@ async def process_ocr(
 
     Returns SSE stream with progress updates.
 
+    OCR Engines:
+    - docling: Docling VLM - local, MLX accelerated on Apple Silicon (default, recommended)
+    - paddleocr_vl: PaddleOCR-VL - ~4 GB RAM, supports image extraction
+    - mlx_dots_ocr: dots.ocr via MLX - model currently unavailable
+
     Event types:
     - extracting_zip: ZIP extraction in progress
+    - loading_model: Loading OCR model
     - processing_pages: OCR processing pages
     - post_processing: LLM cleanup
     - generating_output: Creating output files
@@ -81,6 +91,12 @@ async def process_ocr(
             detail=f"Erreur lors de l'upload: {str(e)}",
         )
 
+    # Parse OCR engine
+    try:
+        engine = OCREngine(ocr_engine)
+    except ValueError:
+        engine = OCREngine.DOCLING
+
     async def event_stream():
         """Generate SSE events for OCR progress."""
         ocr_service = get_ocr_service()
@@ -91,8 +107,9 @@ async def process_ocr(
                 title=title,
                 start_page=start_page,
                 extract_images=_parse_form_bool(extract_images, default=True),
-                post_process_with_llm=_parse_form_bool(post_process_with_llm, default=True),
+                post_process_with_llm=_parse_form_bool(post_process_with_llm, default=False),
                 model_id=model_id,
+                engine=engine,
             ):
                 yield f"data: {json.dumps(event.model_dump())}\n\n"
 

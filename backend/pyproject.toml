@@ -51,6 +51,7 @@ dependencies = [
     "beautifulsoup4>=4.12.3",
     "pymupdf>=1.26.7",
     "einops>=0.8.1",
+    "mlx-vlm>=0.3.9",
 ]
 
 [project.optional-dependencies]
