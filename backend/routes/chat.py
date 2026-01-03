@@ -169,19 +169,16 @@ async def chat(request: ChatRequest):
         # Auto-start model server if needed (MLX or vLLM)
         # Note: "huggingface:" is deprecated and redirects to "vllm:" in model_factory
         if request.model_id.startswith(("mlx:", "vllm:", "huggingface:")):
-            logger.info("DEBUG - Auto-startup condition TRUE")
             if request.model_id.startswith("mlx:"):
                 provider = "MLX"
             else:
                 # Both "vllm:" and deprecated "huggingface:" use vLLM
                 provider = "vLLM"
-            logger.info(f"🚀 {provider} model detected: {request.model_id}")
-            logger.info(f"⏳ Auto-starting {provider} server...")
 
             server_ready = await ensure_model_server(request.model_id)
 
             if not server_ready:
-                error_msg = f"❌ Failed to start {provider} server. "
+                error_msg = f"Failed to start {provider} server. "
                 if provider == "MLX":
                     error_msg += "Check that mlx-lm is installed (uv sync)."
                 else:
@@ -189,13 +186,7 @@ async def chat(request: ChatRequest):
                 logger.error(error_msg)
                 raise HTTPException(status_code=500, detail=error_msg)
 
-            logger.info(f"✅ {provider} server ready")
-        else:
-            logger.info(f"DEBUG - Auto-startup condition FALSE - model_id: '{request.model_id}'")
-            logger.info("DEBUG - This model does not require auto-startup (not MLX/vLLM/huggingface)")
-
         # Create the model
-        logger.info(f"DEBUG - Creating model with model_id: '{request.model_id}'")
         model = create_model(request.model_id)
 
         # Get tools description
@@ -277,31 +268,20 @@ Contexte actuel:
                             "SELECT * FROM document WHERE course_id = $course_id ORDER BY created_at DESC",
                             {"course_id": course_id}
                         )
-                        logger.info(f"Documents query result type: {type(docs_result)}, len: {len(docs_result) if docs_result else 0}")
-
                         documents = []
                         if docs_result and len(docs_result) > 0:
                             # Handle different SurrealDB response formats
                             first_item = docs_result[0]
-                            logger.info(f"🔍 DEBUG: first_item type={type(first_item)}, keys={first_item.keys() if isinstance(first_item, dict) else 'N/A'}")
-
                             if isinstance(first_item, dict):
                                 if "result" in first_item:
                                     # Format: [{"result": [...]}]
                                     documents = first_item["result"] if isinstance(first_item["result"], list) else []
-                                    logger.info(f"🔍 DEBUG: Found documents in 'result' key: {len(documents)}")
                                 elif "id" in first_item or "nom_fichier" in first_item:
                                     # Format: [{doc1}, {doc2}, ...] - direct list of documents
                                     documents = docs_result
-                                    logger.info(f"🔍 DEBUG: Found documents as direct list: {len(documents)}")
                             elif isinstance(first_item, list):
                                 # Format: [[doc1, doc2, ...]]
                                 documents = first_item
-                                logger.info(f"🔍 DEBUG: Found documents as nested list: {len(documents)}")
-                        else:
-                            logger.warning(f"🔍 DEBUG: docs_result is empty or None: {docs_result}")
-
-                        logger.info(f"Parsed {len(documents)} documents")
 
                         if documents:
                             # Build relationship maps FIRST
@@ -456,11 +436,6 @@ Document contents:"""
                                     doc_result = await service.query(f"SELECT * FROM {current_document_id}")
                                     if doc_result and len(doc_result) > 0:
                                         current_document = _parse_surreal_record(doc_result[0])
-                                        logger.info(f"✅ Tutor mode: Document '{current_document.get('nom_fichier')}' is currently open")
-                                elif current_module:
-                                    logger.info(f"✅ Tutor mode: Module '{current_module.get('module_name')}' is currently open")
-                                else:
-                                    logger.info("✅ Tutor mode: No document or module open, course-wide context")
                             except Exception as e:
                                 logger.warning(f"Could not detect current document/module: {e}")
 
@@ -480,7 +455,6 @@ Document contents:"""
                 logger.warning(f"Could not get case context: {e}", exc_info=True)
         else:
             # No course_id provided - build tutor prompt without course context
-            logger.info("No course_id provided - using tutor mode without course context")
             system_content = build_tutor_system_prompt(
                 case_data=None,
                 documents=[],

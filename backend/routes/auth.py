@@ -178,21 +178,16 @@ async def get_user_by_email(email: str) -> Optional[dict]:
 async def get_user_by_id(user_id: str) -> Optional[dict]:
     """Get user from SurrealDB by ID."""
     try:
-        logger.info(f"🔍 get_user_by_id called with: {user_id} (type: {type(user_id).__name__})")
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
         # Use query instead of select because select() doesn't work with string IDs
         result = await service.db.query(f"SELECT * FROM {user_id}")
-        logger.info(f"🔍 get_user_by_id result: {result} (type: {type(result).__name__})")
 
         if result and len(result) > 0:
-            user = result[0]
-            logger.info(f"✅ User found: {user.get('email')}")
-            return user
+            return result[0]
 
-        logger.warning(f"⚠️ get_user_by_id returned None for user_id: {user_id}")
         return None
     except Exception as e:
         logger.error(f"Error getting user by id: {e}")
@@ -463,22 +458,14 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
             detail="Utilisateur non trouvé"
         )
 
-    # Debug logging
-    logger.info(f"🔍 /api/auth/me - User from DB: {user}")
-    user_role = user.get("role", "notaire")
-    logger.info(f"🎭 Role extracted: '{user_role}' (type: {type(user_role).__name__})")
-
-    response = UserResponse(
+    return UserResponse(
         id=str(user.get("id", user_id)),
         email=user.get("email", ""),
         nom=user.get("nom", ""),
         prenom=user.get("prenom", ""),
-        role=user_role,
+        role=user.get("role", "notaire"),
         created_at=str(user.get("created_at", ""))
     )
-    logger.info(f"📤 /api/auth/me - Response: {response.model_dump()}")
-
-    return response
 
 
 @router.post("/logout")

@@ -229,6 +229,16 @@ Le système d'activity tracking permet à l'assistant IA de savoir ce que l'util
   - Suppression des 5 handlers manuels de drag-and-drop
   - Utilisation du hook pour une implémentation plus propre
 
+### Nettoyage des logs de debug (Backend)
+
+**Fichiers nettoyés** :
+- `routes/chat.py` : -28 lignes (suppression logs DEBUG et logs verbeux tutor mode)
+- `routes/auth.py` : -15 lignes (suppression logs DEBUG pour get_user_by_id et /me)
+
+**Logs conservés** :
+- Erreurs et warnings (utiles pour debugging)
+- Logs opérationnels des services (MLX/vLLM server start/stop)
+
 ### Corrections de bugs
 
 - **Import manquant** : `MAX_FILE_SIZE` ajouté dans `routes/documents.py` (cassait l'endpoint de liaison)
@@ -658,9 +668,10 @@ Ajout de la section "Activity Tracking (Contexte IA)" dans CLAUDE.md avec guide 
    **Backend - Décorateur error handling :**
    - ~~Pattern try-except répété~~ - Messages spécifiques utiles pour debug, pas de décorateur générique
 
-4. **Nettoyer les logs de debug**
-   - Retirer les `logger.info("🔍 ...")` ajoutés temporairement
-   - Garder uniquement les logs essentiels (erreurs, warnings)
+4. **Nettoyer les logs de debug** ✅ **FAIT** (2026-01-03)
+   - ~~Retirer les `logger.info("🔍 ...")` ajoutés temporairement~~ - Supprimé
+   - `routes/chat.py` : -28 lignes de debug logs
+   - `routes/auth.py` : -15 lignes de debug logs
 
 ### 🎯 Priorité Haute - Stabilité et Qualité
 
