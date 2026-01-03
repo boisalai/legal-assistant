@@ -27,28 +27,41 @@ from services.tts_service import TTSService
 logger = logging.getLogger(__name__)
 
 
-# Prompt template for flashcard generation - optimized for local models
-FLASHCARD_GENERATION_PROMPT = """Tu dois générer exactement {card_count} fiches de révision en JSON.
+# Prompt template for flashcard generation - optimized for exam preparation
+FLASHCARD_GENERATION_PROMPT = """Tu es un expert en pédagogie créant des fiches de révision pour un examen universitaire.
 
-IMPORTANT: Tu dois retourner un objet JSON avec une clé "cards" contenant un tableau de {card_count} fiches.
+OBJECTIF: Générer {card_count} fiches DIVERSIFIÉES couvrant les concepts clés du contenu ci-dessous.
 
-Exemple de format attendu (avec 3 fiches):
+TYPES DE QUESTIONS À VARIER (utilise au moins 3 types différents):
+- DÉFINITION: "Qu'est-ce que [concept]?" → définition précise
+- APPLICATION: "Dans quel cas utilise-t-on [concept]?" → contexte pratique
+- COMPARAISON: "Quelle différence entre [A] et [B]?" → distinction claire
+- CAUSE-EFFET: "Pourquoi [phénomène] se produit-il?" → explication causale
+- EXEMPLE: "Donnez un exemple de [concept]" → illustration concrète
+- PROCÉDURE: "Quelles sont les étapes de [processus]?" → séquence ordonnée
+
+DOCUMENT SOURCE: {document_name}
+---
+{content}
+---
+
+RÈGLES DE DIVERSITÉ:
+1. Couvre TOUS les thèmes/sections importants du document
+2. Varie les types de questions (pas 2 définitions consécutives)
+3. Priorise les concepts susceptibles d'être à l'examen
+4. Évite les questions triviales ou trop évidentes
+5. Chaque réponse doit être autonome (compréhensible sans la question)
+
+FORMAT JSON REQUIS:
 {{"cards": [
-  {{"front": "Question 1?", "back": "Réponse 1"}},
-  {{"front": "Question 2?", "back": "Réponse 2"}},
-  {{"front": "Question 3?", "back": "Réponse 3"}}
+  {{"front": "Question claire?", "back": "Réponse complète en 1-3 phrases.", "theme": "thème/section"}},
+  ...
 ]}}
 
-Contenu source (résumé):
-{content}
-
-RÈGLES STRICTES:
-1. Génère EXACTEMENT {card_count} fiches, pas plus, pas moins
-2. Chaque fiche DOIT avoir: front (question), back (réponse)
-3. front = question claire et concise
-4. back = réponse en 1-2 phrases
-5. Réponds UNIQUEMENT avec le JSON, rien d'autre
-6. Le JSON doit commencer par {{ et finir par }}
+IMPORTANT:
+- Génère EXACTEMENT {card_count} fiches
+- Réponds UNIQUEMENT avec le JSON valide
+- Inclus le champ "theme" pour chaque fiche
 
 JSON:"""
 
@@ -149,6 +162,9 @@ class FlashcardService:
         """
         Generate flashcards from documents using LLM.
 
+        Processes each document individually to maintain source attribution
+        and ensure diverse coverage across all source materials.
+
         Args:
             deck_id: ID of the deck to add cards to
             source_document_ids: List of document IDs to generate from
@@ -165,9 +181,10 @@ class FlashcardService:
             "message": f"Démarrage de la génération avec {model_id}..."
         }
 
-        # Collect document contents
-        all_content = []
+        # Collect document contents with metadata
+        documents_data = []
         source_docs_info = []
+        total_content_length = 0
 
         for doc_id in source_document_ids:
             doc = await self.get_document_content(doc_id)
@@ -186,9 +203,17 @@ class FlashcardService:
                 linked = doc.get("linked_source", {})
                 filename = linked.get("relative_path", doc_id)
 
-            all_content.append(f"## Document: {filename}\n\n{content}")
-            source_docs_info.append({
+            doc_data = {
                 "doc_id": str(doc.get("id", doc_id)),
+                "name": filename,
+                "content": content,
+                "length": len(content)
+            }
+            documents_data.append(doc_data)
+            total_content_length += len(content)
+
+            source_docs_info.append({
+                "doc_id": doc_data["doc_id"],
                 "name": filename
             })
 
@@ -197,117 +222,119 @@ class FlashcardService:
                 "message": f"Document chargé: {filename}"
             }
 
-        if not all_content:
+        if not documents_data:
             yield {
                 "status": "error",
                 "message": "Aucun contenu trouvé dans les documents sélectionnés"
             }
             return
 
-        # Combine all content (no truncation - we'll chunk it)
-        combined_content = "\n\n---\n\n".join(all_content)
-        total_content_length = len(combined_content)
-        logger.info(f"Total content length: {total_content_length} chars")
+        logger.info(f"Loaded {len(documents_data)} documents, total {total_content_length} chars")
 
-        # Split content into manageable chunks for the LLM
-        # Each chunk should be ~5000 chars for reliable generation
-        chunk_size = 5000
-        chunks = self._split_content_into_chunks(combined_content, chunk_size)
-        total_chunks = len(chunks)
-
-        logger.info(f"Content split into {total_chunks} chunks")
-
-        # Calculate cards per chunk (minimum 3, max 20 per chunk for quality)
-        # Max increased to 20 to allow better coverage with powerful models like Claude
-        cards_per_chunk = max(3, min(20, card_count // max(1, total_chunks)))
-
-        # Calculate how many chunks we actually need
-        chunks_needed = min(total_chunks, (card_count + cards_per_chunk - 1) // cards_per_chunk)
-
-        logger.info(f"Will use {chunks_needed} chunks to generate {card_count} cards ({cards_per_chunk} per chunk)")
-
-        remaining_cards = card_count
+        # Distribute cards proportionally across documents based on content length
+        # Minimum 3 cards per document to ensure coverage
+        cards_distribution = self._distribute_cards_by_document(
+            documents_data, card_count, min_cards_per_doc=3
+        )
 
         yield {
             "status": "generating",
-            "message": f"Génération de {card_count} fiches en {chunks_needed} parties..."
+            "message": f"Génération de {card_count} fiches depuis {len(documents_data)} documents..."
         }
 
-        # Generate cards for each chunk (only process chunks we need)
+        # Generate cards for each document separately
         all_cards = []
-        chunks_processed = 0
-        for chunk_idx, chunk_content in enumerate(chunks):
-            if remaining_cards <= 0:
-                break
+        docs_processed = 0
 
-            chunks_processed += 1
-
-            # Calculate how many cards for this chunk
-            if chunks_processed >= chunks_needed:
-                # Last needed chunk gets remaining cards
-                chunk_cards = remaining_cards
-            else:
-                chunk_cards = min(cards_per_chunk, remaining_cards)
-
-            remaining_cards -= chunk_cards
+        for doc_data, doc_card_count in zip(documents_data, cards_distribution):
+            docs_processed += 1
+            doc_name = doc_data["name"]
+            doc_id = doc_data["doc_id"]
 
             yield {
                 "status": "generating",
-                "message": f"Partie {chunks_processed}/{chunks_needed}: génération de {chunk_cards} fiches..."
+                "message": f"Document {docs_processed}/{len(documents_data)}: {doc_name} ({doc_card_count} fiches)..."
             }
 
-            # Build prompt for this chunk
-            prompt = FLASHCARD_GENERATION_PROMPT.format(
-                card_count=chunk_cards,
-                content=chunk_content
-            )
+            # Split document content into chunks if needed
+            chunk_size = 6000  # Slightly larger chunks for better context
+            chunks = self._split_content_into_chunks(doc_data["content"], chunk_size)
 
-            try:
-                # For Ollama, call directly for better JSON compliance
-                if "ollama" in model_id.lower():
-                    response_text = await self._call_ollama_direct(
-                        model_id=model_id.replace("ollama:", ""),
-                        prompt=prompt,
-                        card_count=chunk_cards
-                    )
-                else:
-                    # Use Agno for other providers (Claude, etc.)
-                    model = create_model(model_id)
-                    agent = Agent(
-                        name="FlashcardGenerator",
-                        model=model,
-                        instructions="Tu génères des fiches de révision en JSON.",
-                        markdown=False
-                    )
-                    response = await agent.arun(prompt)
-                    response_text = response.content if hasattr(response, "content") else str(response)
+            # Distribute this document's cards across its chunks
+            cards_per_chunk = max(3, min(15, doc_card_count // max(1, len(chunks))))
+            remaining_doc_cards = doc_card_count
 
-                # Log the raw response for debugging
-                logger.info(f"Chunk {chunk_idx + 1} response length: {len(response_text)} chars")
-                logger.debug(f"Chunk {chunk_idx + 1} response preview: {response_text[:500]}...")
+            for chunk_idx, chunk_content in enumerate(chunks):
+                if remaining_doc_cards <= 0:
+                    break
 
-                # Parse JSON from response
-                chunk_parsed_cards = self._parse_cards_json(response_text)
+                # Last chunk gets remaining cards
+                chunk_cards = min(cards_per_chunk, remaining_doc_cards)
+                if chunk_idx == len(chunks) - 1:
+                    chunk_cards = remaining_doc_cards
+                remaining_doc_cards -= chunk_cards
 
-                if chunk_parsed_cards:
-                    all_cards.extend(chunk_parsed_cards)
-                    logger.info(f"Chunk {chunk_idx + 1}: {len(chunk_parsed_cards)} cards parsed")
-                else:
-                    logger.warning(f"Chunk {chunk_idx + 1}: No cards parsed from response")
+                # Build prompt with document name for context
+                prompt = FLASHCARD_GENERATION_PROMPT.format(
+                    card_count=chunk_cards,
+                    document_name=doc_name,
+                    content=chunk_content
+                )
 
-            except Exception as e:
-                logger.error(f"Error generating cards for chunk {chunk_idx + 1}: {e}")
-                # Continue with next chunk
+                try:
+                    # For Ollama, call directly for better JSON compliance
+                    if "ollama" in model_id.lower():
+                        response_text = await self._call_ollama_direct(
+                            model_id=model_id.replace("ollama:", ""),
+                            prompt=prompt,
+                            card_count=chunk_cards
+                        )
+                    else:
+                        # Use Agno for other providers (Claude, etc.)
+                        model = create_model(model_id)
+                        agent = Agent(
+                            name="FlashcardGenerator",
+                            model=model,
+                            instructions="Tu génères des fiches de révision diversifiées en JSON.",
+                            markdown=False
+                        )
+                        response = await agent.arun(prompt)
+                        response_text = response.content if hasattr(response, "content") else str(response)
+
+                    # Parse JSON from response
+                    chunk_parsed_cards = self._parse_cards_json(response_text)
+
+                    if chunk_parsed_cards:
+                        # Add source document info to each card
+                        for card in chunk_parsed_cards:
+                            card["source_doc_id"] = doc_id
+                            card["source_doc_name"] = doc_name
+                        all_cards.extend(chunk_parsed_cards)
+                        logger.info(f"Doc '{doc_name}' chunk {chunk_idx + 1}: {len(chunk_parsed_cards)} cards")
+                    else:
+                        logger.warning(f"Doc '{doc_name}' chunk {chunk_idx + 1}: No cards parsed")
+
+                except Exception as e:
+                    logger.error(f"Error generating cards for {doc_name} chunk {chunk_idx + 1}: {e}")
 
         yield {
-            "status": "parsing",
-            "message": f"Analyse terminée: {len(all_cards)} fiches extraites"
+            "status": "deduplicating",
+            "message": f"Déduplication de {len(all_cards)} fiches..."
         }
 
-        cards = all_cards
+        # Deduplicate similar cards
+        unique_cards = self._deduplicate_cards(all_cards)
+        duplicates_removed = len(all_cards) - len(unique_cards)
 
-        if not cards:
-            logger.error("No cards generated from any chunk")
+        if duplicates_removed > 0:
+            logger.info(f"Removed {duplicates_removed} duplicate cards")
+            yield {
+                "status": "deduplicating",
+                "message": f"{duplicates_removed} doublons supprimés, {len(unique_cards)} fiches uniques"
+            }
+
+        if not unique_cards:
+            logger.error("No cards generated from any document")
             yield {
                 "status": "error",
                 "message": "Impossible de générer des fiches depuis le contenu fourni"
@@ -316,7 +343,7 @@ class FlashcardService:
 
         yield {
             "status": "saving",
-            "message": f"Sauvegarde de {len(cards)} fiches..."
+            "message": f"Sauvegarde de {len(unique_cards)} fiches..."
         }
 
         # Save cards to database
@@ -324,18 +351,17 @@ class FlashcardService:
         deck_record_id = deck_id.replace("flashcard_deck:", "")
 
         saved_count = 0
-        for card in cards:
+        for card in unique_cards:
             try:
                 card_id = uuid.uuid4().hex[:8]
 
-                # Determine source document
-                source_doc_id = source_document_ids[0] if source_document_ids else ""
-
                 card_data = {
                     "deck_id": f"flashcard_deck:{deck_record_id}",
-                    "document_id": source_doc_id,
+                    "document_id": card.get("source_doc_id", ""),
+                    "document_name": card.get("source_doc_name", ""),
                     "front": card.get("front", ""),
                     "back": card.get("back", ""),
+                    "theme": card.get("theme"),  # New field for topic tracking
                     "source_excerpt": card.get("source_excerpt"),
                     "source_location": card.get("source_location"),
                     "created_at": datetime.now(timezone.utc).isoformat()
@@ -368,9 +394,116 @@ class FlashcardService:
 
         yield {
             "status": "completed",
-            "message": f"Génération terminée: {saved_count} fiches créées",
+            "message": f"Génération terminée: {saved_count} fiches créées depuis {len(documents_data)} documents",
             "cards_generated": saved_count
         }
+
+    def _distribute_cards_by_document(
+        self,
+        documents_data: List[Dict],
+        total_cards: int,
+        min_cards_per_doc: int = 3
+    ) -> List[int]:
+        """
+        Distribute cards proportionally across documents based on content length.
+
+        Ensures each document gets at least min_cards_per_doc cards for coverage.
+
+        Args:
+            documents_data: List of document data with 'length' field
+            total_cards: Total number of cards to generate
+            min_cards_per_doc: Minimum cards per document
+
+        Returns:
+            List of card counts, one per document
+        """
+        num_docs = len(documents_data)
+        if num_docs == 0:
+            return []
+
+        # Ensure minimum cards per document
+        min_total = min_cards_per_doc * num_docs
+        if total_cards < min_total:
+            # Distribute evenly if not enough cards for minimum
+            base = total_cards // num_docs
+            remainder = total_cards % num_docs
+            return [base + (1 if i < remainder else 0) for i in range(num_docs)]
+
+        # Calculate proportional distribution
+        total_length = sum(d["length"] for d in documents_data)
+        distribution = []
+
+        for doc in documents_data:
+            proportion = doc["length"] / total_length if total_length > 0 else 1 / num_docs
+            doc_cards = max(min_cards_per_doc, int(total_cards * proportion))
+            distribution.append(doc_cards)
+
+        # Adjust to match total_cards exactly
+        current_total = sum(distribution)
+        diff = total_cards - current_total
+
+        if diff > 0:
+            # Add extra cards to largest documents
+            sorted_indices = sorted(range(num_docs), key=lambda i: documents_data[i]["length"], reverse=True)
+            for i in range(diff):
+                distribution[sorted_indices[i % num_docs]] += 1
+        elif diff < 0:
+            # Remove cards from smallest documents (but keep minimum)
+            sorted_indices = sorted(range(num_docs), key=lambda i: documents_data[i]["length"])
+            for i in range(-diff):
+                idx = sorted_indices[i % num_docs]
+                if distribution[idx] > min_cards_per_doc:
+                    distribution[idx] -= 1
+
+        return distribution
+
+    def _deduplicate_cards(self, cards: List[Dict], similarity_threshold: float = 0.8) -> List[Dict]:
+        """
+        Remove duplicate or very similar cards based on question similarity.
+
+        Uses simple word overlap ratio for efficiency.
+
+        Args:
+            cards: List of card dictionaries
+            similarity_threshold: Threshold for considering cards as duplicates (0-1)
+
+        Returns:
+            List of unique cards
+        """
+        if not cards:
+            return []
+
+        unique_cards = []
+        seen_questions = []
+
+        for card in cards:
+            question = card.get("front", "").lower().strip()
+            if not question:
+                continue
+
+            # Check similarity with existing questions
+            is_duplicate = False
+            question_words = set(question.split())
+
+            for seen_q in seen_questions:
+                seen_words = set(seen_q.split())
+
+                # Calculate Jaccard similarity
+                if question_words and seen_words:
+                    intersection = len(question_words & seen_words)
+                    union = len(question_words | seen_words)
+                    similarity = intersection / union if union > 0 else 0
+
+                    if similarity >= similarity_threshold:
+                        is_duplicate = True
+                        logger.debug(f"Duplicate found: '{question[:50]}...' similar to '{seen_q[:50]}...'")
+                        break
+
+            if not is_duplicate:
+                unique_cards.append(card)
+                seen_questions.append(question)
+
+        return unique_cards
 
     def _split_content_into_chunks(self, content: str, chunk_size: int = 5000) -> List[str]:
         """
@@ -622,6 +755,14 @@ class FlashcardService:
         # Copy other fields as-is
         normalized["source_excerpt"] = card.get("source_excerpt", card.get("extrait", card.get("excerpt")))
         normalized["source_location"] = card.get("source_location", card.get("source", card.get("location")))
+
+        # Handle theme field (for tracking topic diversity)
+        # Note: "topic" is excluded as it may be used for front field
+        theme_aliases = ["theme", "thème", "section", "chapitre", "chapter", "category", "catégorie"]
+        for alias in theme_aliases:
+            if alias in card:
+                normalized["theme"] = str(card[alias])
+                break
 
         return normalized
 
