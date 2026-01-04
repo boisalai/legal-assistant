@@ -1,5 +1,4 @@
 #V2
--- ============================================================================
 -- Migration 004: Add pinned field to course table
 -- ============================================================================
 -- Adds a boolean field to allow users to pin/unpin courses
@@ -99,3 +98,4 @@ DELETE document:76e07952;
 SELECT count() FROM document WHERE nom_fichier IS NONE;
 SELECT * FROM document WHERE nom_fichier IS NONE;
 DELETE document:0106c517;
+SELECT count() FROM user GROUP ALL
