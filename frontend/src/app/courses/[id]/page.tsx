@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -122,12 +122,32 @@ export default function CourseDetailPage() {
     }
   }, [courseData?.status, fetchCaseDetails]);
 
+  // Track documents being processed for OCR (to detect completion)
+  const processingDocsRef = useRef<Set<string>>(new Set());
+
   // Poll for updates when documents are being processed (OCR)
   useEffect(() => {
-    const hasProcessingDocs = documents.some(
-      (doc) => doc.ocr_status === "pending" || doc.ocr_status === "processing"
+    const currentProcessing = new Set(
+      documents
+        .filter((doc) => doc.ocr_status === "pending" || doc.ocr_status === "processing")
+        .map((doc) => doc.id)
     );
-    if (hasProcessingDocs) {
+
+    // Check for newly completed documents
+    processingDocsRef.current.forEach((docId) => {
+      const doc = documents.find((d) => d.id === docId);
+      if (doc && doc.ocr_status === "completed") {
+        toast.success("Extraction PDF terminée avec succès");
+      } else if (doc && doc.ocr_status === "error") {
+        toast.error(`Erreur d'extraction: ${doc.ocr_error || "Erreur inconnue"}`);
+      }
+    });
+
+    // Update tracking ref
+    processingDocsRef.current = currentProcessing;
+
+    // Set up polling if there are processing docs
+    if (currentProcessing.size > 0) {
       const interval = setInterval(fetchCaseDetails, 3000);
       return () => clearInterval(interval);
     }
