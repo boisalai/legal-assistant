@@ -111,7 +111,9 @@ class DocumentService:
                     linked_source=linked_source_data,
                     docusaurus_source=DocusaurusSource(**docusaurus_source_data) if docusaurus_source_data else None,
                     indexed=item.get("indexed", False),
-                    module_id=item.get("module_id")
+                    module_id=item.get("module_id"),
+                    ocr_status=item.get("ocr_status"),
+                    ocr_error=item.get("ocr_error")
                 )
 
                 documents.append(doc_response)
@@ -187,7 +189,9 @@ class DocumentService:
                 linked_source=linked_source_data,
                 docusaurus_source=DocusaurusSource(**docusaurus_source_data) if docusaurus_source_data else None,
                 indexed=doc_data.get("indexed", False),
-                module_id=doc_data.get("module_id")
+                module_id=doc_data.get("module_id"),
+                ocr_status=doc_data.get("ocr_status"),
+                ocr_error=doc_data.get("ocr_error")
             )
 
         except Exception as e:

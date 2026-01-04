@@ -109,15 +109,13 @@
     - Assignation de documents aux modules
     - Endpoint direct : `POST /api/modules/{module_id}/documents/upload`
 
-13. **OCR de livres scannés** 🆕
-    - Page admin (`/admin/ocr`) pour convertir livres scannés en Markdown
-    - Upload ZIP contenant images JPG/PNG ou PDF multi-pages
-    - OCR avec PaddleOCR-VL (modèle vision-language, ~5-10 sec/page)
-    - Conversion automatique PDF → images via PyMuPDF
-    - Détection et extraction des figures/illustrations
-    - Post-traitement LLM optionnel (correction OCR, détection chapitres)
-    - Progression temps réel via SSE
-    - Téléchargement résultat : ZIP avec `livre.md` + `images/`
+13. **OCR automatique des PDF** 🆕
+    - Extraction OCR automatique à l'upload de fichiers PDF
+    - Utilise Docling VLM (optimisé Apple Silicon)
+    - Crée un document markdown dérivé (lié au PDF source)
+    - Indexation automatique pour la recherche sémantique (RAG)
+    - Statut visible dans la liste des documents (spinner pendant traitement)
+    - Traitement en arrière-plan (non-bloquant)
 
 ### Architecture technique
 
@@ -125,7 +123,9 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 
 **Modules clés :**
 - `backend/services/document_service.py` - Service CRUD documents (centralise logique métier)
-- `backend/services/auto_sync_service.py` - 🆕 Synchronisation automatique des répertoires liés
+- `backend/services/document_ocr_task.py` - 🆕 Tâche background OCR automatique des PDF
+- `backend/services/ocr_service.py` - Service OCR avec Docling VLM
+- `backend/services/auto_sync_service.py` - Synchronisation automatique des répertoires liés
 - `backend/routes/documents.py` - API de gestion des documents (refactorisé)
 - `backend/routes/linked_directory.py` - API de liaison de répertoires
 - `backend/routes/docusaurus.py` - API d'import Docusaurus
@@ -220,7 +220,41 @@ Le système d'activity tracking permet à l'assistant IA de savoir ce que l'util
 
 ---
 
-## Session actuelle (2026-01-03) - Simplification backend/frontend et tests ✅
+## Session actuelle (2026-01-03) - OCR automatique des PDF ✅
+
+**Objectif** : Intégrer l'OCR automatique lors de l'upload de fichiers PDF dans un cours.
+
+### Fonctionnalité implémentée
+
+Quand un PDF est uploadé dans un cours, l'extraction OCR est automatiquement déclenchée en arrière-plan :
+1. Le document PDF est créé avec `ocr_status = "pending"`
+2. Une tâche background lance l'OCR avec Docling VLM
+3. Un document markdown dérivé est créé et lié au PDF source
+4. Le markdown est indexé pour la recherche sémantique (RAG)
+5. Le statut est mis à jour (`"completed"` ou `"error"`)
+
+### Fichiers modifiés/créés
+
+**Backend :**
+- `models/document_models.py` - Ajout `ocr_status`, `ocr_error` à `DocumentResponse`
+- `services/ocr_service.py` - Ajout `process_pdf_to_markdown()` méthode simplifiée
+- `services/document_ocr_task.py` - **NOUVEAU** - Tâche background OCR
+- `services/document_service.py` - Ajout champs OCR dans les réponses
+- `routes/documents.py` - Déclenchement automatique OCR à l'upload
+
+**Frontend :**
+- `types/index.ts` - Ajout types `ocr_status`, `ocr_error`
+- `components/cases/documents-data-table.tsx` - Affichage statut OCR (spinner/erreur)
+
+### Fichiers supprimés
+
+- `frontend/src/app/admin/ocr/page.tsx` - Page admin OCR (remplacée par OCR automatique)
+- `backend/routes/ocr.py` - Routes admin OCR
+- Références dans `main.py`, `app-sidebar.tsx`, `api.ts`
+
+---
+
+## Session précédente (2026-01-03) - Simplification backend/frontend et tests ✅
 
 **Objectif** : Continuer la simplification du codebase et valider avec les tests.
 
