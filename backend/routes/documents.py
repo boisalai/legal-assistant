@@ -28,6 +28,7 @@ from services.document_indexing_service import DocumentIndexingService
 from utils.text_utils import remove_yaml_frontmatter
 from models.document_models import DocumentResponse, DocumentListResponse, RegisterDocumentRequest
 from services.document_service import get_document_service
+from services.module_service import get_module_service
 from models.transcription_models import ExtractionResponse
 from models.tts_models import TTSVoice, TTSRequest, TTSResponse
 from utils.file_utils import (
@@ -603,6 +604,29 @@ async def diagnose_documents(
         orphan_records=missing_files,  # Alias for clarity
         ok_count=ok_count
     )
+
+
+# ============================================================================
+# Unassigned Documents (Must be before /{doc_id} routes)
+# ============================================================================
+
+@router.get("/{course_id}/documents/unassigned", summary="Unassigned documents")
+async def get_unassigned_documents(
+    course_id: str,
+    user_id: Optional[str] = Depends(get_current_user_id)
+):
+    """
+    Retrieve course documents that are not assigned to any module.
+
+    Useful for identifying documents to organize.
+    """
+    module_service = get_module_service()
+    documents = await module_service.get_unassigned_documents(course_id)
+
+    return {
+        "documents": documents,
+        "total": len(documents)
+    }
 
 
 # ============================================================================

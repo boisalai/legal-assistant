@@ -379,14 +379,8 @@ class TestModuleDocumentAssignment:
         assert data["unassigned_count"] == 1
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Route conflict: documents_router captures 'unassigned' as doc_id before modules_router")
     async def test_get_unassigned_documents(self, client: AsyncClient, test_course_with_documents: dict):
-        """Test de recuperation des documents non assignes.
-
-        Note: Cette route a un conflit avec documents_router qui est inclus
-        avant modules_router dans main.py. Le pattern /documents/{doc_id}
-        capture 'unassigned' comme un ID de document.
-        """
+        """Test de recuperation des documents non assignes."""
         course_id = test_course_with_documents["course"]["id"]
 
         response = await client.get(f"/api/courses/{course_id}/documents/unassigned")
