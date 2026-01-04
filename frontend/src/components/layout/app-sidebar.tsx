@@ -18,7 +18,6 @@ import {
   Database,
   KeyRound,
   Users,
-  BookOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -175,14 +174,6 @@ export function AppSidebar() {
                     <Link href="/admin/passwords">
                       <KeyRound className="h-4 w-4" />
                       <span>Mots de passe</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === "/admin/ocr"}>
-                    <Link href="/admin/ocr">
-                      <BookOpen className="h-4 w-4" />
-                      <span>OCR de livres</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

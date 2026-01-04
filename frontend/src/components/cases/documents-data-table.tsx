@@ -28,7 +28,14 @@ import {
   Loader2,
   DatabaseBackup,
   Mic,
+  AlertCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { GenericDataTable } from "@/components/ui/generic-data-table";
 import { SortableHeader, DateCell } from "@/components/ui/column-helpers";
 import type { Document } from "@/types";
@@ -77,9 +84,33 @@ export function DocumentsDataTable({
         ),
         cell: ({ row }) => {
           const doc = row.original;
+          const isOcrProcessing = doc.ocr_status === "pending" || doc.ocr_status === "processing";
+          const isOcrError = doc.ocr_status === "error";
+
           return (
             <div className="flex items-center gap-2">
               <span className="font-normal">{doc.filename}</span>
+              {isOcrProcessing && (
+                <Loader2
+                  className="h-4 w-4 text-blue-500 animate-spin shrink-0"
+                  aria-label="OCR en cours"
+                />
+              )}
+              {isOcrError && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertCircle
+                        className="h-4 w-4 text-destructive shrink-0 cursor-help"
+                        aria-label="Erreur OCR"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{doc.ocr_error || "Erreur lors de l'extraction OCR"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {doc.extracted_text && (
                 <Database
                   className="h-4 w-4 text-muted-foreground shrink-0"

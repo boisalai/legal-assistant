@@ -122,6 +122,17 @@ export default function CourseDetailPage() {
     }
   }, [courseData?.status, fetchCaseDetails]);
 
+  // Poll for updates when documents are being processed (OCR)
+  useEffect(() => {
+    const hasProcessingDocs = documents.some(
+      (doc) => doc.ocr_status === "pending" || doc.ocr_status === "processing"
+    );
+    if (hasProcessingDocs) {
+      const interval = setInterval(fetchCaseDetails, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [documents, fetchCaseDetails]);
+
   const handleDelete = async () => {
     setDeleting(true);
     try {

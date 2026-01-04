@@ -196,7 +196,6 @@ async def list_documents(
 async def upload_document(
     course_id: str,
     file: UploadFile = File(...),
-    auto_extract_markdown: bool = Form(False),
     module_id: Optional[str] = Form(None),
     user_id: str = Depends(require_auth)
 ):
@@ -204,8 +203,9 @@ async def upload_document(
     Upload a document for a course.
     Accepts: PDF, Word, TXT, Markdown, Audio (MP3, WAV, M4A)
 
+    PDFs are automatically processed with OCR to create a searchable markdown document.
+
     Args:
-        auto_extract_markdown: If True, automatically extract content to markdown after upload (PDF only)
         module_id: If provided, directly assign the document to this module
     """
     # Read file content
@@ -264,24 +264,22 @@ async def upload_document(
 
         logger.info(f"Document created: {document.id}")
 
-        # If auto_extract_markdown is enabled and file is PDF, trigger extraction in background
-        if auto_extract_markdown and ext.lower() == '.pdf':
-            logger.info(f"Auto-extracting markdown for document: {document.id}")
+        # For PDFs, automatically trigger OCR in background
+        if ext.lower() == '.pdf':
+            from services.document_ocr_task import run_ocr_for_document, update_ocr_status
 
-            # Trigger extraction in background (non-blocking)
-            async def trigger_extraction():
-                try:
-                    import httpx
-                    # Make internal HTTP request to extraction endpoint
-                    # Note: This runs in background, so if it fails, user can manually retry
-                    async with httpx.AsyncClient(timeout=300.0) as client:
-                        url = f"http://localhost:{settings.api_port}/api/courses/{course_id}/documents/{document.id}/extract-to-markdown"
-                        await client.post(url, params={"force_reextract": False})
-                        logger.info(f"Markdown extraction triggered for {document.id}")
-                except Exception as e:
-                    logger.warning(f"Auto-extraction failed for {document.id}: {e}. User can retry manually.")
+            # Set initial OCR status to pending
+            await update_ocr_status(document.id, "pending")
+            logger.info(f"OCR scheduled for document: {document.id}")
 
-            asyncio.create_task(trigger_extraction())
+            # Launch OCR task in background (non-blocking)
+            asyncio.create_task(
+                run_ocr_for_document(
+                    document_id=document.id,
+                    course_id=course_id,
+                    pdf_path=file_path
+                )
+            )
 
         return document
 

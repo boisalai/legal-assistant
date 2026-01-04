@@ -60,7 +60,11 @@ export interface Document {
   // Derived documents (for transcriptions, extractions, TTS)
   source_document_id?: string;  // ID of the source document if this is derived
   is_derived?: boolean;         // True if this is a derived file
-  derivation_type?: "transcription" | "pdf_extraction" | "tts";  // Type of derivation
+  derivation_type?: "transcription" | "pdf_extraction" | "tts" | "ocr_extraction";  // Type of derivation
+
+  // OCR processing status
+  ocr_status?: "pending" | "processing" | "completed" | "error" | null;
+  ocr_error?: string | null;
 
   // Linked and Docusaurus source documents
   source_type?: "upload" | "linked" | "docusaurus" | "youtube";  // Source type

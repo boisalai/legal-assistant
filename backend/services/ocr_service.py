@@ -820,6 +820,92 @@ Retourne UNIQUEMENT le texte corrige, sans commentaires."""
                 logger.warning(f"Failed to cleanup work dir: {e}")
 
 
+    async def process_pdf_to_markdown(
+        self,
+        pdf_path: Path,
+        engine: OCREngine = OCREngine.DOCLING,
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Process a single PDF file and return markdown content.
+
+        Simplified method for automatic OCR during document upload.
+
+        Args:
+            pdf_path: Path to the PDF file
+            engine: OCR engine (default: Docling VLM)
+
+        Returns:
+            Tuple of (markdown_content, error_message)
+            If successful: (markdown, None)
+            If error: ("", error_message)
+        """
+        work_dir = Path(tempfile.mkdtemp(prefix="ocr_pdf_"))
+
+        try:
+            # Convert PDF to images
+            logger.info(f"Converting PDF to images: {pdf_path.name}")
+            pdf_images_dir = work_dir / "images"
+            pdf_images_dir.mkdir(parents=True, exist_ok=True)
+
+            # Copy PDF to work directory for processing
+            import shutil as shutil_local
+
+            temp_pdf = pdf_images_dir / pdf_path.name
+            shutil_local.copy2(pdf_path, temp_pdf)
+
+            # Convert PDF to images (this removes the PDF after conversion)
+            num_images = self._convert_pdfs_to_images(pdf_images_dir)
+            if num_images == 0:
+                return "", "Aucune page trouvée dans le PDF"
+
+            # Collect converted images
+            images = self._collect_images_from_dir(pdf_images_dir)
+            if not images:
+                return "", "Échec de la conversion PDF en images"
+
+            logger.info(f"Processing {len(images)} pages with OCR...")
+
+            # Load model if needed
+            await self.load_model(engine)
+
+            # Process each page
+            pages_results: List[OCRPageResult] = []
+            for i, img_path in enumerate(images):
+                page_num = i + 1
+                logger.info(f"OCR page {page_num}/{len(images)}...")
+
+                result = await self.process_page(
+                    img_path,
+                    work_dir,
+                    page_num,
+                    extract_images=False,  # Don't extract images for automatic OCR
+                    engine=engine,
+                )
+                pages_results.append(result)
+
+            # Generate markdown (without title, simpler format)
+            markdown_content = self._generate_markdown(
+                pages_results,
+                title=None,
+                start_page=1,
+                engine=engine,
+            )
+
+            logger.info(f"OCR completed: {len(pages_results)} pages processed")
+            return markdown_content, None
+
+        except Exception as e:
+            logger.error(f"OCR processing error: {e}", exc_info=True)
+            return "", str(e)
+
+        finally:
+            # Cleanup work directory
+            try:
+                shutil.rmtree(work_dir)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup work dir: {e}")
+
+
 # Singleton
 _ocr_service: Optional[OCRService] = None
 
