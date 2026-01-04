@@ -12,7 +12,8 @@ Endpoints:
 - POST /api/modules/{module_id}/documents - Assign documents
 - POST /api/modules/{module_id}/documents/upload - Direct upload to module
 - DELETE /api/modules/{module_id}/documents - Unassign documents
-- GET /api/courses/{course_id}/documents/unassigned - Unassigned documents
+
+Note: GET /api/courses/{course_id}/documents/unassigned is in documents.py
 """
 
 import logging
@@ -124,26 +125,6 @@ async def bulk_create_modules(course_id: str, request: ModuleBulkCreateRequest):
         created_count=len(created),
         modules=created
     )
-
-
-@router.get(
-    "/api/courses/{course_id}/documents/unassigned",
-    summary="Unassigned documents"
-)
-async def get_unassigned_documents(course_id: str):
-    """
-    Retrieve course documents that are not assigned to any module.
-
-    Useful for identifying documents to organize.
-    """
-    service = get_module_service()
-
-    documents = await service.get_unassigned_documents(course_id)
-
-    return {
-        "documents": documents,
-        "total": len(documents)
-    }
 
 
 # ============================================================================
