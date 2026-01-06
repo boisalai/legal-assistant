@@ -1022,6 +1022,7 @@ DEFAULT_VOICES = {
 ## Ressources
 
 - **Architecture complète** : `ARCHITECTURE.md`
+- **Design multi-agent** : `docs/MULTI_AGENT_DESIGN.md` (notes pour implémentation future)
 - **Guide MLX** : `backend/MLX_GUIDE.md` et `backend/MLX_AUTO_START.md`
 - **Guide modèles locaux** : `backend/LOCAL_MODELS_GUIDE.md`
 - **Historique sessions** : `docs/archive/SESSIONS_2025-12.md`
