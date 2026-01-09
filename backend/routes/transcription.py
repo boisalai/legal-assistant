@@ -465,9 +465,9 @@ async def download_youtube_audio(
         if not service.db:
             await service.connect()
 
-        # Normalize judgment ID
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize course ID
+        if not case_id.startswith("course:"):
+            case_id = f"course:{case_id}"
 
         # Normaliser le module_id si fourni
         target_module_id = None
@@ -476,8 +476,8 @@ async def download_youtube_audio(
             if not target_module_id.startswith("module:"):
                 target_module_id = f"module:{target_module_id}"
 
-        # Create upload directory for this judgment
-        upload_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+        # Create upload directory for this course
+        upload_dir = Path(settings.upload_dir) / case_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Download audio
@@ -496,7 +496,7 @@ async def download_youtube_audio(
 
         file_path = Path(result.file_path)
         document_data = {
-            "case_id": case_id,
+            "course_id": case_id,
             "nom_fichier": result.filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -509,7 +509,8 @@ async def download_youtube_audio(
             "metadata": {
                 "youtube_title": result.title,
                 "duration_seconds": result.duration,
-            }
+            },
+            "transcription_status": "pending",  # Auto-transcription enabled
         }
 
         # Ajouter module_id si spécifié
@@ -518,6 +519,18 @@ async def download_youtube_audio(
 
         await service.create("document", document_data, record_id=doc_id)
         logger.info(f"YouTube audio saved as document: {doc_id}")
+
+        # Launch transcription in background (non-blocking)
+        from services.document_transcription_task import run_transcription_for_document
+        asyncio.create_task(
+            run_transcription_for_document(
+                document_id=f"document:{doc_id}",
+                course_id=case_id,
+                audio_path=str(file_path.absolute()),
+                language="fr"
+            )
+        )
+        logger.info(f"Transcription scheduled for document: {doc_id}")
 
         return YouTubeDownloadResponse(
             success=True,

@@ -113,7 +113,9 @@ class DocumentService:
                     indexed=item.get("indexed", False),
                     module_id=item.get("module_id"),
                     ocr_status=item.get("ocr_status"),
-                    ocr_error=item.get("ocr_error")
+                    ocr_error=item.get("ocr_error"),
+                    transcription_status=item.get("transcription_status"),
+                    transcription_error=item.get("transcription_error")
                 )
 
                 documents.append(doc_response)
@@ -191,7 +193,9 @@ class DocumentService:
                 indexed=doc_data.get("indexed", False),
                 module_id=doc_data.get("module_id"),
                 ocr_status=doc_data.get("ocr_status"),
-                ocr_error=doc_data.get("ocr_error")
+                ocr_error=doc_data.get("ocr_error"),
+                transcription_status=doc_data.get("transcription_status"),
+                transcription_error=doc_data.get("transcription_error")
             )
 
         except Exception as e:
