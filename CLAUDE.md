@@ -229,6 +229,19 @@ chunk_overlap = 50
 
 ## Prochaines étapes
 
+### Session actuelle - Multi-agent (2026-01-09)
+
+**Complété :**
+- ✅ Agent Rédacteur ajouté (4ème agent) avec 4 outils tutor_tools
+- ✅ Mots-clés pédagogiques ajoutés à `is_legal_research_query()` (quiz, résumé, carte mentale, explique)
+- ✅ Test réussi : quiz généré via multi-agent avec validation des citations
+
+**Prochaines améliorations multi-agent :**
+- Ajouter des cours avec documents indexés pour tester le Rédacteur avec du contenu réel
+- Améliorer le workflow du Rédacteur pour combiner plusieurs outils (résumé + quiz)
+- Ajouter un indicateur visuel dans le frontend quand le mode multi-agent est actif
+- Logger les interactions entre agents pour debugging
+
 ### Priorité haute
 - Tests d'intégration API endpoints critiques
 - Ajuster paramètres RAG (top_k, min_similarity)
