@@ -226,6 +226,9 @@ chunk_overlap = 50
 
 ## Prochaines étapes
 
+### En cours - Multi-agent
+- **Ajouter l'agent Rédacteur** (4ème agent) - Utilise `generate_summary`, `generate_quiz`, `generate_mindmap` des tutor_tools pour générer du contenu pédagogique structuré
+
 ### Priorité haute
 - Tests d'intégration API endpoints critiques
 - Ajuster paramètres RAG (top_k, min_similarity)
@@ -238,7 +241,6 @@ chunk_overlap = 50
 ### Backlog
 - Extraction d'entités juridiques
 - MCP Server CanLII / Légis Québec
-- Agent Rédacteur (4ème agent multi-agent)
 
 ---
 
