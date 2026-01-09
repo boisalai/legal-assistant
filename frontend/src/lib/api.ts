@@ -870,6 +870,7 @@ export const chatApi = {
       model?: string;
       history?: ChatMessage[];
       language?: string;
+      useMultiAgent?: boolean;
     } = {}
   ): Promise<ChatResponse> {
     return fetchApi<ChatResponse>("/api/chat", {
@@ -880,6 +881,7 @@ export const chatApi = {
         model_id: context.model || "ollama:qwen2.5:7b",
         history: context.history || [],
         language: context.language || "fr",
+        use_multi_agent: context.useMultiAgent || false,
       }),
     });
   },
@@ -891,6 +893,7 @@ export const chatApi = {
       model?: string;
       history?: ChatMessage[];
       language?: string;
+      useMultiAgent?: boolean;
     } = {}
   ): Promise<Response> {
     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
@@ -907,6 +910,7 @@ export const chatApi = {
         model_id: context.model || "ollama:qwen2.5:7b",
         history: context.history || [],
         language: context.language || "fr",
+        use_multi_agent: context.useMultiAgent || false,
       }),
     });
 
