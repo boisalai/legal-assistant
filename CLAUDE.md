@@ -67,13 +67,13 @@
 - Docling VLM (optimisé Apple Silicon)
 - Document markdown dérivé + indexation RAG
 
-### 13. Multi-agents juridiques ✨ NEW
+### 13. Multi-agents juridiques
 
-Équipe de 3 agents spécialisés pour les questions juridiques complexes.
+Équipe de 4 agents spécialisés pour les questions juridiques complexes.
 
 **Architecture :**
 ```
-Question → Chercheur (RAG + CAIJ) → Analyste (C.c.Q.) → Validateur (citations) → Réponse
+Question → Chercheur (RAG + CAIJ) → Analyste (C.c.Q.) → Validateur (citations) → Rédacteur (pédagogie) → Réponse
 ```
 
 **Agents :**
@@ -82,11 +82,13 @@ Question → Chercheur (RAG + CAIJ) → Analyste (C.c.Q.) → Validateur (citati
 | **Chercheur** | Recherche exhaustive | `semantic_search`, `search_caij_jurisprudence` |
 | **Analyste Juridique** | Interprétation du droit | `analyze_legal_text`, `identify_applicable_articles` |
 | **Validateur** | Anti-hallucination | `verify_legal_citations`, `extract_citations` |
+| **Rédacteur** | Contenu pédagogique | `generate_summary`, `generate_mindmap`, `generate_quiz`, `explain_concept` |
 
 **Fichiers :**
-- `backend/agents/legal_research_team.py` - Définition de l'équipe (Team + 3 agents)
+- `backend/agents/legal_research_team.py` - Définition de l'équipe (Team + 4 agents)
 - `backend/tools/validation_tool.py` - Vérification des citations juridiques
 - `backend/tools/legal_analysis_tool.py` - Analyse juridique avec 10 domaines C.c.Q.
+- `backend/tools/tutor_tools.py` - Outils pédagogiques (résumés, quiz, cartes mentales)
 
 **Activation :** Toggle dans le panneau Assistant ou `use_multi_agent: true` dans l'API.
 
@@ -95,6 +97,7 @@ Question → Chercheur (RAG + CAIJ) → Analyste (C.c.Q.) → Validateur (citati
 - Recherche exhaustive : RAG + CAIJ combinés
 - Analyse juridique : articles C.c.Q. identifiés
 - Score de fiabilité : chaque réponse inclut un niveau de confiance
+- Contenu pédagogique : résumés, quiz et cartes mentales générés automatiquement
 
 ---
 
@@ -107,7 +110,7 @@ Voir **`ARCHITECTURE.md`** pour la documentation complète.
 | Catégorie | Fichiers |
 |-----------|----------|
 | **Documents** | `services/document_service.py`, `services/document_ocr_task.py`, `routes/documents.py` |
-| **Multi-agents** | `agents/legal_research_team.py`, `tools/validation_tool.py`, `tools/legal_analysis_tool.py` |
+| **Multi-agents** | `agents/legal_research_team.py`, `tools/validation_tool.py`, `tools/legal_analysis_tool.py`, `tools/tutor_tools.py` |
 | **RAG** | `services/document_indexing_service.py`, `tools/semantic_search_tool.py` |
 | **CAIJ** | `services/caij_search_service.py`, `tools/caij_search_tool.py` |
 | **Tuteur** | `services/tutor_service.py`, `tools/tutor_tools.py` |
@@ -225,9 +228,6 @@ chunk_overlap = 50
 ---
 
 ## Prochaines étapes
-
-### En cours - Multi-agent
-- **Ajouter l'agent Rédacteur** (4ème agent) - Utilise `generate_summary`, `generate_quiz`, `generate_mindmap` des tutor_tools pour générer du contenu pédagogique structuré
 
 ### Priorité haute
 - Tests d'intégration API endpoints critiques

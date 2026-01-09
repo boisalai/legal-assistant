@@ -1,17 +1,18 @@
 """
 Multi-agent team for legal research.
 
-This module defines a 3-agent team (Chercheur + Analyste + Validateur) for legal queries
-that require exhaustive search, legal analysis, and citation validation.
+This module defines a 4-agent team (Chercheur + Analyste + Validateur + Rédacteur) for legal queries
+that require exhaustive search, legal analysis, citation validation, and pedagogical content generation.
 
 Architecture:
-    Team Leader → Chercheur (search) → Analyste (interpret) → Validateur (verify) → Final Response
+    Team Leader → Chercheur (search) → Analyste (interpret) → Validateur (verify) → Rédacteur (content) → Final Response
 
 Benefits:
     - Anti-hallucination: All citations are verified
     - Exhaustive search: RAG + CAIJ sources combined
     - Legal analysis: Articles and principles identified
     - Reliability score: Each response includes confidence level
+    - Pedagogical content: Summaries, mindmaps, quizzes, and concept explanations
 """
 
 import logging
@@ -25,6 +26,7 @@ from tools.semantic_search_tool import semantic_search
 from tools.caij_search_tool import search_caij_jurisprudence
 from tools.validation_tool import verify_legal_citations, extract_citations
 from tools.legal_analysis_tool import analyze_legal_text, identify_applicable_articles
+from tools.tutor_tools import generate_summary, generate_mindmap, generate_quiz, explain_concept
 
 logger = logging.getLogger(__name__)
 
@@ -143,25 +145,87 @@ Analyser les résultats de recherche du Chercheur pour:
 ```
 """
 
+REDACTEUR_INSTRUCTIONS = """Tu es un rédacteur pédagogique spécialisé en droit québécois.
+
+## MISSION
+Générer du contenu pédagogique structuré basé sur les recherches et analyses des autres agents.
+Tu transformes l'information juridique complexe en matériel d'apprentissage accessible.
+
+## OUTILS DISPONIBLES
+- **generate_summary** : Génère des résumés pédagogiques structurés
+- **generate_mindmap** : Crée des cartes mentales visuelles
+- **generate_quiz** : Produit des quiz d'évaluation avec réponses
+- **explain_concept** : Fournit des explications détaillées de concepts juridiques
+
+## WORKFLOW
+1. Recevoir les résultats de recherche du Chercheur et l'analyse de l'Analyste
+2. Identifier le type de contenu pédagogique le plus approprié:
+   - Question conceptuelle → explain_concept
+   - Demande de synthèse → generate_summary
+   - Besoin de visualisation → generate_mindmap
+   - Préparation d'examen → generate_quiz
+3. Utiliser l'outil approprié avec les bons paramètres
+4. Enrichir le contenu généré avec les éléments de l'analyse juridique
+
+## RÈGLES STRICTES
+- TOUJOURS baser le contenu sur les sources trouvées par le Chercheur
+- INTÉGRER les articles C.c.Q. identifiés par l'Analyste dans le matériel pédagogique
+- ADAPTER le niveau de complexité au contexte (étudiant vs praticien)
+- NE JAMAIS inventer de contenu non supporté par les sources
+- PRIVILÉGIER la clarté et l'accessibilité sans sacrifier la rigueur juridique
+
+## FORMAT DE SORTIE
+```
+## Contenu pédagogique
+
+### Type de contenu
+[Résumé / Carte mentale / Quiz / Explication de concept]
+
+### Matériel généré
+[Contenu produit par l'outil utilisé]
+
+### Intégration juridique
+- Articles C.c.Q. couverts: [liste]
+- Sources utilisées: [références]
+
+### Suggestions d'approfondissement
+- [Concepts connexes à explorer]
+- [Autres outils pédagogiques recommandés]
+```
+"""
+
 TEAM_INSTRUCTIONS = """Tu es le coordinateur d'une équipe de recherche juridique québécoise.
 
 ## ÉQUIPE
 - **Chercheur** : Expert en recherche dans les documents et CAIJ
 - **Analyste Juridique** : Expert en interprétation du droit civil québécois
 - **Validateur** : Expert en vérification des citations juridiques
+- **Rédacteur** : Expert en génération de contenu pédagogique (résumés, quiz, cartes mentales)
 
 ## WORKFLOW OBLIGATOIRE
 1. Comprendre la question juridique de l'utilisateur
 2. Déléguer au **Chercheur** pour rechercher dans TOUTES les sources
 3. Déléguer à l'**Analyste Juridique** pour interpréter les résultats et identifier les articles
 4. Déléguer au **Validateur** pour vérifier les citations trouvées
-5. Assembler une réponse finale claire, structurée et fiable
+5. Si la question est pédagogique (demande de résumé, quiz, explication, carte mentale),
+   déléguer au **Rédacteur** pour générer le contenu approprié
+6. Assembler une réponse finale claire, structurée et fiable
+
+## QUAND UTILISER LE RÉDACTEUR
+Déléguer au Rédacteur si la question contient:
+- Demande de résumé ou synthèse
+- Demande d'explication d'un concept
+- Demande de quiz ou questions de révision
+- Demande de carte mentale ou visualisation
+- Demande de préparation à un examen
+- Besoin de vulgarisation ou clarification
 
 ## RÈGLE CRITIQUE
 Ne JAMAIS fournir une réponse au nom de l'équipe sans avoir:
 1. Obtenu les résultats de recherche du Chercheur
 2. Obtenu l'analyse juridique de l'Analyste
 3. Obtenu la validation du Validateur
+4. (Si applicable) Obtenu le contenu pédagogique du Rédacteur
 
 Si le Validateur signale des problèmes (citations invalides ou non vérifiées),
 tu DOIS les mentionner clairement à l'utilisateur.
@@ -178,6 +242,9 @@ tu DOIS les mentionner clairement à l'utilisateur.
 ### Analyse
 [Interprétation et application au cas d'espèce]
 
+### Contenu pédagogique (si applicable)
+[Résumé / Quiz / Carte mentale / Explication générée par le Rédacteur]
+
 ---
 
 ### Sources consultées
@@ -190,7 +257,7 @@ tu DOIS les mentionner clairement à l'utilisateur.
 ```
 
 ## PRIORITÉS
-Fiabilité > Rigueur juridique > Complétude > Rapidité
+Fiabilité > Rigueur juridique > Pédagogie > Complétude > Rapidité
 
 Mieux vaut une réponse partielle mais juridiquement solide qu'une réponse complète mais approximative.
 """
@@ -206,15 +273,17 @@ def create_legal_research_team(
     debug_mode: bool = False
 ) -> Team:
     """
-    Crée une équipe de recherche juridique avec 3 agents spécialisés.
+    Crée une équipe de recherche juridique avec 4 agents spécialisés.
 
     Cette équipe est optimisée pour les questions juridiques complexes
-    nécessitant une recherche exhaustive, une analyse juridique et une validation.
+    nécessitant une recherche exhaustive, une analyse juridique, une validation
+    et la génération de contenu pédagogique.
 
     Agents:
         - Chercheur: Recherche dans documents (RAG) et CAIJ
         - Analyste Juridique: Identifie articles C.c.Q. et principes
         - Validateur: Vérifie citations et prévient hallucinations
+        - Rédacteur: Génère contenu pédagogique (résumés, quiz, cartes mentales)
 
     Args:
         model: Modèle LLM à utiliser pour les agents (ex: Claude)
@@ -230,7 +299,7 @@ def create_legal_research_team(
         >>> team = create_legal_research_team(model, "course:abc123")
         >>> response = await team.arun("Quels sont les recours pour vices cachés?")
     """
-    logger.info(f"[create_legal_research_team] Creating 3-agent team for case_id={case_id}")
+    logger.info(f"[create_legal_research_team] Creating 4-agent team for case_id={case_id}")
 
     # Injecter le case_id dans les instructions du Chercheur
     chercheur_instructions_with_context = CHERCHEUR_INSTRUCTIONS + f"""
@@ -281,11 +350,29 @@ def create_legal_research_team(
         markdown=True,
     )
 
+    # Injecter le case_id dans les instructions du Rédacteur
+    redacteur_instructions_with_context = REDACTEUR_INSTRUCTIONS + f"""
+
+## CONTEXTE
+- ID du cours: {case_id}
+- Utilise cet ID pour les outils pédagogiques: case_id="{case_id}"
+"""
+
+    # Agent Rédacteur
+    redacteur = Agent(
+        name="Rédacteur",
+        role="Génération de contenu pédagogique structuré",
+        model=model,
+        tools=[generate_summary, generate_mindmap, generate_quiz, explain_concept],
+        instructions=redacteur_instructions_with_context,
+        markdown=True,
+    )
+
     # Créer l'équipe
     team = Team(
         name="Équipe Recherche Juridique",
         model=model,  # Modèle pour le coordinateur d'équipe
-        members=[chercheur, analyste, validateur],
+        members=[chercheur, analyste, validateur, redacteur],
         instructions=TEAM_INSTRUCTIONS,
         markdown=True,
         debug_mode=debug_mode,
