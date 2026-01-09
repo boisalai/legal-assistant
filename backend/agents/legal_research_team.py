@@ -387,15 +387,16 @@ def create_legal_research_team(
 
 def is_legal_research_query(message: str) -> bool:
     """
-    Détermine si une question nécessite une recherche juridique approfondie.
+    Détermine si une question nécessite une recherche juridique approfondie
+    ou une génération de contenu pédagogique.
 
-    Heuristique simple basée sur des mots-clés juridiques.
+    Heuristique basée sur des mots-clés juridiques et pédagogiques.
 
     Args:
         message: Message de l'utilisateur
 
     Returns:
-        True si la question semble nécessiter une recherche juridique multi-source
+        True si la question nécessite le mode multi-agent (recherche ou pédagogie)
     """
     # Mots-clés indiquant une question juridique complexe
     legal_keywords = [
@@ -411,13 +412,32 @@ def is_legal_research_query(message: str) -> bool:
         "servitude", "copropriété", "mandat",
     ]
 
+    # Mots-clés pédagogiques (déclenchent le Rédacteur)
+    pedagogical_keywords = [
+        # Quiz et évaluation
+        "quiz", "question", "questions de révision", "évaluation",
+        "teste", "tester", "exercice",
+        # Résumés et synthèses
+        "résumé", "résume", "synthèse", "synthétise", "récapitule",
+        # Cartes mentales
+        "carte mentale", "mindmap", "schéma", "visualise",
+        # Explications de concepts
+        "explique", "explication", "concept", "définition",
+        "vulgarise", "clarifie", "détaille",
+    ]
+
     message_lower = message.lower()
 
-    # Vérifie si au moins 2 mots-clés sont présents
-    # ou si un mot-clé fort (article, loi, code civil) est présent
-    strong_keywords = ["article", "loi", "code civil", "c.c.q.", "jurisprudence"]
+    # Mots-clés forts (déclenchent directement le multi-agent)
+    strong_keywords = [
+        # Juridiques
+        "article", "loi", "code civil", "c.c.q.", "jurisprudence",
+        # Pédagogiques
+        "quiz", "résumé", "résume", "carte mentale", "mindmap",
+        "explique", "synthèse", "synthétise", "récapitule",
+    ]
 
-    keyword_count = sum(1 for kw in legal_keywords if kw in message_lower)
+    keyword_count = sum(1 for kw in legal_keywords + pedagogical_keywords if kw in message_lower)
     has_strong_keyword = any(kw in message_lower for kw in strong_keywords)
 
     return has_strong_keyword or keyword_count >= 2
