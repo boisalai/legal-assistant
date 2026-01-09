@@ -11,9 +11,17 @@ import {
   AlertCircle,
   Copy,
   Check,
+  Users,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Markdown } from "@/components/ui/markdown";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { chatApi, healthApi, type ChatMessage as ApiChatMessage, type DocumentSource } from "@/lib/api";
 import {
   LLM_MODELS,
@@ -68,6 +76,7 @@ export function AssistantPanel({
   const [checkingBackend, setCheckingBackend] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [lastLocale, setLastLocale] = useState<string | null>(null);
+  const [useMultiAgent, setUseMultiAgent] = useState(false);
 
   // LLM configuration - initialized from localStorage
   const [config, setConfig] = useState<LLMConfig>(DEFAULT_LLM_CONFIG);
@@ -162,6 +171,7 @@ export function AssistantPanel({
             model: config.model,
             history,
             language: locale,
+            useMultiAgent,
           });
 
           // Read SSE stream
@@ -233,6 +243,7 @@ export function AssistantPanel({
             model: config.model,
             history,
             language: locale,
+            useMultiAgent,
           });
 
           const assistantMessage: Message = {
@@ -291,6 +302,26 @@ export function AssistantPanel({
       {/* Header */}
       <div className="px-4 border-b bg-background flex items-center justify-between shrink-0 h-[65px]">
         <h2 className="text-xl font-bold">{t("assistant.title")}</h2>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2">
+                <Users className={`h-4 w-4 ${useMultiAgent ? "text-primary" : "text-muted-foreground"}`} />
+                <Switch
+                  checked={useMultiAgent}
+                  onCheckedChange={setUseMultiAgent}
+                  aria-label="Multi-agent mode"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <p className="font-medium">{t("assistant.multiAgent.title")}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("assistant.multiAgent.description")}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Backend status warning */}
