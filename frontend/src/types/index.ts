@@ -66,6 +66,10 @@ export interface Document {
   ocr_status?: "pending" | "processing" | "completed" | "error" | null;
   ocr_error?: string | null;
 
+  // Transcription processing status
+  transcription_status?: "pending" | "processing" | "completed" | "error" | null;
+  transcription_error?: string | null;
+
   // Linked and Docusaurus source documents
   source_type?: "upload" | "linked" | "docusaurus" | "youtube";  // Source type
   linked_source?: {

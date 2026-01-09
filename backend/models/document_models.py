@@ -39,6 +39,8 @@ class DocumentResponse(BaseModel):
     module_id: Optional[str] = None  # ID du module auquel ce document est assigné
     ocr_status: Optional[str] = None  # "pending", "processing", "completed", "error", None
     ocr_error: Optional[str] = None  # Error message if ocr_status is "error"
+    transcription_status: Optional[str] = None  # "pending", "processing", "completed", "error", None
+    transcription_error: Optional[str] = None  # Error message if transcription_status is "error"
 
 
 class DocumentListResponse(BaseModel):

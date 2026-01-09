@@ -86,6 +86,8 @@ export function DocumentsDataTable({
           const doc = row.original;
           const isOcrProcessing = doc.ocr_status === "pending" || doc.ocr_status === "processing";
           const isOcrError = doc.ocr_status === "error";
+          const isTranscriptionProcessing = doc.transcription_status === "pending" || doc.transcription_status === "processing";
+          const isTranscriptionError = doc.transcription_status === "error";
 
           return (
             <div className="flex items-center gap-2">
@@ -107,6 +109,36 @@ export function DocumentsDataTable({
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="max-w-xs">{doc.ocr_error || "Erreur lors de l'extraction OCR"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {isTranscriptionProcessing && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Loader2
+                        className="h-4 w-4 text-green-500 animate-spin shrink-0"
+                        aria-label="Transcription en cours"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Transcription en cours...</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {isTranscriptionError && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertCircle
+                        className="h-4 w-4 text-orange-500 shrink-0 cursor-help"
+                        aria-label="Erreur transcription"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{doc.transcription_error || "Erreur lors de la transcription"}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
