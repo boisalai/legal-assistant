@@ -252,6 +252,10 @@
     "simulation": {
       "note": "Note : Cette réponse est simulée. Le backend n'est pas connecté.",
       "noteConnect": "Note : Le backend n'est pas connecté. Les réponses sont simulées. Démarrez le serveur backend pour des réponses IA réelles."
+    },
+    "multiAgent": {
+      "title": "Mode multi-agents",
+      "description": "Active une équipe de 3 agents spécialisés (Chercheur, Analyste Juridique, Validateur) pour les questions juridiques complexes. Améliore la qualité des réponses et vérifie les citations."
     }
   },
   "settings": {

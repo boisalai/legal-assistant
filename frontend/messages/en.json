@@ -243,6 +243,10 @@
     "simulation": {
       "note": "Note: This response is simulated. The backend is not connected.",
       "noteConnect": "Note: The backend is not connected. Responses are simulated. Start the backend server for real AI responses."
+    },
+    "multiAgent": {
+      "title": "Multi-agent mode",
+      "description": "Activates a team of 3 specialized agents (Researcher, Legal Analyst, Validator) for complex legal questions. Improves response quality and verifies citations."
     }
   },
   "settings": {
