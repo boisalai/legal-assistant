@@ -29,6 +29,7 @@ from tools.semantic_search_tool import semantic_search, index_document_tool, get
 from tools.caij_search_tool import search_caij_jurisprudence
 from tools.tutor_tools import generate_summary, generate_mindmap, generate_quiz, explain_concept
 from services.prompt_builder_service import build_tutor_system_prompt
+from agents.legal_research_team import create_legal_research_team, is_legal_research_query
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class ChatRequest(BaseModel):
     model_id: str = "ollama:qwen2.5:7b"
     history: list[ChatMessage] = []
     language: str = Field(default="fr", description="Language for assistant responses (fr or en)")
+    use_multi_agent: bool = Field(default=False, description="Use multi-agent team for legal research queries")
 
 
 class DocumentSource(BaseModel):
@@ -481,39 +483,55 @@ Document contents:"""
 
         logger.info(f"Sending conversation to agent with {len(request.history)} history messages")
 
-        # Create an Agent with all available tools
-        # Pass course_id in the context for the tool to use
-        agent = Agent(
-            name="LegalAssistant",
-            model=model,
-            instructions=system_content,
-            tools=[
-                # Existing tools
-                transcribe_audio,
-                search_documents,
-                semantic_search,
-                list_documents,
-                extract_entities,
-                find_entity,
-                index_document_tool,  # Tool name: "index_document"
-                get_index_stats,
-                search_caij_jurisprudence,  # Recherche jurisprudence québécoise
-                # NEW: Tutor tools for pedagogical support
-                generate_summary,         # Generate pedagogical summaries
-                generate_mindmap,         # Create mind maps with emojis
-                generate_quiz,            # Generate interactive quizzes
-                explain_concept,          # Explain legal concepts in detail
-            ],
-            markdown=True,
-        )
-
         # Inject course_id into the tool's context by modifying the prompt
         if request.course_id:
             context_msg = f"Context: The current course identifier is '{request.course_id}'" if is_english else f"Contexte: L'identifiant du cours actuel est '{request.course_id}'"
             conversation_prompt += f"\n\n[{context_msg}]"
 
-        # Get response from agent (use arun for async tools support)
-        response = await agent.arun(conversation_prompt)
+        # Check if we should use multi-agent mode
+        use_team = (
+            request.use_multi_agent
+            and request.course_id
+            and is_legal_research_query(request.message)
+        )
+
+        if use_team:
+            # Multi-agent mode: Use legal research team (Chercheur + Validateur)
+            logger.info(f"Using multi-agent team for legal research query")
+            team = create_legal_research_team(
+                model=model,
+                case_id=request.course_id,
+                debug_mode=False
+            )
+            # Get response from team
+            response = await team.arun(conversation_prompt)
+        else:
+            # Single-agent mode: Standard agent with all tools
+            agent = Agent(
+                name="LegalAssistant",
+                model=model,
+                instructions=system_content,
+                tools=[
+                    # Existing tools
+                    transcribe_audio,
+                    search_documents,
+                    semantic_search,
+                    list_documents,
+                    extract_entities,
+                    find_entity,
+                    index_document_tool,  # Tool name: "index_document"
+                    get_index_stats,
+                    search_caij_jurisprudence,  # Recherche jurisprudence québécoise
+                    # NEW: Tutor tools for pedagogical support
+                    generate_summary,         # Generate pedagogical summaries
+                    generate_mindmap,         # Create mind maps with emojis
+                    generate_quiz,            # Generate interactive quizzes
+                    explain_concept,          # Explain legal concepts in detail
+                ],
+                markdown=True,
+            )
+            # Get response from agent (use arun for async tools support)
+            response = await agent.arun(conversation_prompt)
 
         # Extract text from response
         assistant_message = ""
