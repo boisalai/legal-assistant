@@ -240,20 +240,31 @@ chunk_overlap = 50
 
 ## Prochaines étapes
 
-### Session actuelle - Migration course_id (2026-01-10)
+### Session actuelle - Corrections indexation et recherche sémantique (2026-01-10)
 
-**Complété :**
+**Problème résolu :** L'assistant IA ne trouvait pas les documents indexés et les résumés étaient vides.
+
+**Causes identifiées :**
+1. L'extraction de texte ne déclenchait pas l'indexation automatique
+2. Mismatch du nom de modèle : embeddings stockés avec `local:BAAI/bge-m3` mais recherche avec `BAAI/bge-m3`
+3. Seuil de similarité trop élevé (0.5) filtrait tous les résultats
+4. `tutor_service.search_content` ne résolvait pas les noms de fichiers en IDs
+5. Noms de champs incompatibles (`chunk_text` vs `content`, `similarity_score` vs `similarity`)
+
+**Corrections appliquées :**
+- ✅ `routes/extraction.py` : Indexation automatique après extraction de texte
+- ✅ `services/embedding_service.py` : Ajout propriété `full_model_name` (`provider:model`)
+- ✅ `services/document_indexing_service.py` : Utilisation de `full_model_name` + seuil abaissé à 0.35
+- ✅ `tools/semantic_search_tool.py` : Seuil `min_similarity` abaissé à 0.35
+- ✅ `services/tutor_service.py` : Résolution filename → document_id + transformation des champs
+
+**Commit :** `bea4f07` - fix: Resolve semantic search and document indexing issues
+
+### Session précédente - Migration course_id (2026-01-10)
+
 - ✅ Migration complète `case_id` → `course_id` dans tout le codebase (351 occurrences)
 - ✅ Migration DB : `migrations/005_rename_case_id_to_course_id.surql`
-- ✅ Tables migrées : `document`, `conversation`, `user_activity`
-- ✅ Fichiers corrigés : 20 fichiers (tools, services, routes, agents)
-- ✅ Bug corrigé : l'assistant ne voyait pas les documents (requêtes SQL utilisaient `case_id` au lieu de `course_id`)
-
-**Fichiers modifiés :**
-- Tools : `document_search_tool.py`, `semantic_search_tool.py`, `tutor_tools.py`, `validation_tool.py`, `transcription_tool.py`, `entity_extraction_tool.py`
-- Services : `document_indexing_service.py`, `conversation_service.py`, `tutor_service.py`, `user_activity_service.py`
-- Routes : `activity.py`, `chat.py`, `extraction.py`, `transcription.py`, `linked_directory.py`, `settings.py`
-- Agents : `legal_research_team.py`
+- ✅ Bug corrigé : requêtes SQL utilisaient `case_id` au lieu de `course_id`
 
 ### Session précédente - Multi-agent (2026-01-09)
 
@@ -262,7 +273,6 @@ chunk_overlap = 50
 
 ### Priorité haute
 - Tests d'intégration API endpoints critiques
-- Ajuster paramètres RAG (top_k, min_similarity)
 
 ### Priorité moyenne
 - Logos providers dans sélecteur de modèles
