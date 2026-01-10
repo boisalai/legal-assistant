@@ -813,7 +813,7 @@ Veuillez vérifier que:
         Args:
             course_id: Course ID
             query: Search query
-            document_id: Limit to specific document
+            document_id: Limit to specific document (ID or filename)
             top_k: Number of results
 
         Returns:
@@ -824,16 +824,52 @@ Veuillez vérifier que:
             if not course_id.startswith("course:"):
                 course_id = f"course:{course_id}"
 
+            # Normalize document_id: if it's a filename, find the real document ID
+            normalized_doc_id = None
+            if document_id:
+                if document_id.startswith("document:"):
+                    normalized_doc_id = document_id
+                else:
+                    # It's likely a filename - look up the document ID
+                    surreal = get_surreal_service()
+                    if not surreal.db:
+                        await surreal.connect()
+
+                    doc_result = await surreal.query(
+                        "SELECT id FROM document WHERE course_id = $course_id AND nom_fichier = $filename LIMIT 1",
+                        {"course_id": course_id, "filename": document_id}
+                    )
+
+                    if doc_result and len(doc_result) > 0:
+                        first = doc_result[0]
+                        if isinstance(first, dict) and "id" in first:
+                            normalized_doc_id = str(first["id"])
+                        elif isinstance(first, list) and len(first) > 0:
+                            normalized_doc_id = str(first[0].get("id", ""))
+
+                    logger.info(f"Resolved filename '{document_id}' to document_id: {normalized_doc_id}")
+
             # Use the indexing service for semantic search
-            results = await self.indexing_service.search_similar(
+            raw_results = await self.indexing_service.search_similar(
                 query_text=query,
                 course_id=course_id,
                 top_k=top_k
             )
 
             # Filter by document_id if provided
-            if document_id and results:
-                results = [r for r in results if r.get("document_id") == document_id]
+            if normalized_doc_id and raw_results:
+                raw_results = [r for r in raw_results if r.get("document_id") == normalized_doc_id]
+
+            # Transform results to expected format
+            results = []
+            for r in raw_results:
+                results.append({
+                    "content": r.get("chunk_text", ""),
+                    "similarity": r.get("similarity_score", 0),
+                    "document_id": r.get("document_id", ""),
+                    "document_name": r.get("document_id", "").replace("document:", "") if r.get("document_id") else "document",
+                    "chunk_index": r.get("chunk_index", 0),
+                })
 
             return results
 
