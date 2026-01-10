@@ -2,7 +2,7 @@
 Semantic search tool for the Agno agent.
 
 This tool allows the AI agent to perform semantic (vector similarity) search
-through documents in a case using natural language queries.
+through documents in a course using natural language queries.
 """
 
 import logging
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @tool(name="semantic_search")
 async def semantic_search(
-    case_id: str,
+    course_id: str,
     query: str,
     top_k: int = 7  # Increased from 5 for better coverage of legal documents
 ) -> str:
@@ -45,7 +45,7 @@ async def semantic_search(
     - semantic_search: Comprend le sens de la question (ex: "quelles sont les obligations du vendeur ?")
 
     Args:
-        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         query: La question de l'utilisateur (ex: "qu'est-ce que le notariat ?")
         top_k: Nombre de passages pertinents à retourner (défaut: 5)
 
@@ -53,22 +53,22 @@ async def semantic_search(
         Les passages les plus pertinents avec leur score de pertinence
     """
     try:
-        logger.info(f"[semantic_search] START - case_id={case_id}, query={query[:50]}...")
+        logger.info(f"[semantic_search] START - course_id={course_id}, query={query[:50]}...")
 
         # Obtenir le service d'indexation
         indexing_service = get_document_indexing_service()
         logger.info(f"[semantic_search] Got indexing service: {indexing_service}")
 
-        # Normaliser case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normaliser course_id
+        course_id = course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
-        logger.info(f"[semantic_search] Normalized case_id: {case_id}")
+        logger.info(f"[semantic_search] Normalized course_id: {course_id}")
 
         # Vérifier si des documents sont indexés
-        logger.info(f"[semantic_search] Getting index stats for {case_id}...")
-        stats = await indexing_service.get_index_stats(case_id=case_id)
+        logger.info(f"[semantic_search] Getting index stats for {course_id}...")
+        stats = await indexing_service.get_index_stats(course_id=course_id)
         logger.info(f"[semantic_search] Stats: {stats}")
 
         if stats.get("total_chunks", 0) == 0:
@@ -84,7 +84,7 @@ En attendant, je ne peux pas répondre à votre question car je n'ai pas accès 
         logger.info(f"[semantic_search] Searching with query='{query}', top_k={top_k}...")
         results = await indexing_service.search_similar(
             query_text=query,
-            case_id=case_id,
+            course_id=course_id,
             top_k=top_k,
             min_similarity=0.5  # Score minimum de similarité
         )
@@ -161,7 +161,7 @@ Vous pouvez:
 
 @tool(name="index_document")
 async def index_document_tool(
-    case_id: str,
+    course_id: str,
     document_name: str
 ) -> str:
     """
@@ -171,17 +171,17 @@ async def index_document_tool(
     n'a pas fonctionné ou si vous voulez forcer la réindexation.
 
     Args:
-        case_id: L'identifiant du cours
+        course_id: L'identifiant du cours
         document_name: Nom du fichier à indexer
 
     Returns:
         Résultat de l'indexation
     """
     try:
-        # Normaliser case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normaliser course_id
+        course_id = course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Récupérer le document
         surreal_service = get_surreal_service()
@@ -189,8 +189,8 @@ async def index_document_tool(
             await surreal_service.connect()
 
         doc_result = await surreal_service.query(
-            "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $nom_fichier",
-            {"case_id": case_id, "nom_fichier": document_name}
+            "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $nom_fichier",
+            {"course_id": course_id, "nom_fichier": document_name}
         )
 
         documents = []
@@ -204,7 +204,7 @@ async def index_document_tool(
                 documents = doc_result
 
         if not documents:
-            return f"Document '{document_name}' non trouvé dans le cours {case_id}."
+            return f"Document '{document_name}' non trouvé dans le cours {course_id}."
 
         document = documents[0]
         doc_id = document.get("id")
@@ -217,7 +217,7 @@ async def index_document_tool(
         indexing_service = get_document_indexing_service()
         result = await indexing_service.index_document(
             document_id=doc_id,
-            case_id=case_id,
+            course_id=course_id,
             text_content=texte_extrait,
             force_reindex=True  # Forcer la réindexation
         )
@@ -225,10 +225,10 @@ async def index_document_tool(
         if result["success"]:
             chunks_created = result.get("chunks_created", 0)
             embedding_model = result.get("embedding_model", "inconnu")
-            return f"✅ Document '{document_name}' indexé avec succès!\n\n- {chunks_created} segments créés\n- Modèle: {embedding_model}\n\nLe document est maintenant disponible pour la recherche sémantique."
+            return f"Document '{document_name}' indexe avec succes!\n\n- {chunks_created} segments crees\n- Modele: {embedding_model}\n\nLe document est maintenant disponible pour la recherche semantique."
         else:
             error = result.get("error", "Erreur inconnue")
-            return f"❌ Échec de l'indexation: {error}"
+            return f"Echec de l'indexation: {error}"
 
     except Exception as e:
         logger.error(f"Index document error: {e}", exc_info=True)
@@ -236,24 +236,24 @@ async def index_document_tool(
 
 
 @tool(name="get_index_stats")
-async def get_index_stats(case_id: str) -> str:
+async def get_index_stats(course_id: str) -> str:
     """
     Affiche les statistiques de l'index de recherche sémantique pour un cours.
 
     Args:
-        case_id: L'identifiant du cours
+        course_id: L'identifiant du cours
 
     Returns:
         Statistiques de l'index
     """
     try:
-        # Normaliser case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normaliser course_id
+        course_id = course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         indexing_service = get_document_indexing_service()
-        stats = await indexing_service.get_index_stats(case_id=case_id)
+        stats = await indexing_service.get_index_stats(course_id=course_id)
 
         if "error" in stats:
             return f"Erreur lors de la récupération des statistiques: {stats['error']}"
@@ -263,22 +263,22 @@ async def get_index_stats(case_id: str) -> str:
         embedding_dimensions = stats.get("embedding_dimensions", 0)
 
         if total_chunks == 0:
-            return f"""**Index de recherche sémantique pour le cours {case_id}:**
+            return f"""**Index de recherche sémantique pour le cours {course_id}:**
 
-📊 **Statut:** Aucun document indexé
+Statut: Aucun document indexé
 
 Pour indexer des documents:
 1. Les documents avec du texte extrait sont automatiquement indexés lors de l'upload
 2. Utilisez l'outil `index_document` pour indexer manuellement un document spécifique"""
 
-        return f"""**Index de recherche sémantique pour le cours {case_id}:**
+        return f"""**Index de recherche sémantique pour le cours {course_id}:**
 
-📊 **Statistiques:**
+Statistiques:
 - Segments indexés: {total_chunks}
 - Modèle d'embeddings: {embedding_model}
 - Dimensions: {embedding_dimensions}
 
-✅ La recherche sémantique est disponible pour ce cours!
+La recherche sémantique est disponible pour ce cours!
 Utilisez `semantic_search` pour poser des questions en langage naturel."""
 
     except Exception as e:

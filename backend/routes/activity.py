@@ -26,19 +26,19 @@ class TrackActivityRequest(BaseModel):
 class ActivityResponse(BaseModel):
     """Response containing activity information."""
     id: str
-    case_id: str
+    course_id: str
     action_type: str
     timestamp: str
     metadata: Dict[str, Any]
 
 
-@router.post("/{case_id}/activity")
-async def track_activity(case_id: str, request: TrackActivityRequest):
+@router.post("/{course_id}/activity")
+async def track_activity(course_id: str, request: TrackActivityRequest):
     """
     Track a user activity for contextual awareness.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         request: Activity details
 
     Returns:
@@ -56,7 +56,7 @@ async def track_activity(case_id: str, request: TrackActivityRequest):
 
         activity_service = get_activity_service()
         activity_id = await activity_service.track_activity(
-            case_id=case_id,
+            course_id=f"course:{course_id}",
             action_type=action_type,
             metadata=request.metadata
         )
@@ -83,13 +83,13 @@ async def track_activity(case_id: str, request: TrackActivityRequest):
         )
 
 
-@router.get("/{case_id}/activity")
-async def get_activities(case_id: str, limit: int = 50):
+@router.get("/{course_id}/activity")
+async def get_activities(course_id: str, limit: int = 50):
     """
-    Get recent user activities for a case.
+    Get recent user activities for a course.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         limit: Maximum number of activities to retrieve (default: 50, max: 100)
 
     Returns:
@@ -102,12 +102,12 @@ async def get_activities(case_id: str, limit: int = 50):
 
         activity_service = get_activity_service()
         activities = await activity_service.get_recent_activities(
-            case_id=case_id,
+            course_id=f"course:{course_id}",
             limit=limit
         )
 
         return {
-            "case_id": case_id,
+            "course_id": course_id,
             "activities": activities,
             "count": len(activities)
         }
@@ -120,20 +120,20 @@ async def get_activities(case_id: str, limit: int = 50):
         )
 
 
-@router.delete("/{case_id}/activity")
-async def clear_activities(case_id: str):
+@router.delete("/{course_id}/activity")
+async def clear_activities(course_id: str):
     """
-    Clear all activity history for a case.
+    Clear all activity history for a course.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
 
     Returns:
         Success status
     """
     try:
         activity_service = get_activity_service()
-        success = await activity_service.clear_activities(case_id=case_id)
+        success = await activity_service.clear_activities(course_id=f"course:{course_id}")
 
         if success:
             return {
@@ -156,13 +156,13 @@ async def clear_activities(case_id: str):
         )
 
 
-@router.get("/{case_id}/activity/context")
-async def get_activity_context(case_id: str, limit: int = 50):
+@router.get("/{course_id}/activity/context")
+async def get_activity_context(course_id: str, limit: int = 50):
     """
     Get a formatted context summary of recent activities for the AI agent.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         limit: Maximum number of activities to include (default: 50)
 
     Returns:
@@ -171,12 +171,12 @@ async def get_activity_context(case_id: str, limit: int = 50):
     try:
         activity_service = get_activity_service()
         context = await activity_service.get_activity_context(
-            case_id=case_id,
+            course_id=f"course:{course_id}",
             limit=limit
         )
 
         return {
-            "case_id": case_id,
+            "course_id": course_id,
             "context": context
         }
 

@@ -2,10 +2,10 @@
 Routes pour la transcription audio et le téléchargement YouTube.
 
 Endpoints:
-- POST /api/courses/{case_id}/documents/{doc_id}/transcribe - Transcription simple Whisper
-- POST /api/courses/{case_id}/documents/{doc_id}/transcribe-workflow - Transcription avec workflow Agno
-- POST /api/courses/{case_id}/documents/youtube/info - Informations vidéo YouTube
-- POST /api/courses/{case_id}/documents/youtube - Télécharger audio YouTube
+- POST /api/courses/{course_id}/documents/{doc_id}/transcribe - Transcription simple Whisper
+- POST /api/courses/{course_id}/documents/{doc_id}/transcribe-workflow - Transcription avec workflow Agno
+- POST /api/courses/{course_id}/documents/youtube/info - Informations vidéo YouTube
+- POST /api/courses/{course_id}/documents/youtube - Télécharger audio YouTube
 """
 
 import logging
@@ -48,9 +48,9 @@ router = APIRouter(prefix="/api/courses", tags=["Transcription"])
 # Endpoints - Transcription
 # ============================================================================
 
-@router.post("/{case_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
+@router.post("/{course_id}/documents/{doc_id}/transcribe", response_model=TranscriptionResponse)
 async def transcribe_document(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     language: str = "fr",
     user_id: str = Depends(require_auth)
@@ -66,19 +66,17 @@ async def transcribe_document(
         if not service.db:
             await service.connect()
 
-        # Normalize IDs (support both case: and course: prefixes for backwards compatibility)
-        if not case_id.startswith("case:") and not case_id.startswith("course:"):
-            case_id = f"course:{case_id}"
-        if case_id.startswith("case:"):
-            case_id = case_id.replace("case:", "course:")
+        # Normalize IDs
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
         # Verify course exists
-        clean_case_id = case_id.replace("course:", "")
+        clean_course_id = course_id.replace("course:", "")
         course_check = await service.query(
             "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
-            {"course_id": clean_case_id}
+            {"course_id": clean_course_id}
         )
         if not course_check or len(course_check) == 0:
             raise HTTPException(
@@ -109,7 +107,7 @@ async def transcribe_document(
         item = items[0]
 
         # Verify document belongs to course
-        if item.get("course_id") != case_id:
+        if item.get("course_id") != course_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Document does not belong to this course"
@@ -193,9 +191,9 @@ async def transcribe_document(
         )
 
 
-@router.post("/{case_id}/documents/{doc_id}/transcribe-workflow")
+@router.post("/{course_id}/documents/{doc_id}/transcribe-workflow")
 async def transcribe_document_workflow(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     request: TranscribeWorkflowRequest = TranscribeWorkflowRequest(),
     user_id: str = Depends(require_auth)
@@ -215,19 +213,17 @@ async def transcribe_document_workflow(
         if not service.db:
             await service.connect()
 
-        # Normalize IDs (support both case: and course: prefixes for backwards compatibility)
-        if not case_id.startswith("case:") and not case_id.startswith("course:"):
-            case_id = f"course:{case_id}"
-        if case_id.startswith("case:"):
-            case_id = case_id.replace("case:", "course:")
+        # Normalize IDs
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
         # Verify course exists
-        clean_case_id = case_id.replace("course:", "")
+        clean_course_id = course_id.replace("course:", "")
         course_check = await service.query(
             "SELECT * FROM course WHERE id = type::thing('course', $course_id)",
-            {"course_id": clean_case_id}
+            {"course_id": clean_course_id}
         )
         if not course_check or len(course_check) == 0:
             raise HTTPException(
@@ -258,7 +254,7 @@ async def transcribe_document_workflow(
         item = items[0]
 
         # Verify document belongs to course
-        if item.get("course_id") != case_id:
+        if item.get("course_id") != course_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Document does not belong to this course"
@@ -322,7 +318,7 @@ async def transcribe_document_workflow(
                 try:
                     result = await workflow.run(
                         audio_path=file_path,
-                        course_id=case_id,
+                        course_id=course_id,
                         language=request.language,
                         create_markdown_doc=request.create_markdown,
                         raw_mode=request.raw_mode,
@@ -387,9 +383,9 @@ async def transcribe_document_workflow(
 # Endpoints - YouTube
 # ============================================================================
 
-@router.post("/{case_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
+@router.post("/{course_id}/documents/youtube/info", response_model=YouTubeInfoResponse)
 async def get_youtube_info(
-    case_id: str,
+    course_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -433,9 +429,9 @@ async def get_youtube_info(
         )
 
 
-@router.post("/{case_id}/documents/youtube", response_model=YouTubeDownloadResponse)
+@router.post("/{course_id}/documents/youtube", response_model=YouTubeDownloadResponse)
 async def download_youtube_audio(
-    case_id: str,
+    course_id: str,
     request: YouTubeDownloadRequest,
     user_id: str = Depends(require_auth)
 ):
@@ -466,8 +462,8 @@ async def download_youtube_audio(
             await service.connect()
 
         # Normalize course ID
-        if not case_id.startswith("course:"):
-            case_id = f"course:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Normaliser le module_id si fourni
         target_module_id = None
@@ -477,7 +473,7 @@ async def download_youtube_audio(
                 target_module_id = f"module:{target_module_id}"
 
         # Create upload directory for this course
-        upload_dir = Path(settings.upload_dir) / case_id.replace("course:", "")
+        upload_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Download audio
@@ -496,7 +492,7 @@ async def download_youtube_audio(
 
         file_path = Path(result.file_path)
         document_data = {
-            "course_id": case_id,
+            "course_id": course_id,
             "nom_fichier": result.filename,
             "type_fichier": "mp3",
             "type_mime": "audio/mpeg",
@@ -525,7 +521,7 @@ async def download_youtube_audio(
         asyncio.create_task(
             run_transcription_for_document(
                 document_id=f"document:{doc_id}",
-                course_id=case_id,
+                course_id=course_id,
                 audio_path=str(file_path.absolute()),
                 language="fr"
             )

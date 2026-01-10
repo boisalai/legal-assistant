@@ -24,12 +24,12 @@ def _is_audio_file(filename: str) -> bool:
     return ext in AUDIO_EXTENSIONS
 
 
-async def _find_audio_document(case_id: str, filename: Optional[str] = None) -> Optional[dict]:
+async def _find_audio_document(course_id: str, filename: Optional[str] = None) -> Optional[dict]:
     """
-    Find an audio document in the case.
+    Find an audio document in the course.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         filename: Optional specific filename to look for
 
     Returns:
@@ -39,14 +39,14 @@ async def _find_audio_document(case_id: str, filename: Optional[str] = None) -> 
     if not service.db:
         await service.connect()
 
-    # Normalize case_id
-    if not case_id.startswith("case:"):
-        case_id = f"case:{case_id}"
+    # Normalize course_id
+    if not course_id.startswith("course:"):
+        course_id = f"course:{course_id}"
 
-    # Get documents for this case
+    # Get documents for this course
     docs_result = await service.query(
-        "SELECT * FROM document WHERE case_id = $case_id",
-        {"case_id": case_id}
+        "SELECT * FROM document WHERE course_id = $course_id",
+        {"course_id": course_id}
     )
 
     documents = []
@@ -88,7 +88,7 @@ async def _find_audio_document(case_id: str, filename: Optional[str] = None) -> 
 
 
 async def transcribe_audio_streaming(
-    case_id: str,
+    course_id: str,
     audio_filename: Optional[str] = None,
     language: str = "fr",
     raw_mode: bool = False
@@ -105,14 +105,14 @@ async def transcribe_audio_streaming(
     - error: str (if failed)
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         audio_filename: Optional specific filename to transcribe
         language: Language code for transcription
         raw_mode: If True, skip LLM formatting and save raw Whisper output
     """
     try:
         # Find the audio document
-        document = await _find_audio_document(case_id, audio_filename)
+        document = await _find_audio_document(course_id, audio_filename)
 
         if not document:
             if audio_filename:
@@ -135,10 +135,10 @@ async def transcribe_audio_streaming(
         if not file_path or not Path(file_path).exists():
             return {"success": False, "error": f"Fichier audio '{doc_name}' non accessible."}
 
-        # Normalize case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize course_id
+        course_id = course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow
@@ -149,7 +149,7 @@ async def transcribe_audio_streaming(
 
         result = await workflow.run(
             audio_path=file_path,
-            case_id=case_id,
+            course_id=course_id,
             language=language,
             create_markdown_doc=True,
             original_filename=doc_name,
@@ -184,7 +184,7 @@ async def transcribe_audio_streaming(
 
 @tool(name="transcribe_audio")
 async def transcribe_audio(
-    case_id: str,
+    course_id: str,
     audio_filename: Optional[str] = None,
     language: str = "fr"
 ) -> str:
@@ -195,7 +195,7 @@ async def transcribe_audio(
     La transcription utilise Whisper (OpenAI) pour la reconnaissance vocale.
 
     Args:
-        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         audio_filename: Nom du fichier audio à transcrire (optionnel - si non spécifié,
                        utilise le premier fichier audio non transcrit du cours)
         language: Langue de l'audio ("fr" pour français, "en" pour anglais, etc.)
@@ -205,7 +205,7 @@ async def transcribe_audio(
     """
     try:
         # Find the audio document
-        document = await _find_audio_document(case_id, audio_filename)
+        document = await _find_audio_document(course_id, audio_filename)
 
         if not document:
             if audio_filename:
@@ -223,10 +223,10 @@ async def transcribe_audio(
         if not file_path or not Path(file_path).exists():
             return f"Le fichier audio '{doc_name}' n'est pas accessible sur le disque."
 
-        # Normalize case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize course_id
+        course_id = course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Import and run the transcription workflow
         from workflows.transcribe_audio import TranscriptionWorkflow
@@ -237,7 +237,7 @@ async def transcribe_audio(
 
         result = await workflow.run(
             audio_path=file_path,
-            case_id=case_id,
+            course_id=course_id,
             language=language,
             create_markdown_doc=True,
             original_filename=doc_name  # Use original filename, not UUID-based path

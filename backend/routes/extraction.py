@@ -2,9 +2,9 @@
 Routes pour l'extraction de texte depuis les documents.
 
 Endpoints:
-- POST /api/courses/{case_id}/documents/{doc_id}/extract - Extraction simple de texte
-- DELETE /api/courses/{case_id}/documents/{doc_id}/text - Effacer le texte extrait
-- POST /api/courses/{case_id}/documents/{doc_id}/extract-to-markdown - Extraction PDF avancée avec Docling
+- POST /api/courses/{course_id}/documents/{doc_id}/extract - Extraction simple de texte
+- DELETE /api/courses/{course_id}/documents/{doc_id}/text - Effacer le texte extrait
+- POST /api/courses/{course_id}/documents/{doc_id}/extract-to-markdown - Extraction PDF avancée avec Docling
 """
 
 import logging
@@ -44,9 +44,9 @@ class ExtractionResponse(BaseModel):
 # Endpoints - Extraction simple
 # ============================================================================
 
-@router.post("/{case_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
+@router.post("/{course_id}/documents/{doc_id}/extract", response_model=ExtractionResponse)
 async def extract_document_text(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -61,8 +61,8 @@ async def extract_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -148,9 +148,9 @@ async def extract_document_text(
         )
 
 
-@router.delete("/{case_id}/documents/{doc_id}/text")
+@router.delete("/{course_id}/documents/{doc_id}/text")
 async def clear_document_text(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     user_id: str = Depends(require_auth)
 ):
@@ -165,8 +165,8 @@ async def clear_document_text(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -209,9 +209,9 @@ async def clear_document_text(
 # Endpoints - Extraction PDF avancée avec Docling
 # ============================================================================
 
-@router.post("/{case_id}/documents/{doc_id}/extract-to-markdown")
+@router.post("/{course_id}/documents/{doc_id}/extract-to-markdown")
 async def extract_pdf_to_markdown(
-    case_id: str,
+    course_id: str,
     doc_id: str,
     force_reextract: bool = False,
     user_id: str = Depends(require_auth)
@@ -235,8 +235,8 @@ async def extract_pdf_to_markdown(
             await service.connect()
 
         # Normalize IDs
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
         if not doc_id.startswith("document:"):
             doc_id = f"document:{doc_id}"
 
@@ -294,13 +294,13 @@ async def extract_pdf_to_markdown(
                     markdown_filename = Path(original_filename).stem + ".md"
 
                     # Get judgment directory
-                    judgment_dir = Path(settings.upload_dir) / case_id.replace("case:", "")
+                    judgment_dir = Path(settings.upload_dir) / course_id.replace("course:", "")
                     markdown_path = judgment_dir / markdown_filename
 
                     # Check existing documents in database
                     docs_result = await service.query(
-                        "SELECT * FROM document WHERE case_id = $case_id AND nom_fichier = $filename",
-                        {"case_id": case_id, "filename": markdown_filename}
+                        "SELECT * FROM document WHERE course_id = $course_id AND nom_fichier = $filename",
+                        {"course_id": course_id, "filename": markdown_filename}
                     )
 
                     existing_docs = []
@@ -409,7 +409,7 @@ async def extract_pdf_to_markdown(
                     # Generate document ID (remove hyphens for SurrealDB compatibility)
                     new_doc_id = uuid.uuid4().hex[:16]
                     doc_record = {
-                        "case_id": case_id,
+                        "course_id": course_id,
                         "nom_fichier": markdown_filename,
                         "type_fichier": "md",
                         "type_mime": "text/markdown",
@@ -439,7 +439,7 @@ async def extract_pdf_to_markdown(
                         indexing_service = get_document_indexing_service()
                         index_result = await indexing_service.index_document(
                             document_id=f"document:{new_doc_id}",
-                            case_id=case_id,
+                            course_id=course_id,
                             text_content=extraction_result.text,
                             force_reindex=False
                         )

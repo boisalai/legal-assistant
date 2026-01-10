@@ -22,7 +22,7 @@ class TutorService:
 
     async def generate_summary_content(
         self,
-        case_id: str,
+        course_id: str,
         document_id: Optional[str] = None,
         summary_type: str = "comprehensive"
     ) -> str:
@@ -30,14 +30,14 @@ class TutorService:
         Generate a pedagogical summary of a document or course.
 
         Args:
-            case_id: Course ID
+            course_id: Course ID
             document_id: Document ID (if None, summarize entire course)
             summary_type: Type of summary ("comprehensive", "key_points", "executive")
 
         Returns:
             Formatted markdown summary
         """
-        logger.info(f"Generating {summary_type} summary for case_id={case_id}, document_id={document_id}")
+        logger.info(f"Generating {summary_type} summary for course_id={course_id}, document_id={document_id}")
 
         try:
             # Get document name for title
@@ -52,7 +52,7 @@ class TutorService:
 
             # 1. Main concepts and definitions
             concepts_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query="Quels sont les concepts principaux, définitions et notions clés abordés ?",
                 document_id=document_id,
                 top_k=5
@@ -60,7 +60,7 @@ class TutorService:
 
             # 2. Important points and rules
             points_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query="Quels sont les points importants, règles, conditions et obligations à retenir ?",
                 document_id=document_id,
                 top_k=5
@@ -68,7 +68,7 @@ class TutorService:
 
             # 3. Warnings, exceptions, and pitfalls
             warnings_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query="Quels sont les points d'attention, exceptions, cas particuliers et erreurs à éviter ?",
                 document_id=document_id,
                 top_k=3
@@ -176,7 +176,7 @@ Veuillez vérifier que:
 
     async def generate_mindmap_content(
         self,
-        case_id: str,
+        course_id: str,
         document_id: Optional[str] = None,
         focus_topic: Optional[str] = None
     ) -> str:
@@ -184,14 +184,14 @@ Veuillez vérifier que:
         Generate a visual mind map with colors, symbols, and non-linear structure.
 
         Args:
-            case_id: Course ID
+            course_id: Course ID
             document_id: Document ID (if None, map entire course)
             focus_topic: Specific topic to focus on
 
         Returns:
             Formatted HTML/markdown mind map with visual elements
         """
-        logger.info(f"Generating mind map for case_id={case_id}, document_id={document_id}, topic={focus_topic}")
+        logger.info(f"Generating mind map for course_id={course_id}, document_id={document_id}, topic={focus_topic}")
 
         try:
             # Get document name for title
@@ -211,7 +211,7 @@ Veuillez vérifier que:
 
             # Search for main themes and concepts
             main_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query=query,
                 document_id=document_id,
                 top_k=8
@@ -456,7 +456,7 @@ Veuillez vérifier que le document est indexé.
 
     async def generate_quiz_content(
         self,
-        case_id: str,
+        course_id: str,
         document_id: Optional[str] = None,
         num_questions: int = 5,
         difficulty: str = "medium"
@@ -465,7 +465,7 @@ Veuillez vérifier que le document est indexé.
         Generate an interactive quiz with questions and explanations.
 
         Args:
-            case_id: Course ID
+            course_id: Course ID
             document_id: Document ID (if None, quiz on entire course)
             num_questions: Number of questions (1-10)
             difficulty: Difficulty level ("easy", "medium", "hard")
@@ -473,7 +473,7 @@ Veuillez vérifier que le document est indexé.
         Returns:
             Formatted markdown quiz with collapsible answers
         """
-        logger.info(f"Generating quiz ({num_questions} questions, {difficulty}) for case_id={case_id}, document_id={document_id}")
+        logger.info(f"Generating quiz ({num_questions} questions, {difficulty}) for course_id={course_id}, document_id={document_id}")
 
         try:
             # Get document name for title
@@ -494,7 +494,7 @@ Veuillez vérifier que le document est indexé.
             # Search for factual content to base questions on
             # We need diverse content for variety
             factual_content = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query="Quels sont les faits, définitions, règles, conditions et principes importants ?",
                 document_id=document_id,
                 top_k=num_questions * 2  # Get more than needed for variety
@@ -610,7 +610,7 @@ Veuillez vérifier que le document est indexé.
 
     async def generate_concept_explanation(
         self,
-        case_id: str,
+        course_id: str,
         concept: str,
         document_id: Optional[str] = None,
         detail_level: str = "standard"
@@ -619,7 +619,7 @@ Veuillez vérifier que le document est indexé.
         Generate a detailed explanation of a legal concept.
 
         Args:
-            case_id: Course ID
+            course_id: Course ID
             concept: Concept to explain
             document_id: Limit search to specific document
             detail_level: Detail level ("simple", "standard", "advanced")
@@ -627,12 +627,12 @@ Veuillez vérifier que le document est indexé.
         Returns:
             Formatted markdown explanation
         """
-        logger.info(f"Explaining concept '{concept}' (level={detail_level}) for case_id={case_id}, document_id={document_id}")
+        logger.info(f"Explaining concept '{concept}' (level={detail_level}) for course_id={course_id}, document_id={document_id}")
 
         try:
             # Search for definition
             definition_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query=f"Quelle est la définition de {concept} ? Qu'est-ce que {concept} signifie ?",
                 document_id=document_id,
                 top_k=3
@@ -640,7 +640,7 @@ Veuillez vérifier que le document est indexé.
 
             # Search for conditions and elements
             conditions_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query=f"Quelles sont les conditions, éléments ou critères de {concept} ?",
                 document_id=document_id,
                 top_k=3
@@ -648,7 +648,7 @@ Veuillez vérifier que le document est indexé.
 
             # Search for examples
             examples_results = await self.search_content(
-                case_id=case_id,
+                course_id=course_id,
                 query=f"Quels sont les exemples, cas ou applications de {concept} ?",
                 document_id=document_id,
                 top_k=2
@@ -802,7 +802,7 @@ Veuillez vérifier que:
 
     async def search_content(
         self,
-        case_id: str,
+        course_id: str,
         query: str,
         document_id: Optional[str] = None,
         top_k: int = 5
@@ -811,7 +811,7 @@ Veuillez vérifier que:
         Search for content using semantic search.
 
         Args:
-            case_id: Course ID
+            course_id: Course ID
             query: Search query
             document_id: Limit to specific document
             top_k: Number of results
@@ -820,14 +820,14 @@ Veuillez vérifier que:
             List of search results with content and metadata
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("course:"):
-                case_id = f"course:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             # Use the indexing service for semantic search
             results = await self.indexing_service.search_similar(
                 query_text=query,
-                case_id=case_id,
+                course_id=course_id,
                 top_k=top_k
             )
 

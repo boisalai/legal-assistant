@@ -119,7 +119,7 @@ async def _verify_article_ccq(article_num: str) -> dict:
 
 async def _verify_jurisprudence_in_documents(
     citation: str,
-    case_id: str
+    course_id: str
 ) -> dict:
     """
     Vérifie si une jurisprudence est mentionnée dans les documents du cours.
@@ -127,14 +127,14 @@ async def _verify_jurisprudence_in_documents(
     try:
         indexing_service = get_document_indexing_service()
 
-        # Normaliser case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normaliser course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
         # Recherche sémantique
         results = await indexing_service.search_similar(
             query_text=citation,
-            case_id=case_id,
+            course_id=course_id,
             top_k=3,
             min_similarity=0.6
         )
@@ -201,7 +201,7 @@ async def _verify_jurisprudence_in_caij(citation: str) -> dict:
 @tool
 async def verify_legal_citations(
     text_to_verify: str,
-    case_id: str = ""
+    course_id: str = ""
 ) -> str:
     """
     Vérifie les citations juridiques dans un texte.
@@ -216,7 +216,7 @@ async def verify_legal_citations(
 
     Args:
         text_to_verify: Texte contenant les citations à vérifier
-        case_id: ID du cours pour recherche dans documents locaux (optionnel)
+        course_id: ID du cours pour recherche dans documents locaux (optionnel)
 
     Returns:
         Rapport de validation détaillé avec statut de chaque citation.
@@ -273,8 +273,8 @@ elles n'ont pas pu être analysées automatiquement."""
         # Vérifier la jurisprudence
         for juris in citations["jurisprudence"]:
             # D'abord chercher dans les documents locaux
-            if case_id:
-                result = await _verify_jurisprudence_in_documents(juris, case_id)
+            if course_id:
+                result = await _verify_jurisprudence_in_documents(juris, course_id)
                 if result["valid"] is True:
                     results["verified"].append(result)
                     continue
@@ -301,7 +301,7 @@ elles n'ont pas pu être analysées automatiquement."""
 
         # Citations vérifiées
         if results["verified"]:
-            output.append("### Citations vérifiées ✅\n")
+            output.append("### Citations vérifiées\n")
             for r in results["verified"]:
                 output.append(f"- **{r['citation']}**")
                 output.append(f"  - Source: {r['source']}")
@@ -311,7 +311,7 @@ elles n'ont pas pu être analysées automatiquement."""
 
         # Citations invalides
         if results["invalid"]:
-            output.append("### Citations invalides ❌\n")
+            output.append("### Citations invalides\n")
             for r in results["invalid"]:
                 output.append(f"- **{r['citation']}**")
                 output.append(f"  - Raison: {r['note']}")
@@ -319,7 +319,7 @@ elles n'ont pas pu être analysées automatiquement."""
 
         # Citations non vérifiées
         if results["unverified"]:
-            output.append("### Citations non vérifiées ⚠️\n")
+            output.append("### Citations non vérifiées\n")
             for r in results["unverified"]:
                 output.append(f"- **{r['citation']}**")
                 output.append(f"  - Statut: {r['note']}")
@@ -331,13 +331,13 @@ elles n'ont pas pu être analysées automatiquement."""
         unverified_count = len(results["unverified"])
 
         if invalid_count > 0:
-            fiabilite = "⚠️ **BASSE** - Citations invalides détectées"
+            fiabilite = "**BASSE** - Citations invalides détectées"
         elif unverified_count > verified_count:
-            fiabilite = "🔶 **MOYENNE** - Plusieurs citations non vérifiables"
+            fiabilite = "**MOYENNE** - Plusieurs citations non vérifiables"
         elif verified_count > 0 and unverified_count == 0:
-            fiabilite = "✅ **HAUTE** - Toutes les citations vérifiées"
+            fiabilite = "**HAUTE** - Toutes les citations vérifiées"
         else:
-            fiabilite = "🔶 **MOYENNE** - Certaines citations non vérifiables"
+            fiabilite = "**MOYENNE** - Certaines citations non vérifiables"
 
         output.append("---\n")
         output.append(f"### Fiabilité globale: {fiabilite}\n")
@@ -349,7 +349,7 @@ elles n'ont pas pu être analysées automatiquement."""
 
     except Exception as e:
         logger.error(f"Erreur verify_legal_citations: {e}", exc_info=True)
-        return f"❌ Erreur lors de la vérification des citations: {str(e)}"
+        return f"Erreur lors de la vérification des citations: {str(e)}"
 
 
 @tool
