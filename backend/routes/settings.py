@@ -362,7 +362,7 @@ async def reindex_all_documents() -> Dict[str, Any]:
                 logger.info(f"Reindexing {doc_id}...")
                 index_result = await indexing_service.index_document(
                     document_id=doc_id,
-                    case_id=course_id,
+                    course_id=course_id,
                     text_content=texte_extrait,
                     force_reindex=True
                 )

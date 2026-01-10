@@ -1,7 +1,7 @@
 """
 Document search tool for the Agno agent.
 
-This tool allows the AI agent to search through documents in a case.
+This tool allows the AI agent to search through documents in a course.
 """
 
 import logging
@@ -16,12 +16,12 @@ from services.surreal_service import get_surreal_service
 logger = logging.getLogger(__name__)
 
 
-async def _get_case_documents(case_id: str) -> List[dict]:
+async def _get_course_documents(course_id: str) -> List[dict]:
     """
-    Get all documents for a case with their content.
+    Get all documents for a course with their content.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
 
     Returns:
         List of document dicts with texte_extrait
@@ -30,14 +30,14 @@ async def _get_case_documents(case_id: str) -> List[dict]:
     if not service.db:
         await service.connect()
 
-    # Normalize case_id
-    if not case_id.startswith("case:"):
-        case_id = f"case:{case_id}"
+    # Normalize course_id
+    if not course_id.startswith("course:"):
+        course_id = f"course:{course_id}"
 
-    # Get documents for this case
+    # Get documents for this course
     docs_result = await service.query(
-        "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
-        {"case_id": case_id}
+        "SELECT * FROM document WHERE course_id = $course_id ORDER BY created_at DESC",
+        {"course_id": course_id}
     )
 
     documents = []
@@ -109,46 +109,46 @@ def _search_in_text(text: str, keywords: List[str], context_chars: int = 200) ->
 
 @tool(name="search_documents")
 async def search_documents(
-    case_id: str,
+    course_id: str,
     keywords: str,
     max_results: int = 10
 ) -> str:
     """
     Recherche par mots-clés EXACTS dans les documents d'un cours.
 
-    ⚠️ ATTENTION: Utilisez cet outil UNIQUEMENT si l'utilisateur demande explicitement de chercher un mot/phrase exact.
-    Pour les questions normales, utilisez plutôt `semantic_search` qui comprend le sens de la question.
+    ATTENTION: Utilisez cet outil UNIQUEMENT si l'utilisateur demande explicitement de chercher un mot/phrase exact.
+    Pour les questions normales, utilisez plutot `semantic_search` qui comprend le sens de la question.
 
     Exemples de quand UTILISER cet outil:
     - L'utilisateur dit : "Cherche le mot exact 'signature'"
     - L'utilisateur dit : "Trouve toutes les occurrences de '1000$'"
     - L'utilisateur dit : "Recherche 'Jean Dupont' dans les documents"
 
-    Exemples de quand NE PAS utiliser cet outil (utilisez `semantic_search` à la place):
-    - "Qu'est-ce que le notariat ?" → utilisez semantic_search
-    - "Quel est le prix ?" → utilisez semantic_search
-    - "Résume ce document" → utilisez semantic_search
+    Exemples de quand NE PAS utiliser cet outil (utilisez `semantic_search` a la place):
+    - "Qu'est-ce que le notariat ?" -> utilisez semantic_search
+    - "Quel est le prix ?" -> utilisez semantic_search
+    - "Resume ce document" -> utilisez semantic_search
 
     Args:
-        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
-        keywords: Mots-clés à rechercher, séparés par des virgules (ex: "contrat, signature, date")
-        max_results: Nombre maximum de résultats à retourner par mot-clé (défaut: 10)
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
+        keywords: Mots-cles a rechercher, separes par des virgules (ex: "contrat, signature, date")
+        max_results: Nombre maximum de resultats a retourner par mot-cle (defaut: 10)
 
     Returns:
-        Un résumé des résultats trouvés avec les passages pertinents
+        Un resume des resultats trouves avec les passages pertinents
     """
     try:
         # Parse keywords
         keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
 
         if not keyword_list:
-            return "Aucun mot-clé fourni. Veuillez spécifier au moins un mot-clé à rechercher."
+            return "Aucun mot-cle fourni. Veuillez specifier au moins un mot-cle a rechercher."
 
-        # Get case documents
-        documents = await _get_case_documents(case_id)
+        # Get course documents
+        documents = await _get_course_documents(course_id)
 
         if not documents:
-            return "Aucun document avec du contenu extractible trouvé dans ce cours. Les documents doivent être transcrits ou avoir du texte extrait pour être recherchés."
+            return "Aucun document avec du contenu extractible trouve dans ce cours. Les documents doivent etre transcrits ou avoir du texte extrait pour etre recherches."
 
         # Search in each document
         all_results = []
@@ -174,18 +174,18 @@ async def search_documents(
 
         if not all_results:
             keywords_str = ", ".join([f"'{k}'" for k in keyword_list])
-            return f"Aucune occurrence trouvée pour les mots-clés {keywords_str} dans les {len(documents)} documents du cours."
+            return f"Aucune occurrence trouvee pour les mots-cles {keywords_str} dans les {len(documents)} documents du cours."
 
         # Format response
         keywords_str = ", ".join([f"**{k}**" for k in keyword_list])
-        response = f"J'ai trouvé **{total_matches} occurrences** des mots-clés {keywords_str} dans **{len(all_results)} documents** :\n\n"
+        response = f"J'ai trouve **{total_matches} occurrences** des mots-cles {keywords_str} dans **{len(all_results)} documents** :\n\n"
 
         for result in all_results:
             doc_name = result["document"]
             matches = result["matches"]
 
             response += f"### {doc_name}\n"
-            response += f"*{len(matches)} occurrence(s) trouvée(s)*\n\n"
+            response += f"*{len(matches)} occurrence(s) trouvee(s)*\n\n"
 
             # Group by keyword
             by_keyword = {}
@@ -196,7 +196,7 @@ async def search_documents(
                 by_keyword[keyword].append(match)
 
             for keyword, keyword_matches in by_keyword.items():
-                response += f"**Mot-clé: {keyword}** ({len(keyword_matches)} fois)\n"
+                response += f"**Mot-cle: {keyword}** ({len(keyword_matches)} fois)\n"
 
                 # Show first 3 matches for this keyword
                 for i, match in enumerate(keyword_matches[:3], 1):
@@ -223,7 +223,7 @@ async def search_documents(
 
 
 @tool(name="list_documents")
-async def list_documents(case_id: str) -> str:
+async def list_documents(course_id: str) -> str:
     """
     Liste tous les documents d'un cours avec leur statut.
 
@@ -231,25 +231,24 @@ async def list_documents(case_id: str) -> str:
     leur type, et s'ils ont du contenu extractible (texte ou transcription).
 
     Args:
-        case_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
 
     Returns:
-        Une liste formatée des documents avec leur statut
+        Une liste formatee des documents avec leur statut
     """
     try:
         service = get_surreal_service()
         if not service.db:
             await service.connect()
 
-        # Normalize case_id
-        case_id = case_id
-        if not case_id.startswith("case:"):
-            case_id = f"case:{case_id}"
+        # Normalize course_id
+        if not course_id.startswith("course:"):
+            course_id = f"course:{course_id}"
 
-        # Get documents for this case
+        # Get documents for this course
         docs_result = await service.query(
-            "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
-            {"case_id": case_id}
+            "SELECT * FROM document WHERE course_id = $course_id ORDER BY created_at DESC",
+            {"course_id": course_id}
         )
 
         documents = []
@@ -264,7 +263,7 @@ async def list_documents(case_id: str) -> str:
                 documents = first_item
 
         if not documents:
-            return "Aucun document trouvé dans ce cours."
+            return "Aucun document trouve dans ce cours."
 
         response = f"**{len(documents)} document(s) dans ce cours:**\n\n"
 
@@ -368,75 +367,75 @@ async def list_documents(case_id: str) -> str:
 
         # Transcription files
         if transcriptions:
-            response += "### 📝 Transcriptions audio (fichiers texte issus d'enregistrements audio):\n"
-            response += "*IMPORTANT: Ces fichiers .md contiennent le texte extrait de fichiers audio. L'audio a DÉJÀ ÉTÉ transcrit.*\n\n"
+            response += "### Transcriptions audio (fichiers texte issus d'enregistrements audio):\n"
+            response += "*IMPORTANT: Ces fichiers .md contiennent le texte extrait de fichiers audio. L'audio a DEJA ETE transcrit.*\n\n"
             for doc in transcriptions:
                 response += f"- **{doc['name']}** ({doc['type']}, {doc['size']}) - {doc['word_count']} mots\n"
-                response += f"  📝 **Transcription complétée** du fichier audio **{doc['source_audio']}**\n"
-                response += f"  ✅ Le fichier audio source a été traité et son contenu est maintenant disponible en texte\n\n"
+                response += f"  **Transcription completee** du fichier audio **{doc['source_audio']}**\n"
+                response += f"  Le fichier audio source a ete traite et son contenu est maintenant disponible en texte\n\n"
 
         # PDF extractions
         if pdf_extractions:
-            response += "### 📑 Extractions de documents PDF (fichiers texte issus de PDFs):\n"
-            response += "*IMPORTANT: Ces fichiers .md contiennent le texte extrait de documents PDF. Le PDF a DÉJÀ ÉTÉ extrait.*\n\n"
+            response += "### Extractions de documents PDF (fichiers texte issus de PDFs):\n"
+            response += "*IMPORTANT: Ces fichiers .md contiennent le texte extrait de documents PDF. Le PDF a DEJA ETE extrait.*\n\n"
             for doc in pdf_extractions:
                 response += f"- **{doc['name']}** ({doc['type']}, {doc['size']}) - {doc['word_count']} mots\n"
-                response += f"  📑 **Extraction complétée** du document PDF **{doc['source_pdf']}**\n"
-                response += f"  ✅ Le document PDF source a été traité et son contenu est maintenant disponible en texte\n\n"
+                response += f"  **Extraction completee** du document PDF **{doc['source_pdf']}**\n"
+                response += f"  Le document PDF source a ete traite et son contenu est maintenant disponible en texte\n\n"
 
         # Documents with searchable content (excluding transcriptions and PDF extractions)
         if with_content:
             response += "### Autres documents avec contenu recherchable:\n"
             for doc in with_content:
                 response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                response += f"  📄 Document texte - {doc['word_count']} mots\n\n"
+                response += f"  Document texte - {doc['word_count']} mots\n\n"
 
         # Audio files
         if audio_files:
-            response += "### 🎵 Fichiers audio originaux (enregistrements source):\n"
+            response += "### Fichiers audio originaux (enregistrements source):\n"
             for doc in audio_files:
                 transcription_file = doc.get("transcription_file", "")
                 if transcription_file:
                     response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                    response += f"  ✅ **STATUT: TRANSCRIPTION DÉJÀ EFFECTUÉE**\n"
-                    response += f"  📄 Ce fichier audio a déjà été transcrit → voir le fichier texte **{transcription_file}**\n"
-                    response += f"  ⚠️ **NE PAS re-transcrire** - La transcription existe déjà\n"
-                    response += f"  💡 Pour analyser ce contenu, utilisez le fichier de transcription mentionné ci-dessus\n\n"
+                    response += f"  **STATUT: TRANSCRIPTION DEJA EFFECTUEE**\n"
+                    response += f"  Ce fichier audio a deja ete transcrit -> voir le fichier texte **{transcription_file}**\n"
+                    response += f"  **NE PAS re-transcrire** - La transcription existe deja\n"
+                    response += f"  Pour analyser ce contenu, utilisez le fichier de transcription mentionne ci-dessus\n\n"
                 else:
                     response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                    response += f"  ❌ **STATUT: PAS ENCORE TRANSCRIT**\n"
-                    response += f"  ⏳ Ce fichier audio n'a pas de version texte\n"
-                    response += f"  💡 Utilisez l'outil `transcribe_audio` pour créer une transcription\n\n"
+                    response += f"  **STATUT: PAS ENCORE TRANSCRIT**\n"
+                    response += f"  Ce fichier audio n'a pas de version texte\n"
+                    response += f"  Utilisez l'outil `transcribe_audio` pour creer une transcription\n\n"
 
         # PDF files
         if pdf_files:
-            response += "### 📄 Documents PDF originaux (fichiers source):\n"
+            response += "### Documents PDF originaux (fichiers source):\n"
             for doc in pdf_files:
                 extraction_file = doc.get("extraction_file", "")
                 if extraction_file:
                     response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                    response += f"  ✅ **STATUT: EXTRACTION DÉJÀ EFFECTUÉE**\n"
-                    response += f"  📄 Ce PDF a déjà été extrait → voir le fichier texte **{extraction_file}**\n"
-                    response += f"  ⚠️ **NE PAS re-extraire** - L'extraction existe déjà\n"
-                    response += f"  💡 Pour analyser ce contenu, utilisez le fichier d'extraction mentionné ci-dessus\n\n"
+                    response += f"  **STATUT: EXTRACTION DEJA EFFECTUEE**\n"
+                    response += f"  Ce PDF a deja ete extrait -> voir le fichier texte **{extraction_file}**\n"
+                    response += f"  **NE PAS re-extraire** - L'extraction existe deja\n"
+                    response += f"  Pour analyser ce contenu, utilisez le fichier d'extraction mentionne ci-dessus\n\n"
                 else:
                     response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                    response += f"  ❌ **STATUT: CONTENU NON EXTRACTIBLE**\n"
-                    response += f"  ℹ️ PDF scanné ou image - nécessite OCR\n\n"
+                    response += f"  **STATUT: CONTENU NON EXTRACTIBLE**\n"
+                    response += f"  PDF scanne ou image - necessite OCR\n\n"
 
         # Documents without content (excluding PDFs)
         if without_content:
             response += "### Autres documents:\n"
             for doc in without_content:
                 response += f"- **{doc['name']}** ({doc['type']}, {doc['size']})\n"
-                response += f"  ℹ️ Contenu non extractible (image, document scanné, etc.)\n\n"
+                response += f"  Contenu non extractible (image, document scanne, etc.)\n\n"
 
         # Summary
         searchable_count = len(transcriptions) + len(pdf_extractions) + len(with_content)
-        response += f"\n**Résumé:** {searchable_count} document(s) avec contenu recherchable"
+        response += f"\n**Resume:** {searchable_count} document(s) avec contenu recherchable"
 
         return response.strip()
 
     except Exception as e:
         logger.error(f"List documents error: {e}", exc_info=True)
-        return f"Erreur lors de la récupération de la liste des documents: {str(e)}"
+        return f"Erreur lors de la recuperation de la liste des documents: {str(e)}"

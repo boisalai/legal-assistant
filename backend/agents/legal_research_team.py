@@ -269,7 +269,7 @@ Mieux vaut une réponse partielle mais juridiquement solide qu'une réponse comp
 
 def create_legal_research_team(
     model: Model,
-    case_id: str,
+    course_id: str,
     debug_mode: bool = False
 ) -> Team:
     """
@@ -287,7 +287,7 @@ def create_legal_research_team(
 
     Args:
         model: Modèle LLM à utiliser pour les agents (ex: Claude)
-        case_id: ID du cours pour la recherche dans les documents
+        course_id: ID du cours pour la recherche dans les documents
         debug_mode: Activer les logs de debug (défaut: False)
 
     Returns:
@@ -299,25 +299,25 @@ def create_legal_research_team(
         >>> team = create_legal_research_team(model, "course:abc123")
         >>> response = await team.arun("Quels sont les recours pour vices cachés?")
     """
-    logger.info(f"[create_legal_research_team] Creating 4-agent team for case_id={case_id}")
+    logger.info(f"[create_legal_research_team] Creating 4-agent team for course_id={course_id}")
 
-    # Injecter le case_id dans les instructions du Chercheur
+    # Injecter le course_id dans les instructions du Chercheur
     chercheur_instructions_with_context = CHERCHEUR_INSTRUCTIONS + f"""
 
 ## CONTEXTE
-- ID du cours: {case_id}
-- Utilise cet ID pour semantic_search: case_id="{case_id}"
+- ID du cours: {course_id}
+- Utilise cet ID pour semantic_search: course_id="{course_id}"
 """
 
-    # Instructions de l'Analyste Juridique (pas besoin de case_id)
+    # Instructions de l'Analyste Juridique (pas besoin de course_id)
     analyste_instructions = ANALYSTE_JURIDIQUE_INSTRUCTIONS
 
-    # Injecter le case_id dans les instructions du Validateur
+    # Injecter le course_id dans les instructions du Validateur
     validateur_instructions_with_context = VALIDATEUR_INSTRUCTIONS + f"""
 
 ## CONTEXTE
-- ID du cours: {case_id}
-- Utilise cet ID pour verify_legal_citations: case_id="{case_id}"
+- ID du cours: {course_id}
+- Utilise cet ID pour verify_legal_citations: course_id="{course_id}"
 """
 
     # Agent Chercheur
@@ -350,12 +350,12 @@ def create_legal_research_team(
         markdown=True,
     )
 
-    # Injecter le case_id dans les instructions du Rédacteur
+    # Injecter le course_id dans les instructions du Rédacteur
     redacteur_instructions_with_context = REDACTEUR_INSTRUCTIONS + f"""
 
 ## CONTEXTE
-- ID du cours: {case_id}
-- Utilise cet ID pour les outils pédagogiques: case_id="{case_id}"
+- ID du cours: {course_id}
+- Utilise cet ID pour les outils pédagogiques: course_id="{course_id}"
 """
 
     # Agent Rédacteur

@@ -200,7 +200,7 @@ async def chat(request: ChatRequest):
             try:
                 activity_service = get_activity_service()
                 activity_context = await activity_service.get_activity_context(
-                    case_id=request.course_id,
+                    course_id=request.course_id,
                     limit=20  # Show last 20 activities for context
                 )
             except Exception as e:
@@ -427,7 +427,7 @@ Document contents:"""
                             try:
                                 # Get raw activities to parse
                                 activities_raw = await activity_service.get_recent_activities(
-                                    case_id=request.course_id,
+                                    course_id=request.course_id,
                                     limit=20
                                 )
                                 current_document_id = _get_current_document_from_activities(activities_raw)
@@ -500,7 +500,7 @@ Document contents:"""
             logger.info(f"Using multi-agent team for legal research query")
             team = create_legal_research_team(
                 model=model,
-                case_id=request.course_id,
+                course_id=request.course_id,
                 debug_mode=False
             )
             # Get response from team
@@ -548,13 +548,13 @@ Document contents:"""
                 conv_service = get_conversation_service()
                 # Save user message
                 await conv_service.save_message(
-                    case_id=request.course_id,
+                    course_id=request.course_id,
                     role="user",
                     content=request.message
                 )
                 # Save assistant response
                 await conv_service.save_message(
-                    case_id=request.course_id,
+                    course_id=request.course_id,
                     role="assistant",
                     content=assistant_message,
                     model_id=request.model_id,
@@ -668,7 +668,7 @@ async def _handle_transcription_stream(request: ChatRequest) -> AsyncGenerator[s
     try:
         # Run the transcription
         result = await transcribe_audio_streaming(
-            case_id=request.course_id,
+            course_id=request.course_id,
             audio_filename=audio_filename,
             language="fr"
         )
@@ -846,7 +846,7 @@ async def get_chat_history(course_id: str, limit: int = 50, offset: int = 0):
     try:
         conv_service = get_conversation_service()
         messages = await conv_service.get_conversation_history(
-            case_id=course_id,  # Service expects case_id parameter
+            course_id=course_id,
             limit=limit,
             offset=offset
         )
@@ -878,7 +878,7 @@ async def clear_chat_history(course_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        success = await conv_service.clear_conversation(case_id=course_id)  # Service expects case_id parameter
+        success = await conv_service.clear_conversation(course_id=course_id)
 
         if success:
             return {"success": True, "message": "Historique effacé avec succès"}
@@ -911,7 +911,7 @@ async def get_chat_stats(course_id: str):
     """
     try:
         conv_service = get_conversation_service()
-        stats = await conv_service.get_conversation_stats(case_id=course_id)  # Service expects case_id parameter
+        stats = await conv_service.get_conversation_stats(course_id=course_id)
 
         return {
             "course_id": course_id,

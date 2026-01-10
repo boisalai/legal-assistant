@@ -21,7 +21,7 @@ class ConversationService:
 
     async def save_message(
         self,
-        case_id: str,
+        course_id: str,
         role: str,
         content: str,
         model_id: Optional[str] = None,
@@ -31,7 +31,7 @@ class ConversationService:
         Save a message to the conversation history.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             role: Message role ("user" or "assistant")
             content: Message content
             model_id: Model used (for assistant messages)
@@ -41,12 +41,12 @@ class ConversationService:
             Message ID if successful, None otherwise
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             message_data = {
-                "case_id": case_id,
+                "course_id": course_id,
                 "role": role,
                 "content": content,
                 "timestamp": datetime.utcnow().isoformat(),
@@ -77,15 +77,15 @@ class ConversationService:
 
     async def get_conversation_history(
         self,
-        case_id: str,
+        course_id: str,
         limit: int = 50,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
-        Get conversation history for a case.
+        Get conversation history for a course.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             limit: Maximum number of messages to retrieve
             offset: Number of messages to skip
 
@@ -93,21 +93,21 @@ class ConversationService:
             List of message dicts ordered by timestamp (oldest first)
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             # Query conversation messages
             result = await self.service.query(
                 """
                 SELECT * FROM conversation
-                WHERE case_id = $case_id
+                WHERE course_id = $course_id
                 ORDER BY timestamp ASC
                 LIMIT $limit
                 START $offset
                 """,
                 {
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "limit": limit,
                     "offset": offset
                 }
@@ -124,7 +124,7 @@ class ConversationService:
                 elif isinstance(first_item, list):
                     messages = first_item
 
-            logger.info(f"Retrieved {len(messages)} messages for {case_id}")
+            logger.info(f"Retrieved {len(messages)} messages for {course_id}")
             return messages
 
         except Exception as e:
@@ -133,21 +133,21 @@ class ConversationService:
 
     async def get_recent_context(
         self,
-        case_id: str,
+        course_id: str,
         max_messages: int = 10
     ) -> str:
         """
         Get recent conversation history formatted as context for the AI.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             max_messages: Maximum number of recent messages to include
 
         Returns:
             Formatted conversation context string
         """
         try:
-            messages = await self.get_conversation_history(case_id, limit=max_messages)
+            messages = await self.get_conversation_history(course_id, limit=max_messages)
 
             if not messages:
                 return ""
@@ -168,48 +168,48 @@ class ConversationService:
             logger.error(f"Failed to get recent context: {e}", exc_info=True)
             return ""
 
-    async def clear_conversation(self, case_id: str) -> bool:
+    async def clear_conversation(self, course_id: str) -> bool:
         """
-        Clear all conversation history for a case.
+        Clear all conversation history for a course.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
-            # Delete all messages for this case
+            # Delete all messages for this course
             await self.service.query(
-                "DELETE FROM conversation WHERE case_id = $case_id",
-                {"case_id": case_id}
+                "DELETE FROM conversation WHERE course_id = $course_id",
+                {"course_id": course_id}
             )
 
-            logger.info(f"Cleared conversation history for {case_id}")
+            logger.info(f"Cleared conversation history for {course_id}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to clear conversation: {e}", exc_info=True)
             return False
 
-    async def get_conversation_stats(self, case_id: str) -> Dict[str, Any]:
+    async def get_conversation_stats(self, course_id: str) -> Dict[str, Any]:
         """
         Get statistics about the conversation history.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
 
         Returns:
             Dict with stats (message_count, first_message_time, last_message_time)
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             # Query stats
             result = await self.service.query(
@@ -219,10 +219,10 @@ class ConversationService:
                     min(timestamp) as first_message_time,
                     max(timestamp) as last_message_time
                 FROM conversation
-                WHERE case_id = $case_id
-                GROUP BY case_id
+                WHERE course_id = $course_id
+                GROUP BY course_id
                 """,
-                {"case_id": case_id}
+                {"course_id": course_id}
             )
 
             if result and len(result) > 0:

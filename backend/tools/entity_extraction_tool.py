@@ -18,12 +18,12 @@ from services.model_factory import create_model
 logger = logging.getLogger(__name__)
 
 
-async def _get_document_content(case_id: str, document_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+async def _get_document_content(course_id: str, document_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get document content by name or return all documents.
 
     Args:
-        case_id: ID of the case
+        course_id: ID of the course
         document_name: Optional specific document name
 
     Returns:
@@ -33,14 +33,14 @@ async def _get_document_content(case_id: str, document_name: Optional[str] = Non
     if not service.db:
         await service.connect()
 
-    # Normalize case_id
-    if not case_id.startswith("case:"):
-        case_id = f"case:{case_id}"
+    # Normalize course_id
+    if not course_id.startswith("course:"):
+        course_id = f"course:{course_id}"
 
-    # Get documents for this case
+    # Get documents for this course
     docs_result = await service.query(
-        "SELECT * FROM document WHERE case_id = $case_id ORDER BY created_at DESC",
-        {"case_id": case_id}
+        "SELECT * FROM document WHERE course_id = $course_id ORDER BY created_at DESC",
+        {"course_id": course_id}
     )
 
     documents = []
@@ -89,18 +89,18 @@ async def _get_document_content(case_id: str, document_name: Optional[str] = Non
 
 @tool(name="extract_entities")
 async def extract_entities(
-    case_id: str,
+    course_id: str,
     document_name: Optional[str] = None,
     entity_types: str = "personnes,dates,montants,références légales"
 ) -> str:
     """
-    Extrait des entités juridiques importantes des documents d'un dossier.
+    Extrait des entités juridiques importantes des documents d'un cours.
 
     Cet outil analyse les documents et extrait des informations structurées comme
     les noms de personnes, dates importantes, montants financiers, et références légales.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         document_name: Nom d'un document spécifique à analyser (optionnel - si non spécifié, analyse tous les documents)
         entity_types: Types d'entités à extraire, séparés par des virgules (défaut: "personnes,dates,montants,références légales")
 
@@ -109,12 +109,12 @@ async def extract_entities(
     """
     try:
         # Get document content
-        document = await _get_document_content(case_id, document_name)
+        document = await _get_document_content(course_id, document_name)
 
         if not document:
             if document_name:
-                return f"Aucun document nommé '{document_name}' avec du contenu extractible trouvé dans ce dossier."
-            return "Aucun document avec du contenu extractible trouvé dans ce dossier."
+                return f"Aucun document nommé '{document_name}' avec du contenu extractible trouvé dans ce cours."
+            return "Aucun document avec du contenu extractible trouvé dans ce cours."
 
         doc_name = document.get("nom_fichier", "Document")
         content = document.get("texte_extrait", "")
@@ -276,18 +276,18 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après."""
 
 @tool(name="find_entity")
 async def find_entity(
-    case_id: str,
+    course_id: str,
     entity_name: str,
     entity_type: str = "personne"
 ) -> str:
     """
-    Recherche une entité spécifique dans les documents d'un dossier.
+    Recherche une entité spécifique dans les documents d'un cours.
 
     Cet outil permet de rechercher rapidement une personne, une date, un montant
     ou une référence légale spécifique et voir tous les contextes où elle apparaît.
 
     Args:
-        case_id: L'identifiant du dossier (ex: "1f9fc70e" ou "case:1f9fc70e")
+        course_id: L'identifiant du cours (ex: "1f9fc70e" ou "course:1f9fc70e")
         entity_name: Le nom de l'entité à rechercher (ex: "Jean Dupont", "450000", "Art. 1457")
         entity_type: Type d'entité (défaut: "personne"). Options: personne, date, montant, référence
 
@@ -296,10 +296,10 @@ async def find_entity(
     """
     try:
         # Get document content
-        document = await _get_document_content(case_id, None)
+        document = await _get_document_content(course_id, None)
 
         if not document:
-            return "Aucun document avec du contenu extractible trouvé dans ce dossier."
+            return "Aucun document avec du contenu extractible trouvé dans ce cours."
 
         content = document.get("texte_extrait", "")
         doc_name = document.get("nom_fichier", "Documents")
@@ -333,7 +333,7 @@ async def find_entity(
             start = pos + len(entity_name)
 
         if not matches:
-            return f"L'entité **{entity_name}** ({entity_type}) n'a pas été trouvée dans les documents du dossier."
+            return f"L'entité **{entity_name}** ({entity_type}) n'a pas été trouvée dans les documents du cours."
 
         # Format response
         response_text = f"**Recherche de l'entité: {entity_name}** ({entity_type})\n\n"

@@ -728,7 +728,7 @@ async def reindex_unindexed_documents_endpoint(
             try:
                 result = await indexing_service.index_document(
                     document_id=doc_id,
-                    case_id=course_id,
+                    course_id=course_id,
                     text_content=texte_extrait
                 )
 

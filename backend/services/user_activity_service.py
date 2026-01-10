@@ -2,7 +2,7 @@
 User activity tracking service.
 
 Tracks user actions to provide contextual awareness to the AI agent.
-Maintains a rolling window of the N most recent activities per case.
+Maintains a rolling window of the N most recent activities per course.
 """
 
 import logging
@@ -53,14 +53,14 @@ class UserActivityService:
         Initialize the user activity service.
 
         Args:
-            max_activities: Maximum number of activities to keep per case (default: 50)
+            max_activities: Maximum number of activities to keep per course (default: 50)
         """
         self.service = get_surreal_service()
         self.max_activities = max_activities
 
     async def track_activity(
         self,
-        case_id: str,
+        course_id: str,
         action_type: ActivityType,
         metadata: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
@@ -68,7 +68,7 @@ class UserActivityService:
         Track a user activity.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             action_type: Type of activity (from ActivityType enum)
             metadata: Additional context about the activity
 
@@ -76,12 +76,12 @@ class UserActivityService:
             Activity ID if successful, None otherwise
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             activity_data = {
-                "case_id": case_id,
+                "course_id": course_id,
                 "action_type": action_type.value,
                 "timestamp": datetime.utcnow().isoformat(),
                 "metadata": metadata or {}
@@ -97,10 +97,10 @@ class UserActivityService:
                     activity_id = result[0].get("id")
 
             if activity_id:
-                logger.debug(f"Tracked activity: {action_type.value} for case {case_id}")
+                logger.debug(f"Tracked activity: {action_type.value} for course {course_id}")
 
                 # Clean up old activities asynchronously (keep only max_activities)
-                await self._cleanup_old_activities(case_id)
+                await self._cleanup_old_activities(course_id)
 
                 return activity_id
 
@@ -112,23 +112,23 @@ class UserActivityService:
 
     async def get_recent_activities(
         self,
-        case_id: str,
+        course_id: str,
         limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get recent activities for a case.
+        Get recent activities for a course.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             limit: Maximum number of activities to retrieve (default: max_activities)
 
         Returns:
             List of activity dicts ordered by timestamp (newest first)
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             if limit is None:
                 limit = self.max_activities
@@ -136,12 +136,12 @@ class UserActivityService:
             result = await self.service.query(
                 """
                 SELECT * FROM user_activity
-                WHERE case_id = $case_id
+                WHERE course_id = $course_id
                 ORDER BY timestamp DESC
                 LIMIT $limit
                 """,
                 {
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "limit": limit
                 }
             )
@@ -157,7 +157,7 @@ class UserActivityService:
                 elif isinstance(first_item, list):
                     activities = first_item
 
-            logger.debug(f"Retrieved {len(activities)} activities for {case_id}")
+            logger.debug(f"Retrieved {len(activities)} activities for {course_id}")
             return activities
 
         except Exception as e:
@@ -166,21 +166,21 @@ class UserActivityService:
 
     async def get_activity_context(
         self,
-        case_id: str,
+        course_id: str,
         limit: Optional[int] = None
     ) -> str:
         """
         Get a formatted context summary of recent user activities for the AI agent.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
             limit: Maximum number of activities to include (default: max_activities)
 
         Returns:
             Formatted context string ready for inclusion in the AI prompt
         """
         try:
-            activities = await self.get_recent_activities(case_id, limit)
+            activities = await self.get_recent_activities(course_id, limit)
 
             if not activities:
                 return ""
@@ -281,49 +281,49 @@ class UserActivityService:
 
         return base_label
 
-    async def clear_activities(self, case_id: str) -> bool:
+    async def clear_activities(self, course_id: str) -> bool:
         """
-        Clear all activities for a case.
+        Clear all activities for a course.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Normalize case_id
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normalize course_id
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             await self.service.query(
-                "DELETE FROM user_activity WHERE case_id = $case_id",
-                {"case_id": case_id}
+                "DELETE FROM user_activity WHERE course_id = $course_id",
+                {"course_id": course_id}
             )
 
-            logger.info(f"Cleared all activities for {case_id}")
+            logger.info(f"Cleared all activities for {course_id}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to clear activities: {e}", exc_info=True)
             return False
 
-    async def _cleanup_old_activities(self, case_id: str):
+    async def _cleanup_old_activities(self, course_id: str):
         """
         Clean up old activities to maintain the rolling window.
         Keeps only the most recent max_activities entries.
 
         Args:
-            case_id: ID of the case
+            course_id: ID of the course
         """
         try:
             # Get count of activities
             result = await self.service.query(
                 """
                 SELECT count() as total FROM user_activity
-                WHERE case_id = $case_id
+                WHERE course_id = $course_id
                 """,
-                {"case_id": case_id}
+                {"course_id": course_id}
             )
 
             total = 0
@@ -344,17 +344,17 @@ class UserActivityService:
                 delete_result = await self.service.query(
                     """
                     DELETE FROM user_activity
-                    WHERE case_id = $case_id
+                    WHERE course_id = $course_id
                     ORDER BY timestamp ASC
                     LIMIT $to_delete
                     """,
                     {
-                        "case_id": case_id,
+                        "course_id": course_id,
                         "to_delete": to_delete
                     }
                 )
 
-                logger.debug(f"Cleaned up {to_delete} old activities for {case_id}")
+                logger.debug(f"Cleaned up {to_delete} old activities for {course_id}")
 
         except Exception as e:
             logger.error(f"Failed to cleanup old activities: {e}", exc_info=True)

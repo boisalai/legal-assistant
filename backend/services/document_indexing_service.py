@@ -55,7 +55,7 @@ class DocumentIndexingService:
     async def index_document(
         self,
         document_id: str,
-        case_id: str,
+        course_id: str,
         text_content: str,
         force_reindex: bool = False
     ) -> dict:
@@ -64,7 +64,7 @@ class DocumentIndexingService:
 
         Args:
             document_id: ID du document (ex: "document:abc123")
-            case_id: ID du cours (ex: "course:xyz")
+            course_id: ID du cours (ex: "course:xyz")
             text_content: Contenu textuel à indexer
             force_reindex: Si True, supprime les embeddings existants avant de réindexer
 
@@ -75,8 +75,8 @@ class DocumentIndexingService:
             # Normaliser les IDs
             if not document_id.startswith("document:"):
                 document_id = f"document:{document_id}"
-            if not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            if not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             logger.info(f"Indexing document {document_id} with {len(text_content)} chars")
 
@@ -133,7 +133,7 @@ class DocumentIndexingService:
                         # Stocker l'embedding dans SurrealDB
                         await self._store_embedding(
                             document_id=document_id,
-                            case_id=case_id,
+                            course_id=course_id,
                             chunk_index=idx,
                             chunk_text=chunk_text,
                             embedding=embedding_result.embedding,
@@ -172,7 +172,7 @@ class DocumentIndexingService:
     async def _store_embedding(
         self,
         document_id: str,
-        case_id: str,
+        course_id: str,
         chunk_index: int,
         chunk_text: str,
         embedding: List[float],
@@ -207,7 +207,7 @@ class DocumentIndexingService:
 
         params = {
             "document_id": document_id,
-            "course_id": case_id,  # Note: case_id parameter maps to course_id field
+            "course_id": course_id,
             "chunk_index": chunk_index,
             "chunk_text": chunk_text,
             "embedding": embedding,
@@ -254,7 +254,7 @@ class DocumentIndexingService:
     async def search_similar(
         self,
         query_text: str,
-        case_id: Optional[str] = None,
+        course_id: Optional[str] = None,
         top_k: int = 7,  # Increased from 5 for better coverage of legal documents
         min_similarity: float = 0.5
     ) -> List[dict]:
@@ -266,7 +266,7 @@ class DocumentIndexingService:
 
         Args:
             query_text: Texte de la requête
-            case_id: Optionnel, limiter la recherche à un cours
+            course_id: Optionnel, limiter la recherche à un cours
             top_k: Nombre maximum de résultats
             min_similarity: Score de similarité minimum (0-1)
 
@@ -283,9 +283,9 @@ class DocumentIndexingService:
 
             query_embedding = query_embedding_result.embedding
 
-            # Normaliser case_id si fourni
-            if case_id and not case_id.startswith("case:"):
-                case_id = f"case:{case_id}"
+            # Normaliser course_id si fourni
+            if course_id and not course_id.startswith("course:"):
+                course_id = f"course:{course_id}"
 
             # Utiliser l'opérateur vectoriel natif de SurrealDB
             if not self.surreal_service.db:
@@ -297,15 +297,15 @@ class DocumentIndexingService:
             # IMPORTANT: On filtre aussi par embedding_model pour garantir la compatibilité des vecteurs
             current_model = self.embedding_service.model
 
-            if case_id:
+            if course_id:
                 query = """
                 SELECT *, vector::similarity::cosine(embedding, $query_embedding) AS similarity_score
                 FROM document_embedding
-                WHERE case_id = $case_id AND embedding_model = $embedding_model
+                WHERE course_id = $course_id AND embedding_model = $embedding_model
                 ORDER BY similarity_score DESC
                 """
                 params = {
-                    "case_id": case_id,
+                    "course_id": course_id,
                     "query_embedding": query_embedding,
                     "embedding_model": current_model
                 }
@@ -344,7 +344,7 @@ class DocumentIndexingService:
                 if similarity >= min_similarity:
                     similarities.append({
                         "document_id": emb_record.get("document_id"),
-                        "case_id": emb_record.get("case_id"),
+                        "course_id": emb_record.get("course_id"),
                         "chunk_index": emb_record.get("chunk_index"),
                         "chunk_text": emb_record.get("chunk_text"),
                         "similarity_score": similarity,
@@ -394,12 +394,12 @@ class DocumentIndexingService:
             logger.error(f"Error deleting document index: {e}", exc_info=True)
             return False
 
-    async def get_index_stats(self, case_id: Optional[str] = None) -> dict:
+    async def get_index_stats(self, course_id: Optional[str] = None) -> dict:
         """
         Obtient des statistiques sur l'index.
 
         Args:
-            case_id: Optionnel, filtrer par cours
+            course_id: Optionnel, filtrer par cours
 
         Returns:
             Dict avec total_chunks, total_documents, embedding_model
@@ -408,11 +408,11 @@ class DocumentIndexingService:
             if not self.surreal_service.db:
                 await self.surreal_service.connect()
 
-            if case_id:
-                if not case_id.startswith("case:"):
-                    case_id = f"case:{case_id}"
-                query = "SELECT count() AS total, math::max(document_id) AS docs FROM document_embedding WHERE case_id = $case_id GROUP ALL"
-                params = {"case_id": case_id}
+            if course_id:
+                if not course_id.startswith("course:"):
+                    course_id = f"course:{course_id}"
+                query = "SELECT count() AS total, math::max(document_id) AS docs FROM document_embedding WHERE course_id = $course_id GROUP ALL"
+                params = {"course_id": course_id}
             else:
                 query = "SELECT count() AS total, count(DISTINCT document_id) AS docs FROM document_embedding GROUP ALL"
                 params = {}

@@ -68,7 +68,7 @@ async def reindex_course_documents(course_id: str):
         try:
             result = await indexing_service.index_document(
                 document_id=doc_id,
-                case_id=course_id,
+                course_id=course_id,
                 text_content=texte_extrait,
                 force_reindex=True
             )
