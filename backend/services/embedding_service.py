@@ -115,6 +115,11 @@ class EmbeddingService:
         model_info = provider_models.get(model, {})
         self.dimensions = model_info.get("dimensions", 768)
 
+    @property
+    def full_model_name(self) -> str:
+        """Retourne le nom complet du modèle avec préfixe du provider."""
+        return f"{self.provider}:{self.model}"
+
     def _load_local_model(self):
         """Charge le modele SentenceTransformers local avec support MPS/CUDA/CPU."""
         if not SENTENCE_TRANSFORMERS_AVAILABLE:

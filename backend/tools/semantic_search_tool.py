@@ -86,7 +86,7 @@ En attendant, je ne peux pas répondre à votre question car je n'ai pas accès 
             query_text=query,
             course_id=course_id,
             top_k=top_k,
-            min_similarity=0.5  # Score minimum de similarité
+            min_similarity=0.35  # Score minimum de similarité (abaissé pour meilleure couverture)
         )
         logger.info(f"[semantic_search] Found {len(results)} results")
 

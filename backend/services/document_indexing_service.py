@@ -256,7 +256,7 @@ class DocumentIndexingService:
         query_text: str,
         course_id: Optional[str] = None,
         top_k: int = 7,  # Increased from 5 for better coverage of legal documents
-        min_similarity: float = 0.5
+        min_similarity: float = 0.35  # Abaissé de 0.5 pour meilleure couverture des documents juridiques
     ) -> List[dict]:
         """
         Recherche les chunks les plus similaires à une requête.
@@ -295,7 +295,7 @@ class DocumentIndexingService:
             # Note: L'opérateur <|k,COSINE|> nécessite un index MTREE qui n'est pas encore configuré
             # Pour l'instant, on utilise vector::similarity::cosine() et on filtre manuellement
             # IMPORTANT: On filtre aussi par embedding_model pour garantir la compatibilité des vecteurs
-            current_model = self.embedding_service.model
+            current_model = self.embedding_service.full_model_name
 
             if course_id:
                 query = """
@@ -461,7 +461,7 @@ class DocumentIndexingService:
             if not self.surreal_service.db:
                 await self.surreal_service.connect()
 
-            current_model = self.embedding_service.model
+            current_model = self.embedding_service.full_model_name
 
             # Récupérer tous les modèles distincts dans la DB
             query_models = """

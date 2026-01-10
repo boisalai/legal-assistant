@@ -132,6 +132,26 @@ async def extract_document_text(
 
         logger.info(f"Text extracted for document {doc_id}: {len(extraction_result.text)} chars via {extraction_result.extraction_method}")
 
+        # Index document for semantic search
+        try:
+            from services.document_indexing_service import get_document_indexing_service
+
+            indexing_service = get_document_indexing_service()
+            index_result = await indexing_service.index_document(
+                document_id=doc_id,
+                course_id=course_id,
+                text_content=extraction_result.text,
+                force_reindex=False
+            )
+
+            if index_result.get("success"):
+                await service.merge(doc_id, {"indexed": True})
+                logger.info(f"Document indexed: {index_result.get('chunks_created', 0)} chunks")
+            else:
+                logger.warning(f"Indexing failed: {index_result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.warning(f"Could not index document after extraction: {e}")
+
         return ExtractionResponse(
             success=True,
             text=extraction_result.text[:500] + "..." if len(extraction_result.text) > 500 else extraction_result.text,
