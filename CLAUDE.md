@@ -208,6 +208,17 @@ chunk_overlap = 50
 - **Documentation** : Français
 - **Commits** : Anglais + `Co-Authored-By: Claude`
 
+### Nommage des IDs
+
+**Important :** Utiliser `course_id` partout (jamais `case_id`).
+
+| Contexte | Format |
+|----------|--------|
+| Paramètre Python | `course_id: str` |
+| Prefix SurrealDB | `"course:"` |
+| Champ DB | `course_id` |
+| URL API | `/{course_id}/...` |
+
 ### shadcn/ui
 
 **Règle :** Utiliser uniquement les versions officielles sans modification.
@@ -229,18 +240,25 @@ chunk_overlap = 50
 
 ## Prochaines étapes
 
-### Session actuelle - Multi-agent (2026-01-09)
+### Session actuelle - Migration course_id (2026-01-10)
 
 **Complété :**
-- ✅ Agent Rédacteur ajouté (4ème agent) avec 4 outils tutor_tools
-- ✅ Mots-clés pédagogiques ajoutés à `is_legal_research_query()` (quiz, résumé, carte mentale, explique)
-- ✅ Test réussi : quiz généré via multi-agent avec validation des citations
+- ✅ Migration complète `case_id` → `course_id` dans tout le codebase (351 occurrences)
+- ✅ Migration DB : `migrations/005_rename_case_id_to_course_id.surql`
+- ✅ Tables migrées : `document`, `conversation`, `user_activity`
+- ✅ Fichiers corrigés : 20 fichiers (tools, services, routes, agents)
+- ✅ Bug corrigé : l'assistant ne voyait pas les documents (requêtes SQL utilisaient `case_id` au lieu de `course_id`)
 
-**Prochaines améliorations multi-agent :**
-- Ajouter des cours avec documents indexés pour tester le Rédacteur avec du contenu réel
-- Améliorer le workflow du Rédacteur pour combiner plusieurs outils (résumé + quiz)
-- Ajouter un indicateur visuel dans le frontend quand le mode multi-agent est actif
-- Logger les interactions entre agents pour debugging
+**Fichiers modifiés :**
+- Tools : `document_search_tool.py`, `semantic_search_tool.py`, `tutor_tools.py`, `validation_tool.py`, `transcription_tool.py`, `entity_extraction_tool.py`
+- Services : `document_indexing_service.py`, `conversation_service.py`, `tutor_service.py`, `user_activity_service.py`
+- Routes : `activity.py`, `chat.py`, `extraction.py`, `transcription.py`, `linked_directory.py`, `settings.py`
+- Agents : `legal_research_team.py`
+
+### Session précédente - Multi-agent (2026-01-09)
+
+- ✅ Agent Rédacteur ajouté (4ème agent) avec 4 outils tutor_tools
+- ✅ Mots-clés pédagogiques ajoutés à `is_legal_research_query()`
 
 ### Priorité haute
 - Tests d'intégration API endpoints critiques
