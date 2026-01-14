@@ -156,6 +156,7 @@ from routes.transcription import router as transcription_router
 from routes.extraction import router as extraction_router
 from routes.model_servers import router as model_servers_router
 from routes.admin import router as admin_router
+from routes.tools import router as tools_router
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(courses_router, tags=["Courses"])
@@ -171,8 +172,9 @@ app.include_router(activity_router, tags=["Activity"])
 app.include_router(admin_router, tags=["Admin"])
 app.include_router(flashcards_router, tags=["Flashcards"])
 app.include_router(modules_router, tags=["Modules"])
+app.include_router(tools_router, tags=["Tools"])
 
-logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus, /api/admin, /api/flashcard-decks, /api/modules")
+logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus, /api/admin, /api/flashcard-decks, /api/modules, /api/tools")
 
 
 # ============================================================

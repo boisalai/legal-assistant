@@ -37,7 +37,9 @@
     "settings": "Paramètres",
     "admin": "Administration",
     "logout": "Déconnexion",
-    "login": "Connexion"
+    "login": "Connexion",
+    "tools": "Outils",
+    "markdownConverter": "Conversion en markdown"
   },
   "home": {
     "title": "Assistant d'études juridiques",
@@ -631,6 +633,23 @@
     "upload": "Envoyer",
     "uploadSuccess": "{count} fichier(s) ajouté(s)",
     "uploadErrors": "{count} erreur(s) lors de l'envoi"
+  },
+  "tools": {
+    "markdownConverter": {
+      "title": "Conversion en markdown",
+      "subtitle": "Convertissez vos documents PDF, Word ou PowerPoint en markdown",
+      "dropzone": "Glissez-déposez un fichier ou cliquez pour sélectionner",
+      "supportedFormats": "Formats supportés : PDF, DOCX, PPTX",
+      "converting": "Conversion en cours...",
+      "success": "Conversion réussie !",
+      "error": "Erreur lors de la conversion",
+      "download": "Télécharger le markdown",
+      "preview": "Aperçu",
+      "noPreview": "Aucun aperçu disponible",
+      "selectFile": "Sélectionner un fichier",
+      "convert": "Convertir",
+      "downloadPath": "Le fichier sera téléchargé dans votre dossier Téléchargements"
+    }
   },
   "table": {
     "filterByName": "Filtrer par nom...",
