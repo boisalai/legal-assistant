@@ -37,7 +37,9 @@
     "settings": "Settings",
     "admin": "Administration",
     "logout": "Logout",
-    "login": "Login"
+    "login": "Login",
+    "tools": "Tools",
+    "markdownConverter": "Markdown converter"
   },
   "home": {
     "title": "Legal Studies Assistant",
@@ -561,6 +563,23 @@
     "upload": "Upload",
     "uploadSuccess": "{count} file(s) added",
     "uploadErrors": "{count} upload error(s)"
+  },
+  "tools": {
+    "markdownConverter": {
+      "title": "Markdown converter",
+      "subtitle": "Convert your PDF, Word or PowerPoint documents to markdown",
+      "dropzone": "Drag and drop a file or click to select",
+      "supportedFormats": "Supported formats: PDF, DOCX, PPTX",
+      "converting": "Converting...",
+      "success": "Conversion successful!",
+      "error": "Error during conversion",
+      "download": "Download markdown",
+      "preview": "Preview",
+      "noPreview": "No preview available",
+      "selectFile": "Select a file",
+      "convert": "Convert",
+      "downloadPath": "The file will be downloaded to your Downloads folder"
+    }
   },
   "table": {
     "filterByName": "Filter by name...",

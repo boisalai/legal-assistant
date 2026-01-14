@@ -18,6 +18,8 @@ import {
   Database,
   KeyRound,
   Users,
+  Wrench,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -181,6 +183,23 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        {/* Tools Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>{t("nav.tools")}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/tools/markdown-converter"}>
+                  <Link href="/tools/markdown-converter">
+                    <FileText className="h-4 w-4" />
+                    <span>{t("nav.markdownConverter")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
