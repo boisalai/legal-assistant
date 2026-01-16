@@ -58,6 +58,12 @@ class AudioSummaryGenerateRequest(BaseModel):
     regenerate_script: bool = Field(default=False, description="Regénérer le script même s'il existe")
 
 
+class AudioSummaryImportScriptRequest(BaseModel):
+    """Requête pour importer un script markdown existant."""
+    markdown_content: str = Field(..., min_length=10, description="Contenu du script markdown")
+    voice_titles: str = Field(default="fr-CA-SylvieNeural", description="Voix par défaut pour les titres")
+
+
 # ============================================================================
 # Response Models
 # ============================================================================
