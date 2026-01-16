@@ -67,7 +67,15 @@
 - Docling VLM (optimisé Apple Silicon)
 - Document markdown dérivé + indexation RAG
 
-### 13. Multi-agents juridiques
+### 13. Résumés Audio (EN COURS)
+- Conversion documents markdown → audio MP3 pédagogique
+- LLM (Claude) pour reformulation pédagogique du contenu
+- TTS edge-tts avec voix fr-CA et fr-FR
+- Voix unique pour titres H1/H2, voix aléatoires pour sections body
+- Script markdown téléchargeable
+- Player audio intégré avec contrôles
+
+### 14. Multi-agents juridiques
 
 Équipe de 4 agents spécialisés pour les questions juridiques complexes.
 
@@ -240,7 +248,43 @@ chunk_overlap = 50
 
 ## Prochaines étapes
 
-### Session actuelle - Corrections indexation et recherche sémantique (2026-01-10)
+### Session actuelle - Résumés Audio (2026-01-16) - EN COURS
+
+**Fonctionnalité :** Convertir des documents markdown de cours en fichiers audio MP3 pédagogiques.
+
+**Fichiers créés :**
+- `backend/models/audio_summary_models.py` - Modèles Pydantic
+- `backend/services/audio_summary_service.py` - Service principal avec LLM + TTS
+- `backend/routes/audio_summary.py` - Endpoints API REST
+- `backend/migrations/006_create_audio_summary_table.surql` - Migration DB
+- `frontend/src/components/cases/audio-summary-section.tsx` - Liste des résumés
+- `frontend/src/components/cases/create-audio-summary-modal.tsx` - Modal création
+- `frontend/src/components/cases/audio-summary-player-panel.tsx` - Lecteur audio
+
+**Corrections appliquées :**
+- ✅ Un seul sélecteur de voix (titres H1/H2), voix aléatoires pour les sections body
+- ✅ Script sauvegardé en `.md` au lieu de `.txt`
+- ✅ Sélecteur de modèle LLM ajouté au modal (Claude par défaut)
+- ✅ Fix `get_summary_by_id()` - requête SurrealDB corrigée
+- ✅ Prompt LLM réécrit pour génération pédagogique (pas de copie verbatim)
+
+**À TESTER / CORRIGER (prochaine session) :**
+- ⏳ Tester génération avec Claude Sonnet (au lieu d'Ollama)
+- ⏳ Vérifier que le contenu généré est pédagogique et détaillé (30-45 min)
+- ⏳ Si JSON invalide avec Claude, améliorer parsing ou prompt
+- ⏳ Tester lecture audio dans le player
+
+**Architecture du prompt actuel :**
+```
+Tu es un professeur de droit qui prépare un cours audio...
+OBJECTIF: Créer un script PÉDAGOGIQUE et COMPLET qui:
+1. ENSEIGNE chaque concept
+2. EXPLIQUE avec exemples
+3. DÉTAILLE les distinctions
+...
+```
+
+### Session précédente - Corrections indexation et recherche sémantique (2026-01-10)
 
 **Problème résolu :** L'assistant IA ne trouvait pas les documents indexés et les résumés étaient vides.
 

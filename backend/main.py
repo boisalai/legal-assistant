@@ -150,7 +150,7 @@ except ImportError as e:
 # ROUTES
 # ============================================================
 
-from routes import auth_router, courses_router, documents_router, chat_router, docusaurus_router, activity_router, linked_directory_router, flashcards_router, modules_router
+from routes import auth_router, courses_router, documents_router, chat_router, docusaurus_router, activity_router, linked_directory_router, flashcards_router, modules_router, audio_summary_router
 from routes.settings import router as settings_router
 from routes.transcription import router as transcription_router
 from routes.extraction import router as extraction_router
@@ -173,8 +173,9 @@ app.include_router(admin_router, tags=["Admin"])
 app.include_router(flashcards_router, tags=["Flashcards"])
 app.include_router(modules_router, tags=["Modules"])
 app.include_router(tools_router, tags=["Tools"])
+app.include_router(audio_summary_router, tags=["Audio Summary"])
 
-logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus, /api/admin, /api/flashcard-decks, /api/modules, /api/tools")
+logger.info("Routes configured: /api/auth, /api/courses, /api/courses/{id}/documents, /api/transcription, /api/extraction, /api/chat, /api/settings, /api/model-servers, /api/docusaurus, /api/admin, /api/flashcard-decks, /api/modules, /api/tools, /api/audio-summaries")
 
 
 # ============================================================
