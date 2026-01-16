@@ -9,6 +9,7 @@ from .activity import router as activity_router
 from .linked_directory import router as linked_directory_router
 from .flashcards import router as flashcards_router
 from .modules import router as modules_router
+from .audio_summary import router as audio_summary_router
 
 __all__ = [
     "auth_router",
@@ -20,4 +21,5 @@ __all__ = [
     "linked_directory_router",
     "flashcards_router",
     "modules_router",
+    "audio_summary_router",
 ]

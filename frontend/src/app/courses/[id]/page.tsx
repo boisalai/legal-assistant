@@ -20,9 +20,11 @@ import { EditCourseModal } from "@/components/cases/edit-course-modal";
 import { CreateFlashcardDeckModal } from "@/components/cases/create-flashcard-deck-modal";
 import { FlashcardStudyPanel } from "@/components/cases/flashcard-study-panel";
 import { FlashcardAudioPanel } from "@/components/cases/flashcard-audio-panel";
+import { CreateAudioSummaryModal } from "@/components/cases/create-audio-summary-modal";
+import { AudioSummaryPlayerPanel } from "@/components/cases/audio-summary-player-panel";
 import { ModuleDetailsPanel } from "@/components/cases/module-details-panel";
 import type { LinkedDirectory } from "@/components/cases/linked-directories-data-table";
-import type { FlashcardDeck } from "@/types";
+import type { FlashcardDeck, AudioSummary } from "@/types";
 import { ArrowLeft, Loader2, X, Folder } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { coursesApi, documentsApi, modulesApi } from "@/lib/api";
@@ -59,6 +61,11 @@ export default function CourseDetailPage() {
   const [viewModule, setViewModule] = useState<Module | null>(null);
   const [previousModule, setPreviousModule] = useState<Module | null>(null); // Track module to return to after document preview
   const [flashcardsRefreshKey, setFlashcardsRefreshKey] = useState(0);
+
+  // Audio summary state
+  const [createAudioSummaryModalOpen, setCreateAudioSummaryModalOpen] = useState(false);
+  const [playingAudioSummary, setPlayingAudioSummary] = useState<AudioSummary | null>(null);
+  const [audioSummaryRefreshKey, setAudioSummaryRefreshKey] = useState(0);
 
   // Assistant messages - lifted to parent to persist across preview open/close
   const [assistantMessages, setAssistantMessages] = useState<Message[]>([]);
@@ -235,12 +242,17 @@ export default function CourseDetailPage() {
       setViewModule(null); // Close module view if open
       setStudyDeck(null); // Close flashcard study if open
       setAudioDeck(null); // Close flashcard audio if open
+      setPlayingAudioSummary(null); // Close audio summary player if open
     }
   };
 
   const handlePreviewDirectory = (directory: LinkedDirectory) => {
     setPreviewDirectory(directory);
     setPreviewDocument(null); // Close document preview if open
+    setStudyDeck(null);
+    setAudioDeck(null);
+    setPlayingAudioSummary(null);
+    setViewModule(null);
     // Track directory view activity
     trackActivity(courseId, "view_directory", {
       directory_path: directory.basePath,
@@ -291,6 +303,8 @@ export default function CourseDetailPage() {
     setAudioDeck(null);
     setPreviewDocument(null);
     setPreviewDirectory(null);
+    setPlayingAudioSummary(null);
+    setViewModule(null);
   };
 
   const handleCreateDeck = () => {
@@ -312,6 +326,8 @@ export default function CourseDetailPage() {
     setStudyDeck(null);
     setPreviewDocument(null);
     setPreviewDirectory(null);
+    setPlayingAudioSummary(null);
+    setViewModule(null);
   };
 
   const handleCloseAudio = () => {
@@ -329,6 +345,29 @@ export default function CourseDetailPage() {
     setFlashcardsRefreshKey((prev) => prev + 1);
   };
 
+  // Audio summary handlers
+  const handleCreateAudioSummary = () => {
+    setCreateAudioSummaryModalOpen(true);
+  };
+
+  const handlePlayAudioSummary = (summary: AudioSummary) => {
+    setPlayingAudioSummary(summary);
+    setStudyDeck(null);
+    setAudioDeck(null);
+    setPreviewDocument(null);
+    setPreviewDirectory(null);
+    setViewModule(null);
+  };
+
+  const handleCloseAudioSummaryPlayer = () => {
+    setPlayingAudioSummary(null);
+  };
+
+  const handleAudioSummaryUpdated = async () => {
+    // Refresh audio summary list by incrementing refresh key
+    setAudioSummaryRefreshKey((prev) => prev + 1);
+  };
+
   // Module handlers
   const handleViewModule = (module: Module) => {
     setViewModule(module);
@@ -336,6 +375,7 @@ export default function CourseDetailPage() {
     setAudioDeck(null);
     setPreviewDocument(null);
     setPreviewDirectory(null);
+    setPlayingAudioSummary(null);
   };
 
   const handleCloseModule = () => {
@@ -410,6 +450,11 @@ export default function CourseDetailPage() {
                   deck={audioDeck}
                   courseId={courseId}
                   onClose={handleCloseAudio}
+                />
+              ) : playingAudioSummary ? (
+                <AudioSummaryPlayerPanel
+                  summary={playingAudioSummary}
+                  onClose={handleCloseAudioSummaryPlayer}
                 />
               ) : previewDocument ? (
                 <DocumentPreviewPanel
@@ -504,6 +549,9 @@ export default function CourseDetailPage() {
                   onListenFlashcardAudio={handleListenFlashcardAudio}
                   flashcardsRefreshKey={flashcardsRefreshKey}
                   onViewModule={handleViewModule}
+                  onCreateAudioSummary={handleCreateAudioSummary}
+                  onPlayAudioSummary={handlePlayAudioSummary}
+                  audioSummaryRefreshKey={audioSummaryRefreshKey}
                 />
               )}
             </Panel>
@@ -582,6 +630,16 @@ export default function CourseDetailPage() {
           documents={documents}
           modules={modules}
           onSuccess={handleFlashcardsUpdated}
+        />
+
+        {/* Create Audio Summary Modal */}
+        <CreateAudioSummaryModal
+          open={createAudioSummaryModalOpen}
+          onOpenChange={setCreateAudioSummaryModalOpen}
+          courseId={courseId}
+          documents={documents}
+          modules={modules}
+          onSuccess={handleAudioSummaryUpdated}
         />
       </div>
     </AppShell>

@@ -413,3 +413,60 @@ export interface ModuleUpdate {
   order_index?: number;
   exam_weight?: number;
 }
+
+// ============================================
+// Audio Summary Types
+// ============================================
+
+export interface AudioSourceDocument {
+  doc_id: string;
+  name: string;
+  relative_path?: string;
+}
+
+export interface AudioSummary {
+  id: string;
+  course_id: string;
+  name: string;
+  source_documents: AudioSourceDocument[];
+  status: "pending" | "script_ready" | "generating" | "completed" | "error";
+  script_path?: string;
+  audio_path?: string;
+  estimated_duration_seconds: number;
+  actual_duration_seconds?: number;
+  section_count: number;
+  created_at: string;
+  updated_at?: string;
+  error_message?: string;
+}
+
+export interface AudioSummaryCreate {
+  name: string;
+  source_document_ids: string[];
+  voice_titles?: string;  // Voice for H1/H2 titles (body sections use random voices)
+  generate_script_only?: boolean;
+}
+
+export interface AudioSummaryGenerateRequest {
+  model_id?: string;
+  regenerate_script?: boolean;
+}
+
+export interface AudioGenerationProgress {
+  status: "loading" | "restructuring" | "generating_script" | "generating_audio" | "concatenating" | "completed" | "error";
+  message: string;
+  current_section?: number;
+  total_sections?: number;
+  percentage: number;
+  estimated_remaining_seconds?: number;
+  section_count?: number;
+  actual_duration_seconds?: number;
+}
+
+export interface VoiceInfo {
+  id: string;
+  name: string;
+  gender: "female" | "male";
+  region: string;
+  language: string;
+}

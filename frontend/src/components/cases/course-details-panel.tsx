@@ -27,12 +27,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Course, Document, Checklist, FlashcardDeck, Module } from "@/types";
+import type { Course, Document, Checklist, FlashcardDeck, Module, AudioSummary } from "@/types";
 import type { LinkedDirectory } from "./linked-directories-data-table";
 import { CaseEditForm } from "./case-edit-form";
 import { DocumentsSection } from "./documents-section";
 import { SyncSection } from "./sync-section";
 import { FlashcardsSection } from "./flashcards-section";
+import { AudioSummarySection } from "./audio-summary-section";
 import { ModulesSection } from "./modules-section";
 
 interface CaseDetailsPanelProps {
@@ -67,6 +68,10 @@ interface CaseDetailsPanelProps {
   flashcardsRefreshKey?: number;
   // Module props
   onViewModule?: (module: Module) => void;
+  // Audio summary props
+  onCreateAudioSummary?: () => void;
+  onPlayAudioSummary?: (summary: AudioSummary) => void;
+  audioSummaryRefreshKey?: number;
 }
 
 export function CaseDetailsPanel({
@@ -90,6 +95,9 @@ export function CaseDetailsPanel({
   onListenFlashcardAudio,
   flashcardsRefreshKey,
   onViewModule,
+  onCreateAudioSummary,
+  onPlayAudioSummary,
+  audioSummaryRefreshKey,
 }: CaseDetailsPanelProps) {
   const t = useTranslations();
   const [isEditing, setIsEditing] = useState(false);
@@ -160,6 +168,20 @@ export function CaseDetailsPanel({
               onCreateDeck={onCreateDeck}
               onListenAudio={onListenFlashcardAudio}
               refreshKey={flashcardsRefreshKey}
+            />
+          </div>
+        )}
+
+        {/* Audio Summary Section */}
+        {onCreateAudioSummary && (
+          <div className="mb-4">
+            <AudioSummarySection
+              courseId={caseData.id}
+              documents={documents}
+              modules={[]}
+              onCreateSummary={onCreateAudioSummary}
+              onPlayAudio={onPlayAudioSummary}
+              refreshKey={audioSummaryRefreshKey}
             />
           </div>
         )}

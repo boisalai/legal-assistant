@@ -1644,6 +1644,153 @@ export const modulesApi = {
 };
 
 // ============================================
+// Audio Summary API
+// ============================================
+
+import type {
+  AudioSummary,
+  AudioSummaryCreate,
+  AudioGenerationProgress,
+  VoiceInfo,
+} from "@/types";
+
+interface AudioSummaryListResponse {
+  summaries: AudioSummary[];
+  total: number;
+}
+
+export const audioSummaryApi = {
+  // List audio summaries for a course
+  async list(courseId: string): Promise<AudioSummary[]> {
+    const cleanId = courseId.replace("course:", "");
+    const response = await fetchApi<AudioSummaryListResponse>(
+      `/api/courses/${encodeURIComponent(cleanId)}/audio-summaries`
+    );
+    return response.summaries;
+  },
+
+  // Get a single audio summary
+  async get(summaryId: string): Promise<AudioSummary> {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    return fetchApi<AudioSummary>(`/api/audio-summaries/${encodeURIComponent(cleanId)}`);
+  },
+
+  // Create a new audio summary
+  async create(courseId: string, data: AudioSummaryCreate): Promise<AudioSummary> {
+    const cleanId = courseId.replace("course:", "");
+    return fetchApi<AudioSummary>(
+      `/api/courses/${encodeURIComponent(cleanId)}/audio-summaries`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  // Delete an audio summary
+  async delete(summaryId: string): Promise<void> {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    await fetchApi<void>(`/api/audio-summaries/${encodeURIComponent(cleanId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Generate audio summary with SSE progress
+  async generate(
+    summaryId: string,
+    options: {
+      modelId?: string;
+      regenerateScript?: boolean;
+      onProgress?: (progress: AudioGenerationProgress) => void;
+    } = {}
+  ): Promise<{ success: boolean; section_count?: number; actual_duration_seconds?: number; error?: string }> {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/audio-summaries/${encodeURIComponent(cleanId)}/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          model_id: options.modelId,
+          regenerate_script: options.regenerateScript,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Generation failed" }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    // Read SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let result: { success: boolean; section_count?: number; actual_duration_seconds?: number; error?: string } = { success: false };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6)) as AudioGenerationProgress;
+              options.onProgress?.(data);
+
+              if (data.status === "completed") {
+                result = {
+                  success: true,
+                  section_count: data.section_count,
+                  actual_duration_seconds: data.actual_duration_seconds,
+                };
+              } else if (data.status === "error") {
+                result = { success: false, error: data.message };
+              }
+            } catch {
+              // Ignore JSON parse errors
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return result;
+  },
+
+  // Get audio file URL
+  getAudioUrl(summaryId: string): string {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    return `${API_BASE_URL}/api/audio-summaries/${cleanId}/audio`;
+  },
+
+  // Get script file URL
+  getScriptUrl(summaryId: string): string {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    return `${API_BASE_URL}/api/audio-summaries/${cleanId}/script`;
+  },
+
+  // List available voices
+  async listVoices(): Promise<VoiceInfo[]> {
+    return fetchApi<VoiceInfo[]>("/api/audio-summaries/voices");
+  },
+};
+
+// ============================================
 // Export all APIs
 // ============================================
 
@@ -1660,6 +1807,7 @@ export const api = {
   linkedDirectory: linkedDirectoryApi,
   flashcards: flashcardsApi,
   modules: modulesApi,
+  audioSummary: audioSummaryApi,
   // Backward compatibility
   cases: coursesApi,
 };
