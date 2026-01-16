@@ -394,6 +394,518 @@ class AudioSummaryService:
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to clean up temp dir: {cleanup_error}")
 
+    async def generate_audio_from_script(
+        self,
+        summary_id: str,
+    ) -> AsyncGenerator[Dict, None]:
+        """
+        Generate audio from an existing script (no LLM call).
+
+        This method is used when the script has already been generated and we only
+        need to convert it to audio. Useful for re-generating audio or when the
+        user has an existing script.
+
+        Args:
+            summary_id: ID of the audio summary record with existing script_data
+
+        Yields:
+            Progress updates as dict
+        """
+        temp_dir = None
+        service = get_surreal_service()
+
+        try:
+            # Normalize summary_id
+            summary_record_id = summary_id.replace("audio_summary:", "")
+
+            yield {
+                "status": "loading",
+                "message": "Chargement du script existant...",
+                "percentage": 0.0
+            }
+
+            # Load existing summary with script_data
+            result = await service.query(
+                f"SELECT * FROM audio_summary:{summary_record_id}"
+            )
+
+            if not result or len(result) == 0:
+                yield {
+                    "status": "error",
+                    "message": f"Résumé audio non trouvé: {summary_id}"
+                }
+                return
+
+            summary = result[0]
+            script_data_raw = summary.get("script_data")
+            course_id = str(summary.get("course_id", ""))
+            name = summary.get("name", "audio")
+
+            if not script_data_raw:
+                yield {
+                    "status": "error",
+                    "message": "Aucun script trouvé. Générez d'abord le script avec un modèle LLM."
+                }
+                return
+
+            # Convert raw dict to ScriptData
+            script_data = ScriptData(**script_data_raw)
+
+            if not script_data.sections:
+                yield {
+                    "status": "error",
+                    "message": "Le script ne contient aucune section."
+                }
+                return
+
+            yield {
+                "status": "generating_audio",
+                "message": f"Script chargé: {len(script_data.sections)} sections",
+                "percentage": 10.0,
+                "total_sections": len(script_data.sections)
+            }
+
+            # Create output directory
+            course_record_id = course_id.replace("course:", "")
+            audio_dir = Path(settings.upload_dir) / "courses" / course_record_id / "audio_summaries"
+            audio_dir.mkdir(parents=True, exist_ok=True)
+
+            # Update status to generating
+            await service.query(
+                """
+                UPDATE audio_summary
+                SET status = 'generating',
+                    updated_at = time::now()
+                WHERE id = type::thing('audio_summary', $summary_id)
+                """,
+                {"summary_id": summary_record_id}
+            )
+
+            # Generate audio segments
+            temp_dir = tempfile.mkdtemp(prefix="audio_summary_")
+            segment_files = []
+
+            for i, section in enumerate(script_data.sections):
+                yield {
+                    "status": "generating_audio",
+                    "message": f"Section {i+1}/{len(script_data.sections)}: {section.title or section.level}",
+                    "percentage": 10.0 + (80.0 * i / len(script_data.sections)),
+                    "current_section": i + 1,
+                    "total_sections": len(script_data.sections)
+                }
+
+                # Generate pause/silence if needed
+                if section.pause_before_ms > 0:
+                    silence_path = os.path.join(temp_dir, f"{i:03d}_silence.mp3")
+                    await self._generate_silence(silence_path, section.pause_before_ms)
+                    if os.path.exists(silence_path):
+                        segment_files.append(silence_path)
+
+                # Generate audio for section content
+                segment_path = os.path.join(temp_dir, f"{i:03d}_content.mp3")
+                result = await self.tts_service.text_to_speech(
+                    text=section.content,
+                    output_path=segment_path,
+                    voice=section.voice,
+                    language="fr",
+                    clean_markdown=False  # Already cleaned
+                )
+
+                if result.success:
+                    segment_files.append(segment_path)
+                else:
+                    logger.warning(f"Failed to generate audio for section {i}: {result.error}")
+
+            if len(segment_files) < 1:
+                yield {
+                    "status": "error",
+                    "message": "Impossible de générer les segments audio"
+                }
+                return
+
+            # Concatenate segments
+            yield {
+                "status": "concatenating",
+                "message": f"Assemblage de {len(segment_files)} segments...",
+                "percentage": 90.0
+            }
+
+            # Generate final filename
+            safe_name = re.sub(r'[^\w\s-]', '', name).strip().replace(' ', '_')[:50]
+            audio_filename = f"{summary_record_id}_{safe_name}.mp3"
+            audio_path = audio_dir / audio_filename
+
+            # Concatenate with ffmpeg
+            success = await self._concatenate_segments(segment_files, str(audio_path), temp_dir)
+
+            if not success:
+                yield {
+                    "status": "error",
+                    "message": "Erreur lors de l'assemblage des segments audio"
+                }
+                return
+
+            # Get actual duration
+            actual_duration = await self._get_audio_duration(str(audio_path))
+
+            # Update database with final info
+            await service.query(
+                """
+                UPDATE audio_summary
+                SET audio_path = $audio_path,
+                    actual_duration_seconds = $actual_duration,
+                    status = 'completed',
+                    updated_at = time::now()
+                WHERE id = type::thing('audio_summary', $summary_id)
+                """,
+                {
+                    "summary_id": summary_record_id,
+                    "audio_path": str(audio_path),
+                    "actual_duration": actual_duration
+                }
+            )
+
+            yield {
+                "status": "completed",
+                "message": f"Audio généré: {int(actual_duration/60)} min {int(actual_duration%60)} sec",
+                "percentage": 100.0,
+                "section_count": len(script_data.sections),
+                "actual_duration_seconds": actual_duration
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating audio from script: {e}", exc_info=True)
+
+            # Update status to error
+            try:
+                summary_record_id = summary_id.replace("audio_summary:", "")
+                await service.query(
+                    """
+                    UPDATE audio_summary
+                    SET status = 'error',
+                        error_message = $error,
+                        updated_at = time::now()
+                    WHERE id = type::thing('audio_summary', $summary_id)
+                    """,
+                    {
+                        "summary_id": summary_record_id,
+                        "error": str(e)
+                    }
+                )
+            except Exception:
+                pass
+
+            yield {
+                "status": "error",
+                "message": f"Erreur: {str(e)}"
+            }
+
+        finally:
+            # Clean up temp directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up temp dir: {cleanup_error}")
+
+    async def import_script_from_markdown(
+        self,
+        summary_id: str,
+        markdown_content: str,
+        voice_titles: str = "fr-CA-SylvieNeural"
+    ) -> Dict:
+        """
+        Import and parse an existing markdown script.
+
+        Parses a markdown script (in the format generated by this service)
+        and stores it as script_data for later audio generation.
+
+        Args:
+            summary_id: ID of the audio summary record
+            markdown_content: The markdown script content
+            voice_titles: Default voice for titles (used if not specified in script)
+
+        Returns:
+            Dict with import result
+        """
+        service = get_surreal_service()
+
+        try:
+            # Normalize summary_id
+            summary_record_id = summary_id.replace("audio_summary:", "")
+
+            # Parse the markdown content
+            script_data = self._parse_markdown_script(markdown_content, voice_titles)
+
+            if not script_data or not script_data.sections:
+                return {
+                    "success": False,
+                    "error": "Impossible de parser le script markdown. Vérifiez le format."
+                }
+
+            # Get course_id from existing summary
+            result = await service.query(
+                f"SELECT course_id FROM audio_summary:{summary_record_id}"
+            )
+
+            if not result or len(result) == 0:
+                return {
+                    "success": False,
+                    "error": f"Résumé audio non trouvé: {summary_id}"
+                }
+
+            course_id = str(result[0].get("course_id", ""))
+            course_record_id = course_id.replace("course:", "")
+
+            # Create output directory and save script files
+            audio_dir = Path(settings.upload_dir) / "courses" / course_record_id / "audio_summaries"
+            audio_dir.mkdir(parents=True, exist_ok=True)
+
+            script_md_path = audio_dir / f"{summary_record_id}_script.md"
+            script_json_path = audio_dir / f"{summary_record_id}_script.json"
+
+            # Save markdown script
+            script_md_path.write_text(markdown_content, encoding="utf-8")
+
+            # Save structured JSON
+            script_json_path.write_text(
+                json.dumps(script_data.model_dump(), ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
+
+            # Update database
+            await service.query(
+                """
+                UPDATE audio_summary
+                SET script_path = $script_path,
+                    script_data = $script_data,
+                    section_count = $section_count,
+                    estimated_duration_seconds = $estimated_duration,
+                    status = 'script_ready',
+                    updated_at = time::now()
+                WHERE id = type::thing('audio_summary', $summary_id)
+                """,
+                {
+                    "summary_id": summary_record_id,
+                    "script_path": str(script_md_path),
+                    "script_data": script_data.model_dump(),
+                    "section_count": len(script_data.sections),
+                    "estimated_duration": script_data.estimated_duration_seconds
+                }
+            )
+
+            logger.info(f"Script imported for summary {summary_id}: {len(script_data.sections)} sections")
+
+            return {
+                "success": True,
+                "section_count": len(script_data.sections),
+                "estimated_duration_seconds": script_data.estimated_duration_seconds
+            }
+
+        except Exception as e:
+            logger.error(f"Error importing script: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _parse_markdown_script(
+        self,
+        markdown_content: str,
+        default_voice: str
+    ) -> Optional[ScriptData]:
+        """
+        Parse a markdown script into ScriptData structure.
+
+        Expected format:
+        # Title
+        ---
+        **Informations**
+        - **Documents sources:** doc1.md, doc2.md
+        - **Durée estimée:** X min Y sec
+        ...
+        ---
+        ## Section Title
+        *Voix: VoiceName*
+        Content...
+        """
+        sections = []
+        section_idx = 0
+
+        # Build list of available body voices
+        body_voices = [v for v in BODY_VOICES if v != default_voice]
+        if not body_voices:
+            body_voices = BODY_VOICES
+
+        # Extract title from first line
+        lines = markdown_content.strip().split('\n')
+        title = "Script importé"
+        for line in lines:
+            if line.startswith('# '):
+                title = line[2:].strip()
+                break
+
+        # Voice name to full voice ID mapping
+        voice_map = {
+            "Sylvie": "fr-CA-SylvieNeural",
+            "Antoine": "fr-CA-AntoineNeural",
+            "Jean": "fr-CA-JeanNeural",
+            "Thierry": "fr-CA-ThierryNeural",
+            "Denise": "fr-FR-DeniseNeural",
+            "Henri": "fr-FR-HenriNeural",
+            "Éloïse": "fr-FR-EloiseNeural",
+            "Eloise": "fr-FR-EloiseNeural",
+            "Charline": "fr-BE-CharlineNeural",
+            "Gérard": "fr-BE-GerardNeural",
+            "Gerard": "fr-BE-GerardNeural",
+            "Ariane": "fr-CH-ArianeNeural",
+            "Fabrice": "fr-CH-FabriceNeural",
+        }
+
+        # Parse sections using regex
+        # Pattern matches: ## or ### or #### followed by title, then *Voix: Name*, then content
+        section_pattern = r'(?:^|\n)(#{2,4})\s+([^\n]+)\n+\*Voix:\s*([^*]+)\*\n+([\s\S]*?)(?=\n#{2,4}\s|\n---|\Z)'
+
+        matches = re.findall(section_pattern, markdown_content)
+
+        for heading_marks, section_title, voice_name, content in matches:
+            # Determine level from heading marks
+            level_map = {"##": "h1", "###": "h2", "####": "h3"}
+            level = level_map.get(heading_marks, "h2")
+
+            # Get voice ID from name
+            voice_name = voice_name.strip()
+            voice_id = voice_map.get(voice_name, default_voice)
+
+            # Clean content
+            content = content.strip()
+            if not content:
+                continue
+
+            # Determine pause
+            pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
+
+            sections.append(ScriptSection(
+                id=f"s{section_idx:03d}",
+                level=level,
+                title=section_title.strip(),
+                content=content,
+                voice=voice_id,
+                pause_before_ms=pause_ms,
+                estimated_duration_seconds=self._estimate_duration_from_text(content)
+            ))
+            section_idx += 1
+
+        if not sections:
+            # Try alternative parsing for simpler format
+            sections = self._parse_simple_markdown(markdown_content, default_voice, body_voices)
+
+        if not sections:
+            logger.warning("No sections found in markdown script")
+            return None
+
+        # Check if all sections have the same voice (old script format)
+        # If so, re-assign voices based on level
+        unique_voices = set(s.voice for s in sections)
+        if len(unique_voices) == 1:
+            logger.info("Script has single voice, re-assigning voices based on level")
+            last_body_voice = None
+
+            def get_random_body_voice() -> str:
+                nonlocal last_body_voice
+                available = [v for v in body_voices if v != last_body_voice]
+                if not available:
+                    available = body_voices
+                voice = random.choice(available)
+                last_body_voice = voice
+                return voice
+
+            for section in sections:
+                if section.level in ["h1", "h2", "intro", "outro"]:
+                    section.voice = default_voice
+                else:
+                    section.voice = get_random_body_voice()
+
+        total_duration = sum(s.estimated_duration_seconds for s in sections)
+
+        return ScriptData(
+            title=title,
+            source_documents=[],
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            estimated_duration_seconds=total_duration,
+            sections=sections
+        )
+
+    def _parse_simple_markdown(
+        self,
+        markdown_content: str,
+        default_voice: str,
+        body_voices: List[str]
+    ) -> List[ScriptSection]:
+        """
+        Parse simpler markdown format without voice annotations.
+
+        Assigns voices automatically based on heading level.
+        """
+        sections = []
+        section_idx = 0
+        last_body_voice = None
+
+        def get_random_body_voice() -> str:
+            nonlocal last_body_voice
+            available = [v for v in body_voices if v != last_body_voice]
+            if not available:
+                available = body_voices
+            voice = random.choice(available)
+            last_body_voice = voice
+            return voice
+
+        # Split by headings
+        parts = re.split(r'\n(#{2,4})\s+([^\n]+)\n', markdown_content)
+
+        # parts will be: [preamble, ##, title1, content1, ###, title2, content2, ...]
+        i = 1  # Skip preamble
+        while i < len(parts) - 2:
+            heading_marks = parts[i]
+            section_title = parts[i + 1]
+            content = parts[i + 2] if i + 2 < len(parts) else ""
+            i += 3
+
+            # Skip metadata sections
+            if section_title.lower() in ["informations", "information"]:
+                continue
+
+            # Determine level
+            level_map = {"##": "h1", "###": "h2", "####": "h3"}
+            level = level_map.get(heading_marks, "h2")
+
+            # Assign voice
+            if level in ["h1", "h2"]:
+                voice = default_voice
+            else:
+                voice = get_random_body_voice()
+
+            # Clean content - remove voice annotations if present
+            content = re.sub(r'\*Voix:\s*[^*]+\*\n*', '', content).strip()
+
+            if not content:
+                continue
+
+            pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
+
+            sections.append(ScriptSection(
+                id=f"s{section_idx:03d}",
+                level=level,
+                title=section_title.strip(),
+                content=content,
+                voice=voice,
+                pause_before_ms=pause_ms,
+                estimated_duration_seconds=self._estimate_duration_from_text(content)
+            ))
+            section_idx += 1
+
+        return sections
+
     async def _load_documents(
         self, document_ids: List[str]
     ) -> tuple[List[Dict], List[AudioSourceDocument]]:
@@ -688,12 +1200,13 @@ class AudioSummaryService:
             if not content:
                 continue
 
-            if level in ["h1", "h2", "h3"]:
+            # H1 and H2 use the main voice, H3 and body use random voices
+            if level in ["h1", "h2"]:
                 voice = voice_titles
                 pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
             else:
                 voice = get_random_body_voice()
-                pause_ms = DEFAULT_PAUSE_CONFIG["paragraph"]
+                pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["paragraph"])
 
             if title and level in ["h1", "h2"]:
                 content = f"{title}. {content}"
@@ -709,7 +1222,7 @@ class AudioSummaryService:
             ))
             section_idx += 1
 
-        # Add conclusion
+        # Add conclusion (uses main voice)
         if conclusion := data.get("conclusion"):
             sections.append(ScriptSection(
                 id=f"s{section_idx:03d}",
@@ -747,12 +1260,13 @@ class AudioSummaryService:
                 if not content.strip():
                     continue
 
-                if level in ["h1", "h2", "h3"]:
+                # H1 and H2 use the main voice, H3 and body use random voices
+                if level in ["h1", "h2"]:
                     voice = voice_titles
                     pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
                 else:
                     voice = random.choice(body_voices)
-                    pause_ms = DEFAULT_PAUSE_CONFIG["paragraph"]
+                    pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["paragraph"])
 
                 if title and level in ["h1", "h2"]:
                     content = f"{title}. {content}"
@@ -977,16 +1491,20 @@ class AudioSummaryService:
         return "\n".join(lines)
 
     async def _generate_silence(self, output_path: str, duration_ms: int) -> bool:
-        """Generate a silent audio segment using ffmpeg."""
+        """Generate a silent audio segment using ffmpeg.
+
+        Uses 24000 Hz mono to match edge-tts output format.
+        """
         try:
             duration_seconds = duration_ms / 1000.0
 
+            # Use 24000 Hz mono to match edge-tts output
             ffmpeg_cmd = [
                 "ffmpeg", "-y",
                 "-f", "lavfi",
-                "-i", f"anullsrc=r=44100:cl=mono",
+                "-i", "anullsrc=r=24000:cl=mono",
                 "-t", str(duration_seconds),
-                "-q:a", "9",
+                "-b:a", "48k",
                 "-acodec", "libmp3lame",
                 output_path
             ]
@@ -1007,7 +1525,10 @@ class AudioSummaryService:
     async def _concatenate_segments(
         self, segment_files: List[str], output_path: str, temp_dir: str
     ) -> bool:
-        """Concatenate audio segments using ffmpeg."""
+        """Concatenate audio segments using ffmpeg.
+
+        Re-encodes to ensure consistent sample rate and format across all segments.
+        """
         try:
             # Create concat file
             concat_file = os.path.join(temp_dir, "concat.txt")
@@ -1016,13 +1537,17 @@ class AudioSummaryService:
                     escaped_path = seg_file.replace("'", "'\\''")
                     f.write(f"file '{escaped_path}'\n")
 
-            # Concatenate with ffmpeg
+            # Concatenate with ffmpeg - re-encode to ensure consistent output
+            # Use 48kHz stereo for better quality and browser compatibility
             ffmpeg_cmd = [
                 "ffmpeg", "-y",
                 "-f", "concat",
                 "-safe", "0",
                 "-i", concat_file,
-                "-c", "copy",
+                "-ar", "48000",      # 48kHz sample rate
+                "-ac", "2",          # Stereo
+                "-b:a", "128k",      # Good quality bitrate
+                "-acodec", "libmp3lame",
                 output_path
             ]
 

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -27,10 +26,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  FileText,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { audioSummaryApi, modelsApi, type LLMModel } from "@/lib/api";
 import type { Document, AudioGenerationProgress, Module, VoiceInfo } from "@/types";
+
+type GenerationMode = "full" | "script_only" | "import";
 
 interface CreateAudioSummaryModalProps {
   open: boolean;
@@ -70,7 +74,8 @@ export function CreateAudioSummaryModal({
   const [name, setName] = useState("");
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
   const [voiceTitles, setVoiceTitles] = useState("fr-CA-SylvieNeural");
-  const [generateScriptOnly, setGenerateScriptOnly] = useState(false);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>("full");
+  const [importScriptContent, setImportScriptContent] = useState("");
 
   // Generation state
   const [isCreating, setIsCreating] = useState(false);
@@ -147,7 +152,8 @@ export function CreateAudioSummaryModal({
       setSelectedModuleIds([]);
       setVoiceTitles("fr-CA-SylvieNeural");
       setSelectedModelId("anthropic:claude-sonnet-4-20250514");
-      setGenerateScriptOnly(false);
+      setGenerationMode("full");
+      setImportScriptContent("");
       setIsCreating(false);
       setIsGenerating(false);
       setGenerationProgress(null);
@@ -178,55 +184,106 @@ export function CreateAudioSummaryModal({
       toast.error("Veuillez entrer un nom pour le résumé");
       return;
     }
-    if (selectedModuleIds.length === 0) {
-      toast.error("Veuillez sélectionner au moins un module");
-      return;
-    }
-    const selectedDocIds = getSelectedDocumentIds();
-    if (selectedDocIds.length === 0) {
-      toast.error("Aucun document markdown dans les modules sélectionnés");
-      return;
+
+    // For import mode, we need script content but not necessarily modules
+    if (generationMode === "import") {
+      if (!importScriptContent.trim()) {
+        toast.error("Veuillez coller le script markdown à importer");
+        return;
+      }
+    } else {
+      // For LLM modes, we need selected modules
+      if (selectedModuleIds.length === 0) {
+        toast.error("Veuillez sélectionner au moins un module");
+        return;
+      }
+      const selectedDocIds = getSelectedDocumentIds();
+      if (selectedDocIds.length === 0) {
+        toast.error("Aucun document markdown dans les modules sélectionnés");
+        return;
+      }
     }
 
     setIsCreating(true);
     setGenerationError(null);
 
     try {
+      // Get document IDs (empty for import mode)
+      const selectedDocIds = generationMode === "import" ? [] : getSelectedDocumentIds();
+
       // Step 1: Create the audio summary record
       const summary = await audioSummaryApi.create(courseId, {
         name: name.trim(),
-        source_document_ids: selectedDocIds,
+        source_document_ids: selectedDocIds.length > 0 ? selectedDocIds : ["placeholder"],
         voice_titles: voiceTitles,
-        generate_script_only: generateScriptOnly,
+        generate_script_only: generationMode !== "full",
       });
 
-      toast.success("Résumé audio créé");
+      // Step 2: Handle based on mode
+      if (generationMode === "import") {
+        // Import the script directly
+        const importResult = await audioSummaryApi.importScript(
+          summary.id,
+          importScriptContent.trim(),
+          voiceTitles
+        );
 
-      // Step 2: Generate the audio
-      setIsCreating(false);
-      setIsGenerating(true);
+        if (importResult.success) {
+          toast.success(`Script importé: ${importResult.section_count} sections`);
 
-      const result = await audioSummaryApi.generate(summary.id, {
-        modelId: selectedModelId,
-        onProgress: (progress) => {
-          setGenerationProgress(progress);
-        },
-      });
+          // Now generate audio
+          setIsCreating(false);
+          setIsGenerating(true);
 
-      if (result.success) {
-        setGenerationComplete(true);
-        const durationText = result.actual_duration_seconds
-          ? formatDuration(result.actual_duration_seconds)
-          : `${result.section_count} sections`;
-        toast.success(`Résumé audio généré: ${durationText}`);
+          const audioResult = await audioSummaryApi.generateAudioOnly(summary.id, {
+            onProgress: (progress) => {
+              setGenerationProgress(progress);
+            },
+          });
 
-        // Close modal after short delay
-        setTimeout(() => {
-          onOpenChange(false);
-          onSuccess();
-        }, 1500);
+          if (audioResult.success) {
+            setGenerationComplete(true);
+            const durationText = audioResult.actual_duration_seconds
+              ? formatDuration(audioResult.actual_duration_seconds)
+              : `${audioResult.section_count} sections`;
+            toast.success(`Audio généré: ${durationText}`);
+
+            setTimeout(() => {
+              onOpenChange(false);
+              onSuccess();
+            }, 1500);
+          } else {
+            setGenerationError(audioResult.error || "Erreur lors de la génération audio");
+          }
+        } else {
+          setGenerationError(importResult.error || "Erreur lors de l'import du script");
+        }
       } else {
-        setGenerationError(result.error || "Erreur lors de la génération");
+        // Generate with LLM
+        setIsCreating(false);
+        setIsGenerating(true);
+
+        const result = await audioSummaryApi.generate(summary.id, {
+          modelId: selectedModelId,
+          onProgress: (progress) => {
+            setGenerationProgress(progress);
+          },
+        });
+
+        if (result.success) {
+          setGenerationComplete(true);
+          const durationText = result.actual_duration_seconds
+            ? formatDuration(result.actual_duration_seconds)
+            : `${result.section_count} sections`;
+          toast.success(`Résumé audio généré: ${durationText}`);
+
+          setTimeout(() => {
+            onOpenChange(false);
+            onSuccess();
+          }, 1500);
+        } else {
+          setGenerationError(result.error || "Erreur lors de la génération");
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
@@ -239,12 +296,13 @@ export function CreateAudioSummaryModal({
   };
 
   const selectedDocCount = getSelectedDocumentIds().length;
-  const isFormValid =
-    name.trim() &&
-    selectedModuleIds.length > 0 &&
-    selectedDocCount > 0 &&
-    !isCreating &&
-    !isGenerating;
+  const isFormValid = () => {
+    if (!name.trim() || isCreating || isGenerating) return false;
+    if (generationMode === "import") {
+      return importScriptContent.trim().length > 0;
+    }
+    return selectedModuleIds.length > 0 && selectedDocCount > 0;
+  };
 
   // Group voices by region
   const voicesByRegion = voices.reduce((acc, voice) => {
@@ -347,76 +405,179 @@ export function CreateAudioSummaryModal({
                 />
               </div>
 
-              {/* Module selection */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Modules à inclure</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSelectAllModules}
-                    className="h-auto py-1 px-2 text-xs"
+              {/* Generation mode selection */}
+              <div className="space-y-3">
+                <Label>Mode de création</Label>
+                <div className="space-y-2">
+                  <div
+                    className={`flex items-start space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      generationMode === "full" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setGenerationMode("full")}
                   >
-                    {selectedModuleIds.length === sortedModules.filter((m) => getModuleMarkdownCount(m.id) > 0).length
-                      ? "Tout désélectionner"
-                      : "Tout sélectionner"}
-                  </Button>
+                    <div className={`mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                      generationMode === "full" ? "border-primary" : "border-muted-foreground"
+                    }`}>
+                      {generationMode === "full" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        Générer avec LLM + Audio
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Le LLM reformule le contenu en script pédagogique, puis génère l&apos;audio.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`flex items-start space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      generationMode === "script_only" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setGenerationMode("script_only")}
+                  >
+                    <div className={`mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                      generationMode === "script_only" ? "border-primary" : "border-muted-foreground"
+                    }`}>
+                      {generationMode === "script_only" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-orange-500" />
+                        Générer script uniquement
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Génère le script avec LLM sans créer l&apos;audio. Audio générable plus tard.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`flex items-start space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      generationMode === "import" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => setGenerationMode("import")}
+                  >
+                    <div className={`mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                      generationMode === "import" ? "border-primary" : "border-muted-foreground"
+                    }`}>
+                      {generationMode === "import" && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <Upload className="h-4 w-4 text-green-600" />
+                        Importer un script existant
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Collez un script markdown existant. Pas d&apos;appel LLM, économise vos crédits.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
-                  {sortedModules.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun module disponible</p>
-                  ) : (
-                    sortedModules.map((module) => {
-                      const mdCount = getModuleMarkdownCount(module.id);
-                      const isDisabled = mdCount === 0;
-                      return (
-                        <div key={module.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`module-${module.id}`}
-                            checked={selectedModuleIds.includes(module.id)}
-                            onCheckedChange={() => handleModuleToggle(module.id)}
-                            disabled={isDisabled}
-                          />
-                          <label
-                            htmlFor={`module-${module.id}`}
-                            className={`flex-1 text-sm cursor-pointer ${isDisabled ? "text-muted-foreground" : ""}`}
-                          >
-                            {module.name}
-                            <span className="text-muted-foreground ml-2">
-                              ({mdCount} doc{mdCount > 1 ? "s" : ""})
-                            </span>
-                          </label>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                {selectedDocCount > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedDocCount} document{selectedDocCount > 1 ? "s" : ""} sélectionné{selectedDocCount > 1 ? "s" : ""}
-                  </p>
-                )}
               </div>
 
-              {/* Model selection */}
-              <div className="space-y-2">
-                <Label htmlFor="model">Modèle LLM</Label>
-                <Select value={selectedModelId} onValueChange={setSelectedModelId}>
-                  <SelectTrigger id="model">
-                    <SelectValue placeholder="Sélectionner un modèle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.filter(m => m.id.startsWith("anthropic:") || m.id.startsWith("ollama:")).map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Claude recommandé pour un résultat de qualité.
-                </p>
-              </div>
+              {/* Module selection (hidden in import mode) */}
+              {generationMode !== "import" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Modules à inclure</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSelectAllModules}
+                      className="h-auto py-1 px-2 text-xs"
+                    >
+                      {selectedModuleIds.length === sortedModules.filter((m) => getModuleMarkdownCount(m.id) > 0).length
+                        ? "Tout désélectionner"
+                        : "Tout sélectionner"}
+                    </Button>
+                  </div>
+                  <div className="border rounded-lg p-3 max-h-32 overflow-y-auto space-y-2">
+                    {sortedModules.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Aucun module disponible</p>
+                    ) : (
+                      sortedModules.map((module) => {
+                        const mdCount = getModuleMarkdownCount(module.id);
+                        const isDisabled = mdCount === 0;
+                        return (
+                          <div key={module.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`module-${module.id}`}
+                              checked={selectedModuleIds.includes(module.id)}
+                              onChange={() => handleModuleToggle(module.id)}
+                              disabled={isDisabled}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <label
+                              htmlFor={`module-${module.id}`}
+                              className={`flex-1 text-sm cursor-pointer ${isDisabled ? "text-muted-foreground" : ""}`}
+                            >
+                              {module.name}
+                              <span className="text-muted-foreground ml-2">
+                                ({mdCount} doc{mdCount > 1 ? "s" : ""})
+                              </span>
+                            </label>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  {selectedDocCount > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedDocCount} document{selectedDocCount > 1 ? "s" : ""} sélectionné{selectedDocCount > 1 ? "s" : ""}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Model selection (hidden in import mode) */}
+              {generationMode !== "import" && (
+                <div className="space-y-2">
+                  <Label htmlFor="model">Modèle LLM</Label>
+                  <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+                    <SelectTrigger id="model">
+                      <SelectValue placeholder="Sélectionner un modèle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.filter(m => m.id.startsWith("anthropic:") || m.id.startsWith("ollama:")).map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Claude recommandé pour un résultat de qualité.
+                  </p>
+                </div>
+              )}
+
+              {/* Import script file input (shown only in import mode) */}
+              {generationMode === "import" && (
+                <div className="space-y-2">
+                  <Label htmlFor="import-script">Fichier script (.md)</Label>
+                  <input
+                    id="import-script"
+                    type="file"
+                    accept=".md,.markdown,.txt"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const content = await file.text();
+                        setImportScriptContent(content);
+                      }
+                    }}
+                    className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                  />
+                  {importScriptContent && (
+                    <p className="text-xs text-green-600">
+                      ✓ Fichier chargé ({importScriptContent.length} caractères)
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Voice selection */}
               <div className="space-y-2">
@@ -441,23 +602,10 @@ export function CreateAudioSummaryModal({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Les sections de contenu utiliseront des voix aléatoires variées.
+                  {generationMode === "import"
+                    ? "Voix par défaut pour les titres si non spécifié dans le script."
+                    : "Les sections de contenu utiliseront des voix aléatoires variées."}
                 </p>
-              </div>
-
-              {/* Script only option */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="script-only"
-                  checked={generateScriptOnly}
-                  onCheckedChange={(checked) => setGenerateScriptOnly(checked === true)}
-                />
-                <label
-                  htmlFor="script-only"
-                  className="text-sm cursor-pointer"
-                >
-                  Générer uniquement le script (sans audio)
-                </label>
               </div>
             </div>
 
@@ -465,16 +613,26 @@ export function CreateAudioSummaryModal({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Annuler
               </Button>
-              <Button onClick={handleCreate} disabled={!isFormValid}>
+              <Button onClick={handleCreate} disabled={!isFormValid()}>
                 {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Création...
                   </>
+                ) : generationMode === "import" ? (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importer et générer audio
+                  </>
+                ) : generationMode === "script_only" ? (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Générer le script
+                  </>
                 ) : (
                   <>
                     <Headphones className="h-4 w-4 mr-2" />
-                    Générer le résumé
+                    Générer script + audio
                   </>
                 )}
               </Button>

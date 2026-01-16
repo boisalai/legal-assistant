@@ -1772,6 +1772,96 @@ export const audioSummaryApi = {
     return result;
   },
 
+  // Import an existing markdown script
+  async importScript(
+    summaryId: string,
+    markdownContent: string,
+    voiceTitles: string = "fr-CA-SylvieNeural"
+  ): Promise<{ success: boolean; section_count?: number; estimated_duration_seconds?: number; error?: string }> {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    return fetchApi<{ success: boolean; section_count?: number; estimated_duration_seconds?: number; error?: string }>(
+      `/api/audio-summaries/${encodeURIComponent(cleanId)}/import-script`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          markdown_content: markdownContent,
+          voice_titles: voiceTitles,
+        }),
+      }
+    );
+  },
+
+  // Generate audio from existing script (no LLM call)
+  async generateAudioOnly(
+    summaryId: string,
+    options: {
+      onProgress?: (progress: AudioGenerationProgress) => void;
+    } = {}
+  ): Promise<{ success: boolean; section_count?: number; actual_duration_seconds?: number; error?: string }> {
+    const cleanId = summaryId.replace("audio_summary:", "");
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/audio-summaries/${encodeURIComponent(cleanId)}/generate-audio`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Audio generation failed" }));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    // Read SSE stream
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let result: { success: boolean; section_count?: number; actual_duration_seconds?: number; error?: string } = { success: false };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6)) as AudioGenerationProgress;
+              options.onProgress?.(data);
+
+              if (data.status === "completed") {
+                result = {
+                  success: true,
+                  section_count: data.section_count,
+                  actual_duration_seconds: data.actual_duration_seconds,
+                };
+              } else if (data.status === "error") {
+                result = { success: false, error: data.message };
+              }
+            } catch {
+              // Ignore JSON parse errors
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return result;
+  },
+
   // Get audio file URL
   getAudioUrl(summaryId: string): string {
     const cleanId = summaryId.replace("audio_summary:", "");
