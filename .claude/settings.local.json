@@ -65,7 +65,13 @@
       "Bash(uv add:*)",
       "Bash(unzip:*)",
       "Bash(uv pip install:*)",
-      "Bash(uv remove:*)"
+      "Bash(uv remove:*)",
+      "Bash(tail:*)",
+      "Bash(git reset:*)",
+      "Bash(jq:*)",
+      "Bash(ffprobe:*)",
+      "Bash(docker exec:*)",
+      "Bash(git status:*)"
     ],
     "deny": [],
     "ask": []

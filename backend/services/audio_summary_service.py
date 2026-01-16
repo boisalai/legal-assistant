@@ -10,6 +10,7 @@ Converts markdown course documents to structured audio files with:
 
 import asyncio
 import json
+import json5
 import logging
 import os
 import random
@@ -41,61 +42,68 @@ logger = logging.getLogger(__name__)
 
 
 # Prompt template for audio script generation (single document or first chunk)
-AUDIO_SCRIPT_PROMPT = """Tu es un professeur de droit qui prépare un cours audio pour aider un étudiant à réviser pour son examen final.
+AUDIO_SCRIPT_PROMPT = """Tu es un professeur de droit qui REFORMULE un document écrit en script audio pour qu'un étudiant puisse l'écouter et réviser.
 
-CONTENU DU COURS À ENSEIGNER:
+DOCUMENT SOURCE À REFORMULER POUR L'AUDIO:
 \"\"\"
 {content}
 \"\"\"
 
-OBJECTIF: Créer un script audio PÉDAGOGIQUE et COMPLET qui:
-1. ENSEIGNE chaque concept mentionné dans le contenu source
-2. EXPLIQUE les définitions avec des exemples concrets
-3. DÉTAILLE les distinctions importantes (ex: droit civil vs common law)
-4. DÉVELOPPE les principes juridiques pour qu'un étudiant les comprenne et les retienne
-5. INCLUT tous les articles de loi, cas jurisprudentiels et références mentionnés
+MISSION: REFORMULATION ORALE COMPLÈTE (PAS UN RÉSUMÉ)
+Tu dois REFORMULER INTÉGRALEMENT le document ci-dessus en version parlée. Ce n'est PAS un résumé.
+- Le script audio doit contenir TOUTES les informations du document source
+- Chaque phrase, chaque concept, chaque détail doit être présent dans ta reformulation
+- Tu AJOUTES des transitions orales, des clarifications, des développements d'acronymes
+- Le script final doit être PLUS LONG que le document source (car tu ajoutes des explications orales)
 
-RÈGLES DE CONTENU:
-- Couvre TOUS les sujets du document source - ne saute rien
-- Pour chaque concept: définition + explication + exemple si pertinent
-- Développe les abréviations (C.c.Q. → Code civil du Québec)
-- Explique les termes latins (ex: "Ubi societas, ibi jus signifie: là où il y a société, il y a droit")
-- Mentionne les cas jurisprudentiels importants avec leur signification
-- Cible environ 150 mots par minute de lecture
+ADAPTATIONS POUR L'ORAL:
+- Transforme les listes à puces en phrases fluides ("Premièrement... Deuxièmement... Ensuite...")
+- Développe les acronymes (C.c.Q. → "le Code civil du Québec")
+- Explique les termes latins ("Ubi societas, ibi jus, ce qui signifie: là où il y a société, il y a droit")
+- Remplace les références de pages/articles par des formulations orales
+- Ajoute des transitions entre les sections ("Passons maintenant à...", "Examinons ensuite...")
+- Reformule le texte écrit en langage naturel parlé
+
+INTERDIT:
+- NE RÉSUME PAS - reformule tout le contenu
+- NE CONDENSE PAS - garde tous les détails
+- NE SAUTE RIEN - chaque information du source doit apparaître
+- Si le document liste 10 éléments, les 10 doivent être dans le script
 
 FORMAT JSON:
 {{
   "title": "{document_name}",
-  "introduction": "Bienvenue dans cette leçon sur [sujet principal]. Nous allons étudier en détail [liste des thèmes majeurs].",
+  "introduction": "Bienvenue. Nous allons parcourir ensemble [sujet]. Ce cours couvre [thèmes principaux].",
   "sections": [
-    {{"level": "h1", "title": "Titre de section", "content": "Explication pédagogique complète de cette section..."}},
-    {{"level": "h2", "title": "Sous-titre", "content": "Développement détaillé du sous-thème..."}},
-    {{"level": "body", "content": "Explication approfondie avec exemples..."}}
+    {{"level": "h1", "title": "Titre de section", "content": "Reformulation orale complète de cette section..."}},
+    {{"level": "h2", "title": "Sous-titre", "content": "Reformulation orale du sous-thème..."}},
+    {{"level": "body", "content": "Suite de la reformulation..."}}
   ],
-  "conclusion": "Récapitulons les points essentiels à retenir pour l'examen. Premièrement, [concept 1 avec définition clé]. Deuxièmement, [concept 2]. [etc.]"
+  "conclusion": "Voilà qui conclut notre cours. Retenez les points suivants: [récapitulatif des concepts clés]."
 }}
 
-Génère un script LONG et DÉTAILLÉ couvrant TOUTE la matière. JSON:"""
+Reformule INTÉGRALEMENT le document source en script audio. JSON:"""
 
 # Prompt for subsequent chunks (no intro/conclusion)
-AUDIO_SCRIPT_CHUNK_PROMPT = """Continue le cours audio pédagogique (partie {chunk_num}/{total_chunks}).
+AUDIO_SCRIPT_CHUNK_PROMPT = """Continue la REFORMULATION ORALE du document (partie {chunk_num}/{total_chunks}).
 
-CONTENU À ENSEIGNER:
+SUITE DU DOCUMENT À REFORMULER:
 \"\"\"
 {content}
 \"\"\"
 
-Continue à enseigner ce contenu de manière pédagogique et détaillée.
-- Explique chaque concept avec exemples
-- Développe les définitions
-- Pas d'introduction ni conclusion (partie intermédiaire)
+RAPPEL: REFORMULATION COMPLÈTE, PAS UN RÉSUMÉ
+- Reformule TOUT ce contenu en version parlée
+- Chaque information doit être présente
+- Ajoute les transitions orales et développe les acronymes
+- Ne condense pas, ne résume pas
 
-JSON:
+JSON (sections uniquement, pas d'intro/conclusion):
 {{
   "sections": [
-    {{"level": "h1", "title": "Titre", "content": "Explication pédagogique complète..."}},
-    {{"level": "h2", "title": "Sous-titre", "content": "Développement détaillé..."}},
-    {{"level": "body", "content": "Explication approfondie..."}}
+    {{"level": "h1", "title": "Titre", "content": "Reformulation orale complète..."}},
+    {{"level": "h2", "title": "Sous-titre", "content": "Reformulation orale..."}},
+    {{"level": "body", "content": "Suite..."}}
   ]
 }}"""
 
@@ -476,11 +484,13 @@ class AudioSummaryService:
             merged_content += f"\n\n## Document: {doc['name']}\n\n{doc['content']}"
 
         # Chunk if too large (process in parts)
-        chunk_size = 12000
+        # Claude can handle ~200K tokens, so we use larger chunks for better context
+        chunk_size = 50000
+        min_chunk_size = 5000  # Minimum chars per chunk to avoid incomplete content
         if len(merged_content) > chunk_size:
             # Split by headers and process chunks
             all_sections = []
-            chunks = self._split_by_headers(merged_content, chunk_size)
+            chunks = self._split_by_headers(merged_content, chunk_size, min_chunk_size)
 
             for chunk_idx, chunk in enumerate(chunks):
                 chunk_sections = await self._process_chunk_with_llm(
@@ -580,24 +590,74 @@ class AudioSummaryService:
         json_match = re.search(r'\{[\s\S]*\}', response_text)
         if not json_match:
             logger.error("No JSON found in LLM response")
-            return sections
+            # Try fallback extraction
+            return self._fallback_extract_sections(response_text, voice_titles)
 
+        json_str = json_match.group()
+
+        # Try multiple parsing strategies
+        data = self._try_parse_json(json_str)
+
+        if not data:
+            logger.warning("All JSON parsing attempts failed, trying fallback extraction")
+            return self._fallback_extract_sections(response_text, voice_titles)
+
+        return self._build_sections_from_data(data, voice_titles)
+
+    def _try_parse_json(self, json_str: str) -> Optional[Dict]:
+        """Try multiple strategies to parse JSON."""
+        # Strategy 1: Try json5 (most lenient - allows trailing commas, comments, etc.)
         try:
-            data = json.loads(json_match.group())
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            return sections
+            data = json5.loads(json_str)
+            logger.info("JSON parsed successfully with json5")
+            return data
+        except Exception as e:
+            logger.debug(f"json5 parse failed: {e}")
 
+        # Strategy 2: Try standard json
+        try:
+            data = json.loads(json_str)
+            logger.info("JSON parsed successfully with standard json")
+            return data
+        except json.JSONDecodeError as e:
+            logger.debug(f"Standard JSON parse failed: {e}")
+
+        # Strategy 3: Repair and try json5
+        repaired = self._repair_json(json_str)
+        try:
+            data = json5.loads(repaired)
+            logger.info("JSON parsed successfully after repair with json5")
+            return data
+        except Exception as e:
+            logger.debug(f"json5 parse after repair failed: {e}")
+
+        # Strategy 4: Repair and try standard json
+        try:
+            data = json.loads(repaired)
+            logger.info("JSON parsed successfully after repair with standard json")
+            return data
+        except json.JSONDecodeError as e:
+            logger.error(f"All JSON parsing strategies failed. Last error: {e}")
+            # Log snippet for debugging
+            error_pos = e.pos if hasattr(e, 'pos') else 0
+            snippet_start = max(0, error_pos - 100)
+            snippet_end = min(len(repaired), error_pos + 100)
+            logger.error(f"JSON snippet around error: ...{repaired[snippet_start:snippet_end]}...")
+
+        return None
+
+    def _build_sections_from_data(self, data: Dict, voice_titles: str) -> List[ScriptSection]:
+        """Build ScriptSection list from parsed JSON data."""
+        sections = []
         section_idx = 0
 
-        # Build list of available body voices (excluding the title voice for variety)
+        # Build list of available body voices
         body_voices = [v for v in BODY_VOICES if v != voice_titles]
         if not body_voices:
-            body_voices = BODY_VOICES  # Fallback if title voice is the only one
-        last_body_voice = None  # Track last used voice to avoid repetition
+            body_voices = BODY_VOICES
+        last_body_voice = None
 
         def get_random_body_voice() -> str:
-            """Get a random body voice, avoiding consecutive repetition."""
             nonlocal last_body_voice
             available = [v for v in body_voices if v != last_body_voice]
             if not available:
@@ -628,16 +688,13 @@ class AudioSummaryService:
             if not content:
                 continue
 
-            # Determine voice and pause based on level
             if level in ["h1", "h2", "h3"]:
                 voice = voice_titles
                 pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
             else:
-                # Body sections get random voices from fr-CA and fr-FR
                 voice = get_random_body_voice()
                 pause_ms = DEFAULT_PAUSE_CONFIG["paragraph"]
 
-            # Add title announcement for H1/H2
             if title and level in ["h1", "h2"]:
                 content = f"{title}. {content}"
 
@@ -666,23 +723,164 @@ class AudioSummaryService:
 
         return sections
 
-    def _split_by_headers(self, content: str, max_chunk_size: int) -> List[str]:
-        """Split content by headers while respecting max chunk size."""
-        # Split by H1 headers first
-        parts = re.split(r'\n(?=# )', content)
+    def _fallback_extract_sections(self, response_text: str, voice_titles: str) -> List[ScriptSection]:
+        """Fallback: extract sections using regex when JSON parsing fails completely."""
+        sections = []
+        section_idx = 0
+
+        body_voices = [v for v in BODY_VOICES if v != voice_titles]
+        if not body_voices:
+            body_voices = BODY_VOICES
+
+        # Try to extract individual section objects
+        # Pattern matches {"level": "...", "title": "...", "content": "..."}
+        section_pattern = r'\{\s*"level"\s*:\s*"([^"]+)"\s*,\s*"title"\s*:\s*"([^"]*)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}'
+
+        matches = re.findall(section_pattern, response_text, re.DOTALL)
+
+        if matches:
+            logger.info(f"Fallback extraction found {len(matches)} sections")
+            for level, title, content in matches:
+                # Unescape the content
+                content = content.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+
+                if not content.strip():
+                    continue
+
+                if level in ["h1", "h2", "h3"]:
+                    voice = voice_titles
+                    pause_ms = DEFAULT_PAUSE_CONFIG.get(level, DEFAULT_PAUSE_CONFIG["h2"])
+                else:
+                    voice = random.choice(body_voices)
+                    pause_ms = DEFAULT_PAUSE_CONFIG["paragraph"]
+
+                if title and level in ["h1", "h2"]:
+                    content = f"{title}. {content}"
+
+                sections.append(ScriptSection(
+                    id=f"s{section_idx:03d}",
+                    level=level,
+                    title=title if title else None,
+                    content=content,
+                    voice=voice,
+                    pause_before_ms=pause_ms,
+                    estimated_duration_seconds=self._estimate_duration_from_text(content)
+                ))
+                section_idx += 1
+        else:
+            logger.error("Fallback extraction found no sections")
+
+        return sections
+
+    def _repair_json(self, json_str: str) -> str:
+        """Attempt to repair common JSON issues from LLM responses."""
+        repaired = json_str
+
+        # Step 1: Fix unescaped newlines inside strings
+        # This is the most common issue - Claude puts actual newlines in string values
+        result = []
+        in_string = False
+        escape_next = False
+        i = 0
+
+        while i < len(repaired):
+            char = repaired[i]
+
+            if escape_next:
+                result.append(char)
+                escape_next = False
+                i += 1
+                continue
+
+            if char == '\\':
+                escape_next = True
+                result.append(char)
+                i += 1
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                result.append(char)
+                i += 1
+                continue
+
+            if char == '\n' and in_string:
+                # Replace actual newline in string with escaped version
+                result.append('\\n')
+            elif char == '\t' and in_string:
+                result.append('\\t')
+            else:
+                result.append(char)
+
+            i += 1
+
+        repaired = ''.join(result)
+
+        # Step 2: Remove trailing commas before } or ]
+        repaired = re.sub(r',(\s*[}\]])', r'\1', repaired)
+
+        # Step 3: Fix missing commas between objects in arrays: }{ -> },{
+        repaired = re.sub(r'\}(\s*)\{', r'},\1{', repaired)
+
+        # Step 4: Fix missing commas between array elements: ]["  -> ],["
+        repaired = re.sub(r'\](\s*)\[', r'],\1[', repaired)
+
+        # Step 5: Fix missing commas after string values before new keys
+        # Pattern: "value" \n "key": -> "value", \n "key":
+        repaired = re.sub(r'"(\s*)\n(\s*)"([^"]+)"(\s*):', r'",\1\n\2"\3"\4:', repaired)
+
+        # Step 6: Fix missing commas after } before "key":
+        repaired = re.sub(r'\}(\s*)"([^"]+)"(\s*):', r'},\1"\2"\3:', repaired)
+
+        # Step 7: Ensure proper closing brackets at the end
+        open_braces = repaired.count('{') - repaired.count('}')
+        open_brackets = repaired.count('[') - repaired.count(']')
+
+        if open_braces > 0:
+            repaired = repaired.rstrip() + '}' * open_braces
+        if open_brackets > 0:
+            repaired = repaired.rstrip() + ']' * open_brackets
+
+        return repaired
+
+    def _split_by_headers(self, content: str, max_chunk_size: int, min_chunk_size: int = 5000) -> List[str]:
+        """Split content by headers while respecting max and min chunk sizes.
+
+        Args:
+            content: The full content to split
+            max_chunk_size: Maximum characters per chunk
+            min_chunk_size: Minimum characters per chunk (to avoid tiny chunks)
+        """
+        # Split by H1 and H2 headers for better granularity
+        parts = re.split(r'\n(?=##? [^#])', content)
         chunks = []
         current_chunk = ""
 
         for part in parts:
             if len(current_chunk) + len(part) > max_chunk_size:
-                if current_chunk:
+                # Only save current chunk if it meets minimum size
+                if current_chunk and len(current_chunk) >= min_chunk_size:
                     chunks.append(current_chunk)
-                current_chunk = part
+                    current_chunk = part
+                elif current_chunk:
+                    # Current chunk too small, keep accumulating
+                    current_chunk += "\n" + part
+                else:
+                    current_chunk = part
             else:
                 current_chunk += "\n" + part if current_chunk else part
 
+        # Handle final chunk
         if current_chunk:
-            chunks.append(current_chunk)
+            if chunks and len(current_chunk) < min_chunk_size:
+                # Merge small final chunk with previous
+                chunks[-1] += "\n" + current_chunk
+            else:
+                chunks.append(current_chunk)
+
+        # Safety check: if we ended up with no chunks, return the whole content
+        if not chunks:
+            chunks = [content]
 
         return chunks
 

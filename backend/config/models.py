@@ -262,6 +262,50 @@ DEFAULT_MLX_SERVER_URL = "http://localhost:8080/v1"  # URL OpenAI-compatible
 
 
 # ========================================
+# Modèles Google (Gemini)
+# ========================================
+
+GoogleModel = Literal[
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-exp", # Experimental
+]
+
+GOOGLE_MODELS_INFO = {
+    "gemini-1.5-pro": {
+        "name": "Gemini 1.5 Pro",
+        "speed": "Fast",
+        "quality": "Excellent",
+        "cost": "Free tier available / Paid",
+        "context": "2M tokens",
+        "best_for": "Raisonnement complexe, contextes longs",
+        "recommended": True,
+    },
+    "gemini-1.5-flash": {
+        "name": "Gemini 1.5 Flash",
+        "speed": "Very Fast",
+        "quality": "Good",
+        "cost": "Very Low",
+        "context": "1M tokens",
+        "best_for": "Tâches rapides, grand volume",
+        "recommended": True,
+    },
+    "gemini-2.0-flash-exp": {
+        "name": "Gemini 2.0 Flash (Exp)",
+        "speed": "Ultra Fast",
+        "quality": "Excellent",
+        "cost": "Free (Preview)",
+        "context": "1M tokens",
+        "best_for": "Test des dernières capacités multimodales",
+        "recommended": False,
+    },
+}
+
+# Modèle Google par défaut
+DEFAULT_GOOGLE_MODEL: GoogleModel = "gemini-1.5-pro"
+
+
+# ========================================
 # Modèles vLLM - SUPPRIMÉS
 # ========================================
 # vLLM est lent sur Apple Silicon (CPU uniquement, ~5-10 tok/s)
@@ -358,6 +402,26 @@ def get_all_models_for_api() -> dict:
                 for model, info in CLAUDE_MODELS_INFO.items()
             ],
         },
+        "google": {
+            "name": "Google Gemini",
+            "description": "API Gemini",
+            "icon": "sparkles",  # Using a distinct icon name if supported, else cloud
+            "requires_api_key": True,
+            "default": f"google:{DEFAULT_GOOGLE_MODEL}",
+            "models": [
+                {
+                    "id": f"google:{model}",
+                    "name": info["name"],
+                    "speed": info.get("speed", ""),
+                    "quality": info.get("quality", ""),
+                    "cost": info.get("cost", ""),
+                    "context": info.get("context", ""),
+                    "best_for": info.get("best_for", ""),
+                    "recommended": info.get("recommended", False),
+                }
+                for model, info in GOOGLE_MODELS_INFO.items()
+            ],
+        },
         "mlx": {
             "name": "MLX (Apple Silicon)",
             "description": "Modèles HF convertis pour Mac M1/M2/M3",
@@ -403,6 +467,12 @@ def print_models_info():
         # Truncate model name for display
         model_short = model[:35] + "..." if len(model) > 35 else model
         print(f"{recommended} {model_short:38} | {info['cost']:25} | {info['quality']:12} | {info['best_for']}")
+
+    print("\n✨ GOOGLE GEMINI API")
+    print("-" * 80)
+    for model, info in GOOGLE_MODELS_INFO.items():
+        recommended = "⭐" if info.get("recommended") else "  "
+        print(f"{recommended} {model:38} | {info['cost']:25} | {info['quality']:12} | {info['best_for']}")
 
     print("\n🍎 MLX (Apple Silicon)")
     print("-" * 80)

@@ -98,6 +98,19 @@ export function ModelSelector({ collapsed = false, variant = "sidebar" }: ModelS
               </SelectItem>
             ))}
 
+            {/* Google models */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+              Google (Gemini API)
+            </div>
+            {LLM_MODELS.filter((m) => m.provider === "google").map((model) => (
+              <SelectItem key={model.value} value={model.value}>
+                <div className="flex items-center gap-2">
+                  {getModelIcon(model.value, "h-4 w-4 flex-shrink-0 text-foreground")}
+                  <span>{model.label}</span>
+                </div>
+              </SelectItem>
+            ))}
+
             {/* MLX models */}
             <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
               MLX (Apple Silicon)
