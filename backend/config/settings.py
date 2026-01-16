@@ -115,6 +115,16 @@ class Settings(BaseSettings):
         description="Modele Claude a utiliser"
     )
 
+    # Google (Gemini API - Cloud)
+    google_api_key: str = Field(
+        default="",
+        description="Clé API Google Gemini"
+    )
+    google_model: str = Field(
+        default="gemini-1.5-pro",
+        description="Modèle Google à utiliser"
+    )
+
     # Ollama (Local - Cross-platform)
     ollama_base_url: str = Field(
         default="http://localhost:11434",

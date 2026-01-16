@@ -104,10 +104,12 @@ def create_model(model_string: str, **kwargs) -> Any:
         return _create_vllm_model(model_id, **kwargs)
     elif provider == "openai":
         return _create_openai_model(model_id, **kwargs)
+    elif provider == "google" or provider == "gemini":
+        return _create_google_model(model_id, **kwargs)
     else:
         raise ValueError(
             f"Provider non supporté: '{provider}'. "
-            f"Providers supportés: ollama, anthropic, mlx, vllm, openai"
+            f"Providers supportés: ollama, anthropic, mlx, vllm, openai, google"
         )
 
 
@@ -176,6 +178,43 @@ def _create_claude_model(model_id: str, **kwargs) -> Any:
     logger.info(f"✅ Creating Claude model: {model_id}")
 
     return Claude(
+        id=model_id,
+        api_key=api_key,
+        **kwargs
+    )
+
+
+def _create_google_model(model_id: str, **kwargs) -> Any:
+    """
+    Crée un modèle Google Gemini.
+
+    Args:
+        model_id: ID du modèle Gemini (ex: "gemini-1.5-pro")
+        **kwargs: Paramètres additionnels (api_key, etc.)
+
+    Returns:
+        Instance de agno.models.google.Gemini
+    """
+    try:
+        from agno.models.google import Gemini
+    except ImportError as e:
+        raise ImportError(
+            "Le package 'google-generativeai' n'est pas installé. "
+            "Installez-le avec: uv add google-generativeai"
+        ) from e
+
+    # Récupérer la clé API
+    api_key = kwargs.pop("api_key", None) or settings.google_api_key
+
+    if not api_key:
+        logger.warning(
+            "⚠️  GOOGLE_API_KEY non configurée. "
+            "Le modèle sera créé mais échouera à l'exécution."
+        )
+
+    logger.info(f"✅ Creating Google Gemini model: {model_id}")
+
+    return Gemini(
         id=model_id,
         api_key=api_key,
         **kwargs
@@ -312,17 +351,26 @@ def _create_openai_model(model_id: str, **kwargs) -> Any:
 
 def create_default_ollama_model(**kwargs) -> Any:
     """Crée le modèle Ollama par défaut (mistral)."""
+    from config.models import DEFAULT_OLLAMA_MODEL
     return create_model(f"ollama:{DEFAULT_OLLAMA_MODEL}", **kwargs)
 
 
 def create_default_claude_model(**kwargs) -> Any:
     """Crée le modèle Claude par défaut (Sonnet 4.5)."""
+    from config.models import DEFAULT_CLAUDE_MODEL
     return create_model(f"anthropic:{DEFAULT_CLAUDE_MODEL}", **kwargs)
 
 
 def create_default_mlx_model(**kwargs) -> Any:
     """Crée le modèle MLX par défaut (Qwen 2.5 3B 4-bit)."""
+    from config.models import DEFAULT_MLX_MODEL
     return create_model(f"mlx:{DEFAULT_MLX_MODEL}", **kwargs)
+
+
+def create_default_google_model(**kwargs) -> Any:
+    """Crée le modèle Google par défaut."""
+    from config.models import DEFAULT_GOOGLE_MODEL
+    return create_model(f"google:{DEFAULT_GOOGLE_MODEL}", **kwargs)
 
 
 # ========================================
@@ -352,7 +400,7 @@ def validate_model_string(model_string: str) -> tuple[str, str]:
     provider = provider.lower().strip()
     model_id = model_id.strip()
 
-    valid_providers = ["ollama", "anthropic", "mlx", "vllm", "openai"]
+    valid_providers = ["ollama", "anthropic", "mlx", "vllm", "openai", "google", "gemini"]
     if provider not in valid_providers:
         raise ValueError(
             f"Provider non supporté: '{provider}'. "
@@ -402,13 +450,19 @@ def test_model_creation():
     except Exception as e:
         print(f"   ❌ Erreur: {e}")
 
-    # Test création HuggingFace
-    print("\n5. Test création HuggingFace...")
+    # Test création Google Gemini
+    print("\n5. Test création Google Gemini...")
     try:
-        model = create_model("huggingface:Qwen/Qwen2.5-3B-Instruct")
+        model = create_model("google:gemini-1.5-pro")
         print(f"   ✅ Modèle créé: {model}")
     except Exception as e:
-        print(f"   ❌ Erreur: {e}")
+        # Expected to fail if package not installed or Key missing, but that's fine for structure test
+        if "not installed" in str(e):
+             print(f"   ⚠️  Package manquant (attendu): {e}")
+        elif "API_KEY" in str(e):
+             print(f"   ⚠️  Clé manquante (attendu): {e}")
+        else:
+             print(f"   ❌ Erreur: {e}")
 
     print("\n" + "=" * 70)
 

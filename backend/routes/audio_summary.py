@@ -19,8 +19,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from services.surreal_service import get_surreal_service
 from services.audio_summary_service import get_audio_summary_service
@@ -268,7 +268,10 @@ async def delete_audio_summary(summary_id: str):
             detail=f"Résumé audio non trouvé: {summary_id}"
         )
 
-    record_id = summary_id.replace("audio_summary:", "")
+    # Get the full record ID for deletion
+    record_id = str(summary.get("id", ""))
+    if not record_id.startswith("audio_summary:"):
+        record_id = f"audio_summary:{summary_id}"
 
     # Delete script file
     script_path = summary.get("script_path")
@@ -292,13 +295,11 @@ async def delete_audio_summary(summary_id: str):
         except Exception as e:
             logger.warning(f"Error deleting audio file: {e}")
 
-    # Delete database record
-    await service.query(
-        "DELETE audio_summary WHERE id = type::thing('audio_summary', $summary_id)",
-        {"summary_id": record_id}
-    )
+    # Delete database record using direct delete (not WHERE clause)
+    # This avoids type mismatch issues with type::thing() when ID is numeric
+    await service.delete(record_id)
 
-    logger.info(f"Audio summary deleted: {summary_id}")
+    logger.info(f"Audio summary deleted: {record_id}")
     return None
 
 
@@ -442,8 +443,8 @@ async def download_script(summary_id: str):
     "/api/audio-summaries/{summary_id}/audio",
     summary="Stream audio file"
 )
-async def stream_audio(summary_id: str):
-    """Stream or download the generated MP3 file."""
+async def stream_audio(summary_id: str, request: Request):
+    """Stream or download the generated MP3 file with Range request support."""
     service = get_surreal_service()
 
     summary = await get_summary_by_id(service, summary_id)
@@ -466,11 +467,65 @@ async def stream_audio(summary_id: str):
             detail="Fichier audio non trouvé sur le serveur"
         )
 
+    file_size = os.path.getsize(audio_path)
     name = summary.get("name", "audio")
     safe_name = name.replace(" ", "_")[:30]
 
+    # Check for Range header (for seeking/streaming)
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parse Range header: "bytes=start-end" or "bytes=start-"
+        try:
+            range_spec = range_header.replace("bytes=", "")
+            if "-" in range_spec:
+                parts = range_spec.split("-")
+                start = int(parts[0]) if parts[0] else 0
+                end = int(parts[1]) if parts[1] else file_size - 1
+            else:
+                start = int(range_spec)
+                end = file_size - 1
+
+            # Ensure valid range
+            start = max(0, min(start, file_size - 1))
+            end = max(start, min(end, file_size - 1))
+            content_length = end - start + 1
+
+            def iter_file():
+                with open(audio_path, "rb") as f:
+                    f.seek(start)
+                    remaining = content_length
+                    chunk_size = 8192
+                    while remaining > 0:
+                        read_size = min(chunk_size, remaining)
+                        data = f.read(read_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_file(),
+                status_code=206,
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length),
+                    "Content-Disposition": f'inline; filename="{safe_name}.mp3"',
+                }
+            )
+        except (ValueError, IndexError):
+            # Invalid range, fall through to full file response
+            pass
+
+    # No Range header or invalid range - return full file
     return FileResponse(
         audio_path,
         media_type="audio/mpeg",
-        filename=f"{safe_name}.mp3"
+        filename=f"{safe_name}.mp3",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+        }
     )
