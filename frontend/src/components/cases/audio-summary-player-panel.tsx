@@ -1,21 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   X,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
   Volume2,
-  VolumeX,
   Download,
   FileText,
   Headphones,
+  Loader2,
 } from "lucide-react";
+import { Markdown } from "@/components/ui/markdown";
 import { audioSummaryApi } from "@/lib/api";
 import type { AudioSummary } from "@/types";
 
@@ -24,105 +19,46 @@ interface AudioSummaryPlayerPanelProps {
   onClose: () => void;
 }
 
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
 export function AudioSummaryPlayerPanel({
   summary,
   onClose,
 }: AudioSummaryPlayerPanelProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [scriptContent, setScriptContent] = useState<string | null>(null);
+  const [loadingScript, setLoadingScript] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
-  // Initialize audio source
+  // Initialize audio URL
   useEffect(() => {
-    if (audioRef.current && summary.status === "completed") {
-      const audioUrl = audioSummaryApi.getAudioUrl(summary.id);
-      audioRef.current.src = audioUrl;
-      audioRef.current.load();
+    if (summary.status === "completed") {
+      setAudioUrl(audioSummaryApi.getAudioUrl(summary.id));
     }
   }, [summary]);
 
-  // Audio event handlers
+  // Load script content if available
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const loadScript = async () => {
+      if (!summary.script_path) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleDurationChange = () => setDuration(audio.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
-
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("durationchange", handleDurationChange);
-    audio.addEventListener("play", handlePlay);
-    audio.addEventListener("pause", handlePause);
-    audio.addEventListener("ended", handleEnded);
-
-    return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("durationchange", handleDurationChange);
-      audio.removeEventListener("play", handlePlay);
-      audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("ended", handleEnded);
+      setLoadingScript(true);
+      try {
+        const scriptUrl = audioSummaryApi.getScriptUrl(summary.id);
+        const response = await fetch(scriptUrl);
+        if (response.ok) {
+          const content = await response.text();
+          setScriptContent(content);
+        }
+      } catch (error) {
+        console.error("Error loading script:", error);
+      } finally {
+        setLoadingScript(false);
+      }
     };
-  }, []);
 
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-  };
-
-  const handleSeek = (value: number[]) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = value[0];
-    setCurrentTime(value[0]);
-  };
-
-  const handleVolumeChange = (value: number[]) => {
-    if (!audioRef.current) return;
-    const newVolume = value[0];
-    audioRef.current.volume = newVolume;
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
-  };
-
-  const toggleMute = () => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      audioRef.current.volume = volume || 0.5;
-      setIsMuted(false);
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
-  };
-
-  const skipBackward = () => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
-  };
-
-  const skipForward = () => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
-  };
+    loadScript();
+  }, [summary.id, summary.script_path]);
 
   const handleDownloadAudio = () => {
-    const audioUrl = audioSummaryApi.getAudioUrl(summary.id);
+    if (!audioUrl) return;
     const link = document.createElement("a");
     link.href = audioUrl;
     link.download = `${summary.name.replace(/\s+/g, "_")}.mp3`;
@@ -133,113 +69,103 @@ export function AudioSummaryPlayerPanel({
 
   const handleDownloadScript = () => {
     const scriptUrl = audioSummaryApi.getScriptUrl(summary.id);
-    window.open(scriptUrl, "_blank");
+    const link = document.createElement("a");
+    link.href = scriptUrl;
+    link.download = `${summary.name.replace(/\s+/g, "_")}_script.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Headphones className="h-4 w-4" />
-            {summary.name}
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Hidden audio element */}
-        <audio ref={audioRef} preload="metadata" />
-
-        {/* Progress slider */}
-        <div className="space-y-2">
-          <Slider
-            value={[currentTime]}
-            max={duration || 100}
-            step={0.1}
-            onValueChange={handleSeek}
-            className="cursor-pointer"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(duration)}</span>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header - same style as document-preview-panel */}
+      <div className="p-4 border-b bg-background flex items-center justify-between shrink-0 min-h-[65px]">
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <h2 className="text-xl font-bold truncate">{summary.name}</h2>
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Headphones className="h-4 w-4 flex-shrink-0" />
+            <span className="text-muted-foreground">
+              {summary.section_count} section{summary.section_count > 1 ? "s" : ""} • {summary.source_documents.length} document{summary.source_documents.length > 1 ? "s" : ""}
+            </span>
           </div>
         </div>
-
-        {/* Playback controls */}
-        <div className="flex items-center justify-center gap-2">
-          <Button variant="ghost" size="sm" onClick={skipBackward} title="Reculer 10s">
-            <SkipBack className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={togglePlay}
-            className="h-10 w-10 rounded-full"
-          >
-            {isPlaying ? (
-              <Pause className="h-5 w-5" />
-            ) : (
-              <Play className="h-5 w-5 ml-0.5" />
-            )}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={skipForward} title="Avancer 10s">
-            <SkipForward className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Volume and download controls */}
-        <div className="flex items-center justify-between">
-          {/* Volume control */}
-          <div className="flex items-center gap-2 w-32">
-            <Button variant="ghost" size="sm" onClick={toggleMute}>
-              {isMuted ? (
-                <VolumeX className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )}
-            </Button>
-            <Slider
-              value={[isMuted ? 0 : volume]}
-              max={1}
-              step={0.01}
-              onValueChange={handleVolumeChange}
-              className="w-20"
-            />
-          </div>
-
-          {/* Download buttons */}
-          <div className="flex items-center gap-1">
-            {summary.script_path && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDownloadScript}
-                title="Télécharger le script"
-              >
-                <FileText className="h-4 w-4" />
-              </Button>
-            )}
+        <div className="flex items-center gap-1 shrink-0 ml-4">
+          {summary.script_path && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleDownloadAudio}
-              title="Télécharger l'audio"
+              className="h-8 px-2"
+              onClick={handleDownloadScript}
+              title="Télécharger le script"
             >
-              <Download className="h-4 w-4" />
+              <FileText className="h-4 w-4 mr-1" />
+              <span className="text-xs">Script</span>
             </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={handleDownloadAudio}
+            title="Télécharger l'audio"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            <span className="text-xs">Audio</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onClose}
+            title="Fermer"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Audio Player Bar - same style as TTS player in document-preview-panel */}
+      {audioUrl && (
+        <div className="px-4 py-3 border-b bg-muted/10">
+          <div className="flex items-center gap-3">
+            <Volume2 className="h-4 w-4 text-purple-500 flex-shrink-0" />
+            <div className="flex-1">
+              <audio
+                controls
+                autoPlay
+                className="w-full h-8"
+                src={audioUrl}
+              >
+                Votre navigateur ne supporte pas l&apos;élément audio.
+              </audio>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Info */}
-        <div className="text-xs text-muted-foreground text-center">
-          {summary.section_count} section{summary.section_count > 1 ? "s" : ""} • {summary.source_documents.length} document{summary.source_documents.length > 1 ? "s" : ""}
-        </div>
-      </CardContent>
-    </Card>
+      {/* Content - Script markdown */}
+      <div className="flex-1 overflow-auto">
+        {loadingScript ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : scriptContent ? (
+          <div className="p-4 prose prose-sm dark:prose-invert max-w-none">
+            <Markdown content={scriptContent} />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+            <Headphones className="h-16 w-16 text-purple-500/30" />
+            <div>
+              <h4 className="font-medium">Résumé audio</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                Écoutez le résumé audio de vos documents de cours.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -1436,38 +1436,24 @@ async def generate_tts(
             )
 
         # Create document record for the TTS audio
-        tts_doc_id = str(uuid.uuid4())[:8]
-        now = datetime.utcnow().isoformat()
-
-        tts_doc_data = {
-            "course_id": course_id,
-            "nom_fichier": audio_filename,
-            "type_fichier": "mp3",
-            "type_mime": "audio/mpeg",
-            "taille": Path(tts_result.audio_path).stat().st_size,
-            "file_path": tts_result.audio_path,
-            "user_id": user_id,
-            "created_at": now,
-            "is_tts": True,
-            "source_document": doc_id,  # Keep for compatibility
-            "source_document_id": doc_id,  # New field
-            "is_derived": False,  # Show in documents list for download
-            "derivation_type": "tts",
-            "source_type": "tts_audio",
-            "metadata": {
-                "voice": tts_result.voice,
-                "language": tts_result.language,
-                "duration_seconds": tts_result.duration,
-                "generated_at": now
-            }
-        }
-
-        await service.create("document", tts_doc_data, record_id=tts_doc_id)
-        logger.info(f"TTS audio saved as document: {tts_doc_id}")
+        tts_document = await doc_service.create_document(
+            course_id=course_id,
+            filename=audio_filename,
+            file_path=tts_result.audio_path,
+            file_size=Path(tts_result.audio_path).stat().st_size,
+            file_type="mp3",
+            mime_type="audio/mpeg",
+            source_type="tts_audio",
+            source_document_id=doc_id,
+            is_derived=False,  # Show in documents list for download
+            derivation_type="tts"
+        )
+        logger.info(f"TTS audio saved as document: {tts_document.id}")
 
         # Return URL for downloading/streaming
         clean_course_id = course_id.replace("course:", "")
-        audio_url = f"/api/courses/{clean_course_id}/documents/document:{tts_doc_id}/download?inline=true"
+        # tts_document.id already includes the "document:" prefix
+        audio_url = f"/api/courses/{clean_course_id}/documents/{tts_document.id}/download?inline=true"
 
         return TTSResponse(
             success=True,
