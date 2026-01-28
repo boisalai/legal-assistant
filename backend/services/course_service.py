@@ -1,7 +1,7 @@
 """
 Course service for managing academic courses.
 
-Courses are stored in the "case" table with academic fields populated.
+Courses are stored in the "course" table with academic fields populated.
 This service provides helper methods for academic-specific operations.
 """
 
@@ -50,14 +50,14 @@ class CourseService:
                 conditions.append(f"semester = '{semester}'")
 
             if exclude_id:
-                if not exclude_id.startswith("case:"):
-                    exclude_id = f"case:{exclude_id}"
+                if not exclude_id.startswith("course:"):
+                    exclude_id = f"course:{exclude_id}"
                 conditions.append(f"id != {exclude_id}")
 
             where_clause = " AND ".join(conditions)
 
             query = f"""
-                SELECT count() FROM case
+                SELECT count() FROM course
                 WHERE {where_clause}
                 GROUP ALL
             """
@@ -88,7 +88,7 @@ class CourseService:
         """
         try:
             query = f"""
-                SELECT * FROM case
+                SELECT * FROM course
                 WHERE professor = '{professor}'
                 ORDER BY created_at DESC
             """
@@ -119,7 +119,7 @@ class CourseService:
         """
         try:
             query = f"""
-                SELECT * FROM case
+                SELECT * FROM course
                 WHERE course_code IS NOT NONE
                 ORDER BY created_at DESC
                 LIMIT {limit}
