@@ -38,9 +38,11 @@ async def cleanup_test_data():
     - Un titre contenant "Test" ou "test"
     - Un titre égal à "Cours minimal"
     """
+    from config.settings import settings
+
     db = AsyncSurreal("http://localhost:8002")
     await db.signin({"username": "root", "password": "root"})
-    await db.use("legal", "legal_db")
+    await db.use(settings.surreal_namespace, settings.surreal_database)
 
     try:
         # Get all courses
