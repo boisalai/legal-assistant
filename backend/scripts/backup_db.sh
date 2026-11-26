@@ -5,7 +5,7 @@
 set -e  # Arrêt en cas d'erreur
 
 # Configuration
-BACKUP_DIR="/Users/alain/Workspace/GitHub/legal-assistant/backend/backups"
+BACKUP_DIR="$(cd "$(dirname "$0")/.." && pwd)/backups"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.surql"
 MAX_BACKUPS=30  # Garder les 30 derniers backups

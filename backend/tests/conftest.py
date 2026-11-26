@@ -124,7 +124,7 @@ def test_server() -> Generator[str, None, None]:
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd="/Users/alain/Workspace/GitHub/legal-assistant/backend",  # Ensure correct working directory
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),  # backend/, quel que soit l'emplacement du projet
     )
 
     # Wait for server to be ready (max 10 seconds)

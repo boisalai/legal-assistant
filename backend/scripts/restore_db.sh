@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-BACKUP_DIR="/Users/alain/Workspace/GitHub/legal-assistant/backend/backups"
+BACKUP_DIR="$(cd "$(dirname "$0")/.." && pwd)/backups"
 
 # Vérifier si un fichier de backup est spécifié
 if [ -z "$1" ]; then

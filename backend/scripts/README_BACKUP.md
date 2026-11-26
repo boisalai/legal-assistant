@@ -28,7 +28,7 @@ surreal start --user root --pass root --bind 0.0.0.0:8002 file:data/surreal.db
 **Créer un backup immédiat de la base de données.**
 
 ```bash
-cd /Users/alain/Workspace/GitHub/legal-assistant/backend
+cd /Users/alain/Code/legal-assistant/backend
 ./scripts/backup_db.sh
 ```
 
@@ -43,7 +43,7 @@ cd /Users/alain/Workspace/GitHub/legal-assistant/backend
 
 ```bash
 # Lister les backups disponibles
-cd /Users/alain/Workspace/GitHub/legal-assistant/backend
+cd /Users/alain/Code/legal-assistant/backend
 ./scripts/restore_db.sh
 
 # Restaurer un backup spécifique
@@ -69,7 +69,7 @@ Pour un backup quotidien automatique, ajoutez à votre crontab:
 crontab -e
 
 # Ajouter cette ligne (backup tous les jours à 2h du matin)
-0 2 * * * /Users/alain/Workspace/GitHub/legal-assistant/backend/scripts/backup_db.sh
+0 2 * * * /Users/alain/Code/legal-assistant/backend/scripts/backup_db.sh
 ```
 
 ## 📂 Structure des Backups
@@ -126,7 +126,7 @@ Le script affiche un warning mais **démarre quand même SurrealDB**. Cela peut 
 
 ```bash
 # Terminal 1: SurrealDB (avec backup auto)
-cd /Users/alain/Workspace/GitHub/legal-assistant/backend
+cd /Users/alain/Code/legal-assistant/backend
 ./scripts/start_surreal.sh
 
 # Terminal 2: Backend
