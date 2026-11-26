@@ -494,10 +494,13 @@ class DocumentIndexingService:
                             mismatched_chunks += chunk_count
 
             # Compter les documents à réindexer (ceux sans embeddings avec le modèle actuel)
+            # SurrealDB ne supporte pas COUNT(DISTINCT), on utilise GROUP BY + count
             query_docs = """
-            SELECT count(DISTINCT document_id) AS doc_count
-            FROM document_embedding
-            WHERE embedding_model != $current_model
+            SELECT count() AS doc_count FROM (
+                SELECT document_id FROM document_embedding
+                WHERE embedding_model != $current_model
+                GROUP BY document_id
+            )
             """
             result_docs = await self.surreal_service.query(query_docs, {"current_model": current_model})
 
