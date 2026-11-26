@@ -4,6 +4,13 @@
 
 ---
 
+## Documentation de vision
+
+Voir `VISION_MULTI_AGENTS.md` pour l'architecture cible et la planification des évolutions multi-agents.
+Ce document d'orientation a été créé le 30 janvier 2026.
+
+---
+
 ## Fonctionnalités
 
 ### 1. Gestion des dossiers
