@@ -269,10 +269,10 @@ export default function SettingsPage() {
     }
   };
 
-  const saveTTSVoices = () => {
+  const saveTTSVoices = (voiceFr?: string, voiceEn?: string) => {
     // Save TTS voice preferences to localStorage
-    localStorage.setItem("tts_voice_fr", selectedVoiceFr);
-    localStorage.setItem("tts_voice_en", selectedVoiceEn);
+    localStorage.setItem("tts_voice_fr", voiceFr ?? selectedVoiceFr);
+    localStorage.setItem("tts_voice_en", voiceEn ?? selectedVoiceEn);
   };
 
   const saveLLMSettings = () => {
@@ -741,7 +741,7 @@ export default function SettingsPage() {
                   <Label htmlFor="voice-fr">Voix française</Label>
                   <Select value={selectedVoiceFr} onValueChange={(value) => {
                     setSelectedVoiceFr(value);
-                    saveTTSVoices();
+                    saveTTSVoices(value, undefined);
                   }}>
                     <SelectTrigger id="voice-fr">
                       <SelectValue placeholder="Sélectionner une voix française" />
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                   <Label htmlFor="voice-en">Voix anglaise</Label>
                   <Select value={selectedVoiceEn} onValueChange={(value) => {
                     setSelectedVoiceEn(value);
-                    saveTTSVoices();
+                    saveTTSVoices(undefined, value);
                   }}>
                     <SelectTrigger id="voice-en">
                       <SelectValue placeholder="Sélectionner une voix anglaise" />

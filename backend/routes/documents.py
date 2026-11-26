@@ -1452,8 +1452,8 @@ async def generate_tts(
 
         # Return URL for downloading/streaming
         clean_course_id = course_id.replace("course:", "")
-        # tts_document.id already includes the "document:" prefix
-        audio_url = f"/api/courses/{clean_course_id}/documents/{tts_document.id}/download?inline=true"
+        clean_doc_id = tts_document.id.replace("document:", "")
+        audio_url = f"/api/courses/{clean_course_id}/documents/{clean_doc_id}/download?inline=true"
 
         return TTSResponse(
             success=True,

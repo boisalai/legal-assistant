@@ -277,8 +277,10 @@ export function DocumentPreviewPanel({
               <audio
                 controls
                 autoPlay
+                preload="auto"
                 className="w-full h-8"
                 src={ttsAudioUrl}
+                onError={(e) => console.error("Audio error:", e)}
               >
                 Votre navigateur ne supporte pas l&apos;élément audio.
               </audio>
