@@ -101,3 +101,6 @@ backend/scripts/caij_api_endpoints.json
 # Debug and temporary files (general patterns)
 backend/*.png
 backend/history.txt
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
